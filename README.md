@@ -12,7 +12,7 @@ This program is heavily inspired by auto-rsa from Nelson Dane. Go check it out a
 
 
 
-
+# List of supported casinos
 
 
 
