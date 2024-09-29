@@ -32,7 +32,7 @@ This program is heavily inspired by auto-rsa from Nelson Dane. Go check it out a
 | Sportzino      | ✓          | ✗               | No                          | $1 bonus/day |
 | Goldnluck      | ✓          | ✓               | No                          | $2 bonus/day |
 | Luckybird      | ✓          | ✓               | No                          | $.25 bonus/day. Increases with VIP |
-| Crown Coins      | ✓          | ✓               | Yes                          | Varies between $0.00-$2 bonus/day |
+| Crown Coins      | ✓          | ✓               | Yes                          | Varies between $0.00-$2 bonus/day Requires Usr Data Dir for auth. Social Auth support in development|
 | Modo     | ✓          | ✓               | No                          | $.30-$1 SC bonus/day |
 | Hello Millions     | IN DEVELOPMENT          | IN DEVELOPMENT | IN DEVELOPMENT  | $.25 SC bonus/day |
 | Scratchful     | IN DEVELOPMENT  | IN DEVELOPMENT     | IN DEVELOPMENT                          | $.25 SC bonus/day |
