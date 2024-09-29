@@ -1,6 +1,13 @@
 # Casino Claim 🎰
 Never miss a casino bonus again! A discord app for claiming social casino bonuses.
 
+<p>
+<img src="https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54"/>
+<img src="https://img.shields.io/badge/-selenium-%43B02A?style=for-the-badge&logo=selenium&logoColor=white"/>
+<img src="https://img.shields.io/badge/-discord.py-%232c2f33?style=for-the-badge&logo=discord&logoColor=white"/>
+<img src="https://img.shields.io/badge/-docker-%232c2f33?style=for-the-badge&logo=docker&logoColor=white"/>
+</p>
+
 # About 🧾
 Casino Claim is a selenium based python bot for claiming social casino bonuses. The bot will automatically claim your bonus, and provide a countdown for the next. If authentication is required, the bot will handle it. 
 
