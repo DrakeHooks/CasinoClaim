@@ -25,9 +25,9 @@ This program is heavily inspired by auto-rsa from Nelson Dane. Go check it out a
 3. Open the .env file in the /app directory of the project and add the following:
     1. Add `DISCORD_TOKEN` and `DISCORD_CHANNEL` to your `.env` file.
     2. Add your casino login credentials to .env file
-4. ```bash
-docker compose up -d
-```
+4. run `docker compose up -d`
+
+
 
 
 
