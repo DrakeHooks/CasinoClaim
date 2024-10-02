@@ -99,7 +99,7 @@ async def check_dingdingding_countdown(driver, ctx):
         await ctx.send(countdown_message)
 
     except TimeoutException:
-        await ctx.send("Failed to retrieve countdown timer.")
+        await ctx.send("Failed to retrieve DingDingDing countdown timer.")
         return False
 
     return True
