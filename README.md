@@ -17,6 +17,12 @@ I am not responsible for any financial loss or gain incurred with the use of thi
 # Acknowledgement 🏆
 This program is heavily inspired by auto-rsa from Nelson Dane. Go check it out and give it a star here: https://github.com/NelsonDane/auto-rsa
 
+# Installation 🛠️
+1. Sign in to Chanced, CrownCoins Casino, and Luckybird on a google chrome browser. Then, take the "User Data" folder, rename it to "google-chrome" and place it in the root of the project.
+
+
+
+
 
 # Supported Casinos ✅
 | Casino         | Auto Claim | Countdown Timer | Require User Data Directory | Notes            |
