@@ -6,7 +6,6 @@ import os
 import datetime
 import time
 import re
-import discord
 import asyncio
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
@@ -17,14 +16,11 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
-import datetime
-import time
 from dotenv import load_dotenv
 import discord
 import undetected_chromedriver as uc
 from discord import Intents, Client, Message
 from discord.ext import commands, tasks
-import asyncio
 from seleniumbase import Driver
 from selenium.webdriver.common.action_chains import ActionChains
 
