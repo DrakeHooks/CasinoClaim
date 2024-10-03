@@ -61,6 +61,6 @@ Browser automation breaks. It is just a matter of when. I will do my best to pus
 
 
 # Get Help
-Gambling can become addicting, if you start feeling addicted, please get help before it affects your life negativly. Always remember, you are not alone!
+Gambling can become addicting, if you start feeling addicted, please get help before it affects your life negatively. Always remember, you are not alone!
 
 <a href="https://www.ncpgambling.org/help-treatment/"><img src="https://www.ncpgambling.org/wp-content/themes/magneti/assets/build/images/800gamb-logo-header.svg"/></a>
