@@ -74,7 +74,6 @@ dingdingding_task = None
 stake_task = None
 zula_task = None
 rollingriches_task = None
-sportzino_task = None
 fortunecoins_task = None
 
 # Flags to check if corresponding background tasks are running
@@ -88,7 +87,6 @@ stake_running = False
 zula_running = False
 rollingriches_running = False
 funrize_running = False
-sportzino_running = False
 
 
 @bot.event
