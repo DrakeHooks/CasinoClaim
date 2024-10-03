@@ -50,7 +50,7 @@ async def crowncoins_casino(ctx, driver, channel):
         try:
             ccc_close_popups(driver)
         except Exception as e:
-            print(f"Unable to close popups: {e}")
+            print(f"Unable to close Crown Coins popups")
 
         # Navigate to rewards page
         try:
@@ -65,7 +65,7 @@ async def crowncoins_casino(ctx, driver, channel):
             view_btn_xpath = "//button[contains(@class, 'button--main') and contains(@class, 'rewards__card_button')]"
             WebDriverWait(driver, 30).until(EC.element_to_be_clickable((By.XPATH, view_btn_xpath))).click()
         except Exception as e:
-            await channel.send(f"Unable to navigate to Rewards page: {e}")
+            await channel.send(f"Unable to navigate to Crown Coins Rewards page")
             return
 
         await asyncio.sleep(5)
