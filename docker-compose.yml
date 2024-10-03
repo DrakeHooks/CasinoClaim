@@ -1,11 +1,26 @@
 version: '3.1'
+
 services:
-  chrome:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  casino-bot:
+    container_name: casino-bot
+    image: drakehooks/casinoclaim:latest  # Pull the image from Docker Hub
     ports:
       - 5900:5900
     volumes:
       - ./app:/app
-    shm_size: '2g'
+    environment:
+      - ENV_VAR=some_value  # Add any necessary environment variables
+    restart: unless-stopped
+
+  watchtower:
+    container_name: watchtower
+    image: containrrr/watchtower:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # Needed for Watchtower to monitor other containers
+    environment:
+      - WATCHTOWER_CLEANUP=true  # Remove old images after update
+      - WATCHTOWER_INCLUDE_STOPPED=true  # Include stopped containers in monitoring
+      - WATCHTOWER_POLL_INTERVAL=3600  # Check for updates every hour (3600 seconds)
+    command: 
+      - casino-bot  # Name of the container to monitor
+    restart: unless-stopped
