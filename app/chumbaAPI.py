@@ -68,7 +68,7 @@ async def authenticate_chumba(driver, bot, channel):
             return True
 
     except Exception as e:
-        await channel.send(f"Error during authentication: {e}")
+        await channel.send(f"Error during authentication")
         return False
 
 # Function to claim Chumba Casino bonus
