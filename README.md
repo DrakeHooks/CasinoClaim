@@ -60,3 +60,7 @@ This program is heavily inspired by auto-rsa from Nelson Dane. Go check it out a
 Browser automation breaks. It is just a matter of when. I will do my best to push updates quickly for changes in website structure as well as overall efficiency of the bot. Over time, the bot should become more 'robust' so that if website structure changes, it will adapt or bypass. This is a passion project for me and I may not always have time to push changes the second something breaks. If you identify a fix, feel free to submit a pull request and I will review it.
 
 
+# Get Help
+Gambling can become addicting, if you start feeling addicted, please get help before it affects your life negatively. Always remember, you are not alone!
+
+<a href="https://www.ncpgambling.org/help-treatment/"><img src="https://www.ncpgambling.org/wp-content/themes/magneti/assets/build/images/800gamb-logo-header.svg"/></a>
