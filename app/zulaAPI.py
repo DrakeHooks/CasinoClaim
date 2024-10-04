@@ -30,8 +30,8 @@ def close_popups_zula(driver):
     
     # General popup close logic for any "CLOSE" button
     try:
-        close_buttons = WebDriverWait(driver, 3).until(
-            EC.presence_of_all_elements_located((By.XPATH, "//button[contains(text(), 'CLOSE')]"))
+        close_buttons = WebDriverWait(driver, 5).until(
+            EC.presence_of_all_elements_located((By.XPATH, "//button[contains(text(), 'close')]"))
         )
         for close_button in close_buttons:
             close_button.click()
@@ -40,9 +40,8 @@ def close_popups_zula(driver):
         print("No 'CLOSE' button found.")
 
 # Main function for Zula bonus claiming
-async def zula_casino(driver, bot, ctx):
-    channel = bot.get_channel(int(ctx.channel.id))
-    driver.get("https://www.zulacasino.com/")
+async def zula_casino(ctx, driver, channel):
+    driver.get("https://www.zulacasino.com")
     
     # Click the login button
     login_button_xpath = "/html/body/div[1]/div[2]/div[1]/div/div/div/button"
@@ -52,35 +51,29 @@ async def zula_casino(driver, bot, ctx):
     try:
         # Time to wait for the page to fully load before entering username and password
         await asyncio.sleep(5)
-        
         # Retrieve credentials from .env
         credentials = os.getenv("ZULA").split(":")
         username_text = credentials[0]
         password_text = credentials[1]
-        
         # Find and fill the username field
         WebDriverWait(driver, 90).until(EC.presence_of_element_located((By.ID, "emailAddress")))
         username_field = driver.find_element(By.ID, "emailAddress")
         for char in username_text:
             username_field.send_keys(char)
             await asyncio.sleep(0.3)  # Simulate typing speed
-        
         # Find and fill the password field
         WebDriverWait(driver, 90).until(EC.presence_of_element_located((By.ID, "password")))
         password_field = driver.find_element(By.ID, "password")
         for char in password_text:
             password_field.send_keys(char)
             await asyncio.sleep(0.3)  # Simulate typing speed
-        
-        # Send the Enter key to login
         password_field.send_keys(Keys.ENTER)
-        
         # Wait for the page to load after login
         await asyncio.sleep(10)
-        
         # Close any popups
         close_popups_zula(driver)
-        
+        close_popups_zula(driver)
+
         # Click the "Free Coins" button
         free_coins_btn_xpath = "/html/body/div[1]/div[2]/div[1]/div/nav/div[2]/button[1]"
         free_coins_btn = WebDriverWait(driver, 10).until(
@@ -90,6 +83,7 @@ async def zula_casino(driver, bot, ctx):
     
     except:
         await channel.send(f"Unable to login to Zula! ")
+        driver.save_screenshot("zula_login_error.png")
         return
     
     # Claim the bonus

@@ -328,6 +328,10 @@ async def casino_loop():
     try:
         # Run the casino tasks sequentially with 2-hour gaps
         try:
+            await zula_casino(None, driver, channel)
+        except:
+            print("Error in Zula")
+        try:
             await crowncoins_casino(None, driver, channel)
         except:
             print("Error in CrownCoinsCasino")
