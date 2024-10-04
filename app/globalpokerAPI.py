@@ -91,24 +91,29 @@ async def claim_global_poker_bonus(ctx, driver, channel):
             "/html/body/div[8]/div/div/div[2]/div[2]/div[2]/div/div[2]/div[2]/div[7]"
         ]
 
-        # Loop through the possible claim buttons
+        # Loop through the possible claim buttons and attempt to click each one
+        bonus_claimed = False
         for button_xpath in button_xpaths:
             try:
                 # Wait for the claim button to become clickable
-                claim_button = WebDriverWait(driver, 30).until(
+                claim_button = WebDriverWait(driver, 10).until(
                     EC.element_to_be_clickable((By.XPATH, button_xpath))
                 )
                 claim_button.click()  # Click the button to claim the bonus
-                await channel.send("Global Poker daily bonus Claimed!")
-                
-                # Exit the loop after successfully claiming the bonus
-                break
-            
+                bonus_claimed = True
+                print(f"Clicked bonus button: {button_xpath}")
+                await asyncio.sleep(2)
             except TimeoutException:
+                print(f"Bonus button not found: {button_xpath}")
                 continue  # If the current button is not found, move to the next
 
+        if bonus_claimed:
+            await channel.send("Global Poker Daily Bonus Claimed!")
+        else:
+            await channel.send("No bonus was claimed. All buttons were attempted, but none were clickable.")
+            
     except Exception as e:
-        await channel.send(f"Error claiming Global Poker bonus")
+        await channel.send(f"Error claiming Global Poker bonus: {str(e)}")
 
 # Function to click the "Get Coins" button before claiming the bonus
 async def click_get_coins_button(driver, channel):
