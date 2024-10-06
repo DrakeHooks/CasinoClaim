@@ -6,8 +6,8 @@ services:
       - 5900:5900
     volumes:
       - ./:/app
-    environment:
-      - ENV_VAR=some_value  # Add any necessary environment variables
+    env_file:
+      - .env
     restart: unless-stopped
 
   watchtower:

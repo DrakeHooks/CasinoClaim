@@ -1,0 +1,11 @@
+# Ignore everything
+*
+
+# Main files
+!main.py
+!requirements.txt
+!CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx
+!google-chrome/
+
+# Casino APIs
+!**/*API*.py
