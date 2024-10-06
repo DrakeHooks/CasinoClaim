@@ -1,0 +1,14 @@
+{
+   "appDescription": {
+      "message": "Tilføjelsesprogram til aktivering af webautomatisering. Denne webudvidelse er kompatibel med Power Automate til skrivebord version 2.26 eller tidligere."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate (ældre)"
+   },
+   "deprecationLink": {
+      "message": "her"
+   },
+   "deprecationMessage": {
+      "message": "Efter en bestemt dato, der annonceres af Google Chrome-teamet (udfasningsdatoen), understøtter Chrome-browseren ikke længere webudvidelser, der er oprettet med Manifest V2. Den webudvidelse, du bruger, er oprettet med Manifest V2 og er kompatibel med Power Automate til skrivebord version 2.26 eller tidligere. Den vil derfor ikke fungere fra udfasningsdatoen og fremad. Hvis du vil fortsætte med at automatisere webscenarier med denne browser efter udfasningsdatoen, skal du opgradere Power Automate til skrivebord til den nyeste version (2.27 eller nyere) og installere den nye Microsoft Power Automate-webudvidelse. Få mere at vide "
+   }
+}

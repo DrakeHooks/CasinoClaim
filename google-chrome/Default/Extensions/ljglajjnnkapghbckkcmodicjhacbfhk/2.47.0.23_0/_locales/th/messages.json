@@ -1,0 +1,35 @@
+{
+   "appDescription": {
+      "message": "Add-on สำหรับระบบอัตโนมัติของเว็บ ส่วนขยายเว็บนี้เข้ากันได้กับ Power Automate สำหรับเดสก์ท็อป เวอร์ชัน 2.27 หรือใหม่กว่า"
+   },
+   "appName": {
+      "message": "Microsoft Power Automate"
+   },
+   "consentAccept": {
+      "message": "ยอมรับ"
+   },
+   "consentCollectedData1": {
+      "message": "URI ของหน้าเว็บที่คุณโต้ตอบซึ่งเรารวบรวมเพื่อเปิดใช้งานความสามารถด้านระบบอัตโนมัติของเว็บของ Power Automate สำหรับเดสก์ท็อป"
+   },
+   "consentDecline": {
+      "message": "ปฏิเสธ"
+   },
+   "consentHeader": {
+      "message": "ความยินยอมด้านความเป็นส่วนตัวของ Microsoft Power Automate"
+   },
+   "consentParagraph1": {
+      "message": "หากคุณเลือกที่จะไม่อนุญาตให้เรารวบรวมข้อมูลที่ไม่ระบุตัวตน ระบบอัตโนมัติของเว็บจะไม่สามารถใช้งานได้"
+   },
+   "consentParagraph2": {
+      "message": "รายละเอียดทั้งหมดเกี่ยวกับข้อมูลไม่ระบุตัวตนที่เรารวบรวมและการดำเนินการกับข้อมูลดังกล่าวจะแสดงอยู่ใน "
+   },
+   "consentPrivacyLink": {
+      "message": "นโยบายความเป็นส่วนตัว"
+   },
+   "consentQuestion": {
+      "message": "เราสามารถรวบรวมข้อมูลที่ไม่ระบุตัวตนต่อไปนี้เกี่ยวกับการใช้ส่วนขยายเว็บ Microsoft Power Automate ของคุณได้หรือไม่"
+   },
+   "consentUninstall": {
+      "message": "การดำเนินการนี้จะถอนการติดตั้งส่วนขยายเว็บ Microsoft Power Automate คุณต้องการดำเนินการต่อหรือไม่"
+   }
+}

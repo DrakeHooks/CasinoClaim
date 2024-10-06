@@ -1,0 +1,1 @@
+!function(){"use strict";var e=vAPI.messaging;setInterval(function(){e.send("documentBlocked",{what:"loadingPage"},function(e){var n=e.redirectedUrl;n&&window.location.replace(n)})},50)}();

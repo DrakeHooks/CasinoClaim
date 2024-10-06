@@ -1,0 +1,30 @@
+{
+   "background": {
+      "page": "background.html"
+   },
+   "browser_action": {
+      "default_popup": "popup/popup.html"
+   },
+   "content_scripts": [ {
+      "js": [ "msgport.js", "content.js" ],
+      "match_about_blank": true,
+      "matches": [ "http://*/*", "https://*/*", "file://*/*" ],
+      "run_at": "document_start"
+   } ],
+   "content_security_policy": "default-src 'self'",
+   "default_locale": "en",
+   "description": "__MSG_appDescription__",
+   "icons": {
+      "32": "PAD-ico_32.png",
+      "48": "PAD-ico_48.png",
+      "56": "PAD-ico_56.png",
+      "64": "PAD-ico_64.png"
+   },
+   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArgdHOSzqptBEGPHD0u8U1hbUonWzVkfAncbbMK7h857cYE8DDhBvJnq7UMstCvPin7/KH2sgvw/aeZYwEwRtTV6VsQ3myBOmiWn61eQhA40l+vdGVkSw4Cigo1EFMJGICeK4Be6liFjW+P7ie2O5UcDGj8xu/cmGEeTWnZ+SwlUos6kNGKiLj6F84l5Wk5A1jelj5PgF2oLPlL++YMlBPD9HVhZ/y0pNgUI834qPqf9lEtLCa5OEMJsDIr2NxcYC7S8wl8v4OAF4oTpZxAUM4FGdez+EtAeUm4+53zrjEbIlmLGLDzExs0RYy8kJbcolwOuGDhjHutDDOpAV6Hv5CwIDAQAB",
+   "manifest_version": 2,
+   "minimum_chrome_version": "50.0",
+   "name": "__MSG_appName__",
+   "permissions": [ "\u003Call_urls>", "activeTab", "tabs", "browsingData", "nativeMessaging", "http://*/*", "https://*/*" ],
+   "update_url": "https://clients2.google.com/service/update2/crx",
+   "version": "2.0.19"
+}

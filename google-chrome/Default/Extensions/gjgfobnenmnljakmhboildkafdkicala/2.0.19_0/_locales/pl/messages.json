@@ -1,0 +1,14 @@
+{
+   "appDescription": {
+      "message": "Dodatek włączający automatyzację sieci web. To rozszerzenie sieci web jest zgodne z aplikacją klasyczną Power Automate w wersji 2.26 i wcześniejszych."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate (starsza wersja)"
+   },
+   "deprecationLink": {
+      "message": "tutaj"
+   },
+   "deprecationMessage": {
+      "message": "Po pewnej dacie, która zostanie ogłoszona przez zespół przeglądarki Google Chrome (data wycofania), przeglądarka Chrome nie będzie już obsługiwać rozszerzeń sieci web utworzonych przy użyciu platformy Manifest V2. Rozszerzenie sieci web, którego używasz, zostało utworzone przy użyciu platformy Manifest V2 i jest zgodne z aplikacją klasyczną Power Automate w wersji 2.26 i wcześniejszych. Z tego powodu przestanie ono działać od określonej daty wycofania. Aby po dacie wycofania nadal realizować scenariusze automatyzacji sieci web, musisz uaktualnić aplikację klasyczną Power Automate do najnowszej wersji (2.27 lub nowsza) i zainstalować nowe rozszerzenie sieci web Microsoft Power Automate. Dowiedz się więcej. "
+   }
+}

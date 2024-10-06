@@ -84,11 +84,8 @@ async def claim_rolling_riches_bonus(ctx, driver, channel):
         claim_btn.click()
         await channel.send("Rolling Riches 6-Hour Bonus Claimed!")
 
-    except TimeoutException as e:
-        print(f"Error claiming bonus: {e}")
     except Exception as e:
         print(f"Error: {str(e)}")
-        await channel.send(f"Error in claiming bonus: {str(e)}")
     finally:
         await asyncio.sleep(4)
         print("Checking for countdown element.")

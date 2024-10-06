@@ -1,0 +1,14 @@
+{
+   "appDescription": {
+      "message": "Lisandmoodul veebiautomaatika lubamiseks. See veebilaiend ühildub Power Automate’i töölauaversiooniga 2.26 või varasema versiooniga."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate (pärandversioon)"
+   },
+   "deprecationLink": {
+      "message": "siit"
+   },
+   "deprecationMessage": {
+      "message": "Pärast teatud kuupäeva, millest teatab Google Chrome’i meeskond (iganemiskuupäev), ei toeta Chrome’i brauser enam Manifest V2-ga loodud veebilaiendeid. Teie kasutatav veebilaiend on loodud Manifest V2-ga ja ühildub Power Automate’i töölauaversiooniga 2.26 või varasema versiooniga. Seetõttu ei ole see iganemiskuupäevast alates funktsionaalne. Kui soovite jätkata veebistsenaariumide automatiseerimist selle brauseriga pärast iganemiskuupäeva, peate täiendama oma Power Automate’i töölauaversiooni uusimale versioonile (2.27 või uuemale) ja installima uue Microsoft Power Automate’i veebilaiendi. Lisateavet vt "
+   }
+}

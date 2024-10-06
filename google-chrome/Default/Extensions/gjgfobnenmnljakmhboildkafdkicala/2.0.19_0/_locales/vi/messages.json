@@ -1,0 +1,14 @@
+{
+   "appDescription": {
+      "message": "Tiện ích bổ sung để tự động hóa cho web. Phần mở rộng web này tương thích với Power Automate cho máy tính để bàn phiên bản 2.26 trở xuống."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate (Cũ)"
+   },
+   "deprecationLink": {
+      "message": "tại đây"
+   },
+   "deprecationMessage": {
+      "message": "Sau một ngày cụ thể sẽ được nhóm Google Chrome thông báo (ngày ngừng sử dụng), trình duyệt Chrome sẽ không còn hỗ trợ các phần mở rộng web được tạo bằng Manifest V2. Phần mở rộng web mà bạn đang sử dụng được tạo bằng Manifest V2 và tương thích với Power Automate cho máy tính để bàn phiên bản 2.26 trở xuống. Do đó, phần mở rộng này sẽ ngừng hoạt động kể từ ngày ngừng sử dụng trở đi. Để tiếp tục tự động hóa các trường hợp web bằng trình duyệt này sau ngày ngừng sử dụng, bạn phải nâng cấp Power Automate cho máy tính để bàn lên phiên bản mới nhất (2.27 trở lên) và cài đặt phần mở rộng web Microsoft Power Automate mới. Tìm hiểu thêm "
+   }
+}

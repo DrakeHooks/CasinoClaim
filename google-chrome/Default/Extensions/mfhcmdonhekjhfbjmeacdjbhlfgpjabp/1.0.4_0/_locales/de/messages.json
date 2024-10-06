@@ -1,0 +1,82 @@
+{
+   "backToSafety": {
+      "description": "back to safety prompt",
+      "message": "ZURÜCK ZUR SICHERHEIT"
+   },
+   "contactUs": {
+      "description": "navigation tab for warning page",
+      "message": "Kontakt"
+   },
+   "continueToSite": {
+      "description": "continue to site prompt",
+      "message": "WEITER ZUR WEBSITE"
+   },
+   "continueToSiteUserAgreement": {
+      "description": "continue to site user agreement",
+      "message": "Wenn Sie auf \"Weiter zur Website\" klicken, nehmen Sie zur Kenntnis, dass diese Website markiert wurde und Ihren Computer beschädigen kann."
+   },
+   "documentBlockedPageName": {
+      "description": "Title for the document blocked page",
+      "message": "Web Safety | Unsicher"
+   },
+   "dontWarnAboutSite": {
+      "description": "don't warn about site prompt",
+      "message": "Für diese Website keine weitere Warnung mehr anzeigen"
+   },
+   "extName": {
+      "description": "extension name.",
+      "message": "Web Safety"
+   },
+   "extShortDesc": {
+      "description": "this will be in the chrome web store: must be 132 characters or less",
+      "message": "Bleiben Sie geschützt, während Sie im Netz surfen oder eine Suche durchführen."
+   },
+   "faq": {
+      "description": "navigation tab for warning page",
+      "message": "Faq"
+   },
+   "freeDownload": {
+      "description": "navigation tab for warning page",
+      "message": "Kostenlos Downloaden"
+   },
+   "help": {
+      "description": "navigation tab for warning page",
+      "message": "Hilfe"
+   },
+   "home": {
+      "description": "navigation tab for warning page",
+      "message": "Startseite"
+   },
+   "howTo": {
+      "description": "navigation tab for warning page",
+      "message": "Beistand"
+   },
+   "malwareWarning": {
+      "description": "malware warning text for the document blocked page",
+      "message": "Sie versuchen, eine URL oder ein Programm mit bösartiger Software oder Bedrohungen aufzurufen. Malware kann Ihren Computer beschädigen und ohne Ihre Einwilligung steuern. Schon das Aufrufen einer Website, die Malware hostet, kann den Computer infizieren."
+   },
+   "searchPlaceholder": {
+      "description": "placeholder value",
+      "message": "Suche"
+   },
+   "securityWarning": {
+      "description": "security warning head for the document blocked page",
+      "message": "Sicherheitswarnung"
+   },
+   "securityWarningHarm": {
+      "description": "security warning text for the document blocked page",
+      "message": "Das Aufrufen dieser Website oder Datei kann Ihren Computer beschädigen."
+   },
+   "trustWebsitePrompt": {
+      "description": "ask user if website is trusted for the document blocked page",
+      "message": "Wenn Sie diese Website als vertrauenswürdig einstufen und in Zukunft keine weiteren Warnungen mehr erhalten möchten, fügen Sie sie zur Liste der sicheren Seiten hinzu, indem Sie das Feld unten auswählen. Klicken Sie dann auf \"WEITER ZUR WEBSITE\". Achtung: Diese Aktion kann nicht rückgängig gemacht werden."
+   },
+   "updates": {
+      "description": "navigation tab for warning page",
+      "message": "Update"
+   },
+   "upgradeToPro": {
+      "description": "navigation tab for warning page",
+      "message": "Upgrade auf Pro"
+   }
+}

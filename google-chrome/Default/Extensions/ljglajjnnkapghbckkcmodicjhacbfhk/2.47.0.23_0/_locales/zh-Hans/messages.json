@@ -1,0 +1,35 @@
+{
+  "appName": {
+    "message": "Microsoft Power Automate"
+  },
+  "appDescription": {
+    "message": "用于启用 Web 自动化的加载项。此 Web 扩展与 Power Automate 桌面版 2.27 或更高版本兼容。"
+  },
+  "consentHeader": {
+    "message": "Microsoft Power Automate 隐私同意书"
+  },
+  "consentQuestion": {
+    "message": "我们能否收集以下关于您的 Microsoft Power Automate Web 扩展使用情况的匿名数据?"
+  },
+  "consentCollectedData1": {
+    "message": "我们收集您与之交互的网页的 URI，以启用 Power Automate 桌面版的 Web 自动化功能。"
+  },
+  "consentParagraph1": {
+    "message": "如果选择不允许我们收集匿名数据，则 Web 自动化将不可用。"
+  },
+  "consentParagraph2": {
+    "message": "关于我们收集的匿名数据以及我们处理的具体数据的完整详细信息，请参阅我们的"
+  },
+  "consentPrivacyLink": {
+    "message": "隐私策略"
+  },
+  "consentAccept": {
+    "message": "接受"
+  },
+  "consentDecline": {
+    "message": "拒绝"
+  },
+  "consentUninstall": {
+    "message": "这将卸载 Microsoft Power Automate Web 扩展。是否要继续?"
+  }
+}

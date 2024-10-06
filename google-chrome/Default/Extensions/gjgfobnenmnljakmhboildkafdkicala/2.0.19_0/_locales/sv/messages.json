@@ -1,0 +1,14 @@
+{
+   "appDescription": {
+      "message": "Tillägg för aktivering av webbautomatisering. Detta webbtillägg är kompatibelt med Power Automate för dator version 2.26 eller tidigare."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate (äldre)"
+   },
+   "deprecationLink": {
+      "message": "här"
+   },
+   "deprecationMessage": {
+      "message": "Efter ett visst datum som meddelas av Google Chrome-teamet (utfasningsdatumet) kommer Chrome-webbläsaren inte längre att ha stöd för webbtillägg som skapats med Manifest V2. Webbtillägget du använder är skapat med Manifest V2 och är kompatibelt med Power Automate för dator version 2.26 eller tidigare. Det kommer därför inte att fungera från och med utfasningsdatumet och tills vidare. Om du vill fortsätta automatisera webbscenarier med den här webbläsaren efter utfasningsdatumet måste du uppgradera din Power Automate för dator till den senaste versionen (2.27 eller senare) och installera det nya Microsoft Power Automate-webbtillägget. Läs mer "
+   }
+}

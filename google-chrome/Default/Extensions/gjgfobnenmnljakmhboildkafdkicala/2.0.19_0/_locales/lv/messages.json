@@ -1,0 +1,14 @@
+{
+   "appDescription": {
+      "message": "Papildinājums tīmekļa automatizācijas iespējošanai. Šis tīmekļa paplašinājums ir saderīgs ar Power Automate datoriem versiju 2.26 vai vecāku."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate (mantots)"
+   },
+   "deprecationLink": {
+      "message": "šeit"
+   },
+   "deprecationMessage": {
+      "message": "Pēc konkrēta datuma, par ko informēs Google Chrome komanda (novecošanas datums), tiks paziņots, ka pārlūkprogramma Chrome vairs neatbalstīs tīmekļa paplašinājumus, kas izveidoti, izmantojot Manifest V2. Tīmekļa paplašinājums, ko lietojat, ir izveidots, izmantojot Manifest V2, un tas ir saderīgs ar Power Automate datoriem versiju 2.26 vai vecāku. Tāpēc tas, sākot ar novecošanas datumu, vairs nedarbosies. Lai turpinātu automatizēt tīmekļa scenārijus šajā pārlūkprogrammā pēc novecošanas datuma, jauniniet Power Automate datoriem uz jaunāko versiju (2.27 vai jaunāku) un instalējiet jauno Microsoft Power Automate tīmekļa paplašinājumu. Papildinformācija "
+   }
+}
