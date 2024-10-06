@@ -3,9 +3,11 @@
 # Never Miss a Casino Bonus Again! A discord app for claiming social casino bonuses.
 
 import os
-import datetime
+from datetime import datetime, timedelta
 import time
 import re
+import sqlite3
+import discord
 import asyncio
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
@@ -16,11 +18,12 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
+import datetime
 from dotenv import load_dotenv
-import discord
 import undetected_chromedriver as uc
 from discord import Intents, Client, Message
 from discord.ext import commands, tasks
+import asyncio
 from seleniumbase import Driver
 from selenium.webdriver.common.action_chains import ActionChains
 
@@ -33,6 +36,8 @@ from chumbaAPI import *
 from crowncoinsAPI import *
 from zulaAPI import *
 from luckybirdAPI import *
+from sportzinoAPI import *
+
 
 load_dotenv()
 
@@ -50,8 +55,7 @@ options.add_argument('--ignore-ssl-errors')
 options.add_argument("disable-infobars")
 options.add_argument('--disable-blink-features=AutomationControlled')
 options.add_argument('--no-sandbox')
-user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-# user_agent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36"
+user_agent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36"
 options.add_argument(f"--user-agent={user_agent}")
 user_data_dir = "/temp/google-chrome/"  # Change path for Linux environment
 options.add_argument(f"--user-data-dir={user_data_dir}")
@@ -74,7 +78,9 @@ dingdingding_task = None
 stake_task = None
 zula_task = None
 rollingriches_task = None
-fortunecoins_task = None
+sportzino_task = None
+
+
 
 # Flags to check if corresponding background tasks are running
 chanced_casino_running = False
@@ -87,6 +93,7 @@ stake_running = False
 zula_running = False
 rollingriches_running = False
 funrize_running = False
+sportzino_running = False
 
 
 @bot.event
@@ -262,12 +269,12 @@ async def crowncoinscasino(ctx):
 async def DingDingDing(ctx):
     global authenticated
     await ctx.send("Checking DingDingDing for bonus...")
-    channel = bot.get_channel(DISCORD_CHANNEL)
+    channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
     
     # Check if already authenticated
     if not authenticated:
         await ctx.send("Authenticating DingDingDing first...")
-        authenticated = await authenticate_dingdingding(driver, channel)
+        authenticated = await authenticate_dingdingding(driver, channel, ctx)
 
     # Proceed if authentication was successful
     if authenticated:
@@ -275,10 +282,10 @@ async def DingDingDing(ctx):
         driver.get("https://www.dingdingding.com/lobby")
 
         # Attempt to claim the daily bonus (but proceed to check countdown regardless)
-        await claim_dingdingding_bonus(driver, channel)
+        await claim_dingdingding_bonus(driver, ctx)
 
         # Always check for the countdown, even if the bonus claim was unsuccessful
-        await check_dingdingding_countdown(driver, channel)
+        await check_dingdingding_countdown(driver, ctx)
     else:
         await ctx.send("Authentication failed. Unable to proceed.")
 
@@ -325,8 +332,20 @@ async def casino_loop():
         print(f"Error: Invalid channel ID '{DISCORD_CHANNEL}' or bot is not connected.")
         return  # Exit the task loop early if the channel is invalid
 
+
     try:
         # Run the casino tasks sequentially with 2-hour gaps
+        try:
+            await asyncio.sleep(10)
+            await zula_casino(None, driver, channel)
+        except:
+            print("Error in Zula")
+        await asyncio.sleep(10)
+        try:
+            await Sportzino(None, driver, channel)
+        except:
+            print("Error in Sportzino")
+        await asyncio.sleep(10)
         try:
             await crowncoins_casino(None, driver, channel)
         except:
@@ -344,6 +363,7 @@ async def casino_loop():
         await asyncio.sleep(10)
         try:
             await global_poker(None, driver, channel)
+            await asyncio.sleep(10)
         except:
             print("Error in GlobalPoker")
         await asyncio.sleep(10)
@@ -351,6 +371,7 @@ async def casino_loop():
             await LuckyBird(None, driver, bot)
         except:
             print("Error in LuckyBird")
+        await asyncio.sleep(10)
         try:
             await chumba_casino(None, driver, bot)
         except:
