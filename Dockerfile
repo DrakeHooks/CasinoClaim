@@ -18,11 +18,11 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
-    # Install Chrome
+# Install Chrome
 RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - && \
-sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list' && \
-apt-get update && apt-get install -y google-chrome-stable && \
-rm -rf /var/lib/apt/lists/*
+    sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list' && \
+    apt-get update && apt-get install -y google-chrome-stable && \
+    rm -rf /var/lib/apt/lists/*
 
 # Create app directory
 WORKDIR /app
@@ -36,16 +36,15 @@ COPY ./CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx /temp/
 RUN python3 -m venv /venv && \
     /venv/bin/pip install --no-cache-dir -r /app/requirements.txt
 
-
 # Install common utilities
 RUN apt-get update && apt-get install -y xdg-utils ca-certificates
 
+# Ensure the lock file is removed on every container start
+RUN echo '#!/bin/bash\nrm -f /tmp/.X99-lock\nexec "$@"' > /usr/local/bin/docker-entrypoint.sh && chmod +x /usr/local/bin/docker-entrypoint.sh
 
+# Set environment variables
 ENV PATH="/venv/bin:$PATH"
 ENV DISPLAY=:99
 
-
-CMD Xvfb :99 -screen 0 1920x1080x24 & \
-    fluxbox & \
-    x11vnc -forever -usepw -create -display :99 & \
-    /venv/bin/python /app/main.py
+# Start Xvfb, fluxbox, and x11vnc, ensuring no lock conflicts
+CMD ["/usr/local/bin/docker-entrypoint.sh", "bash", "-c", "Xvfb :99 -screen 0 1920x1080x24 & fluxbox & x11vnc -forever -usepw -create -display :99 & /venv/bin/python /app/main.py"]
