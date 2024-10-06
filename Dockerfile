@@ -24,13 +24,11 @@ RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add
     apt-get update && apt-get install -y google-chrome-stable && \
     rm -rf /var/lib/apt/lists/*
 
-# Create app directory
+# Set the working directory to the root of the project
 WORKDIR /app
 
-COPY ./requirements.txt /app/requirements.txt
-COPY ./main.py /app/main.py
-COPY ./google-chrome /temp/google-chrome
-COPY ./CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx /temp/CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx
+# Copy the entire project to /app in the container
+COPY . /app
 
 # Create virtual environment and install Python dependencies
 RUN python3 -m venv /venv && \
