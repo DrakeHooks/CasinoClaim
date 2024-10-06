@@ -100,7 +100,6 @@ async def Sportzino(ctx, driver, channel):
     casino_name = "Sportzino"
     driver.get("https://sportzino.com/login?")
     await asyncio.sleep(5)
-    driver.save_screenshot("sportzino_login.png")
 
     try:
         # Login process
@@ -124,7 +123,6 @@ async def Sportzino(ctx, driver, channel):
         
         password_field.send_keys(Keys.ENTER)
         await asyncio.sleep(10)
-        driver.save_screenshot("sportzino_login_filled.png")
         close_popups_sz(driver)  # Close any pop-ups
 
         # Claim bonus
