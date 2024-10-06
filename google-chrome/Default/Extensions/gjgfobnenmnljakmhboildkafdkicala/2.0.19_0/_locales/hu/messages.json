@@ -1,0 +1,14 @@
+{
+   "appDescription": {
+      "message": "Bővítmény a webes automatizálás engedélyezéséhez. Ez a webkiterjesztés a Power Automate asztali számítógépekhez 2.26-os vagy korábbi verziójával kompatibilis."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate (örökölt)"
+   },
+   "deprecationLink": {
+      "message": "itt"
+   },
+   "deprecationMessage": {
+      "message": "A Google Chrome csapata által bejelentendő dátum (elavulási dátum) után a Chrome böngésző már nem támogatja a Manifest V2 segítségével létrehozott webes bővítményeket. Az Ön által használt webes bővítmény a Manifest V2 segítségével készült, és kompatibilis a Power Automate asztali számítógépekhez 2.26-os vagy korábbi verziójával. Ezért az elavulási dátum után nem lesz működőképes. Az elavulási dátumot követően a webes forgatókönyvek automatizálásának folytatásához ezzel a böngészővel, a Power Automate asztali számítógépekhez legújabb verziójára (2.27 vagy újabb) kell frissítenie, és telepítenie kell az új Microsoft Power Automate webes bővítményt. További információk "
+   }
+}

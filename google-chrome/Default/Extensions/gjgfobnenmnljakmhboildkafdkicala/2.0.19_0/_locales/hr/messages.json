@@ -1,0 +1,14 @@
+{
+   "appDescription": {
+      "message": "Dodatak za omogućivanje automacije weba. To je web-proširenje kompatibilno s uslugom Power Automate za radne površine verzije 2.26 ili starijom."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate (naslijeđen)"
+   },
+   "deprecationLink": {
+      "message": "ovdje"
+   },
+   "deprecationMessage": {
+      "message": "Nakon određenog datuma, kojeg će najaviti tim za Google Chrome (datum odlaska u zastaru), preglednik Chrome više neće podržavati web-proširenja stvorena pomoću Manifesta V2. Web-proširenje koje upotrebljavate izrađeno je pomoću Manifesta V2 i kompatibilno je s uslugom Power Automate za radne površine verzije 2.26 ili starijom. Stoga neće funkcionirati od datuma odlaska u zastaru nadalje. Da biste nastavili automatizirati web-scenarije s ovim preglednikom i nakon datuma odlaska u zastaru morate nadograditi svoju uslugu Power Automate za radne površine na najnoviju verziju (2.27 ili noviju) i instalirati novo web-proširenje za Microsoft Power Automate. Saznajte više "
+   }
+}

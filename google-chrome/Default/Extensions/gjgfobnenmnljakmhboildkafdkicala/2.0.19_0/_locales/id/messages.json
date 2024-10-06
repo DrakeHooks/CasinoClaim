@@ -1,0 +1,14 @@
+{
+   "appDescription": {
+      "message": "Add-on untuk mengaktifkan automasi web. Ekstensi web ini kompatibel dengan Power Automate untuk desktop versi 2.26 atau yang sebelumnya."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate (Warisan)"
+   },
+   "deprecationLink": {
+      "message": "di sini"
+   },
+   "deprecationMessage": {
+      "message": "Setelah tanggal tertentu yang akan diumumkan oleh tim Google Chrome (tanggal penghentian), browser Chrome tidak lagi mendukung ekstensi web yang dibuat dengan Manifest V2. Ekstensi web yang Anda gunakan dibuat dengan Manifest V2 dan kompatibel dengan Power Automate untuk desktop versi 2.26 atau yang sebelumnya. Oleh karena itu, browser ini tidak akan berfungsi mulai tanggal penghentian dan seterusnya. Untuk terus mengotomatiskan skenario web dengan browser ini setelah tanggal penghentian, Anda harus meningkatkan Power Automate untuk desktop ke versi terbaru (2.27 atau yang lebih baru) dan menginstal ekstensi web Microsoft Power Automate yang baru. Pelajari selengkapnya "
+   }
+}

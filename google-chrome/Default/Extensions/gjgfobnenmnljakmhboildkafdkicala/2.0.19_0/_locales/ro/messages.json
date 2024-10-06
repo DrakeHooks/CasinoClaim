@@ -1,0 +1,14 @@
+{
+   "appDescription": {
+      "message": "Program de completare pentru activarea automatizării web. Această extensie web este compatibilă cu Power Automate pentru desktop versiunea 2.26 sau o versiune anterioară."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate (moștenit)"
+   },
+   "deprecationLink": {
+      "message": "aici"
+   },
+   "deprecationMessage": {
+      "message": "După o anumită dată care va fi anunțată de echipa Google Chrome (data de perimare), browserul Chrome nu va mai accepta extensii web create cu Manifest V2. Extensia web pe care o utilizați este creată cu Manifest V2 și este compatibilă cu Power Automate pentru desktop versiunea 2.26 sau o versiune anterioară. Prin urmare, nu va mai fi funcțională după data de perimare. Pentru a continua automatizarea scenariilor web cu acest browser după iunie 2023, trebuie să faceți upgrade la cea mai recentă versiune a Power Automate pentru desktop (2.27 sau o versiune ulterioară) și să instalați noua extensie web Microsoft Power Automate. Aflați mai multe "
+   }
+}

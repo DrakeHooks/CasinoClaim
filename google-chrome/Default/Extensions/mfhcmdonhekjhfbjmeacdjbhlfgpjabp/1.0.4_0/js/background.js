@@ -1,0 +1,1 @@
+"use strict";var webSafety={startupTime:0,pageStores:{},pageStoresToken:0,warningPageUrls:{},noopFunc:function(){},dummy:0};

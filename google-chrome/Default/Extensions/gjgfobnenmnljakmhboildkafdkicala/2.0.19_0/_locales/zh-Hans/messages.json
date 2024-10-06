@@ -1,0 +1,14 @@
+{
+  "appName": {
+    "message": "Microsoft Power Automate (旧版)"
+  },
+  "appDescription": {
+    "message": "用于启用 Web 自动化的加载项。此 Web 扩展与 Power Automate 桌面版 2.26 或更早版本兼容。"
+  },
+  "deprecationMessage": {
+    "message": "在 Google Chrome 团队将宣布的特定日期(弃用日期)之后，Chrome 浏览器将不再支持使用 Manifest V2 创建的 Web 扩展。您使用的 Web 扩展是使用 Manifest V2 创建的，它与 Power Automate 桌面版 2.26 或更早版本兼容。因此，它从弃用日期起将无法正常使用。要在此弃用日期之后继续使用此浏览器实现 Web 方案自动化，您必须将 Power Automate 桌面版升级到最新版本(2.27 或更高版本)，并安装新的 Microsoft Power Automate Web 扩展。了解详细信息 "
+  },
+  "deprecationLink": {
+    "message": "此处"
+  }
+}

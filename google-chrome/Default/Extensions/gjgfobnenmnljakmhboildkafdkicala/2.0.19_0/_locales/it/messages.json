@@ -1,0 +1,14 @@
+{
+   "appDescription": {
+      "message": "Componente aggiuntivo per abilitare l'automazione Web. Questa estensione Web è compatibile con Power Automate per desktop versione 2.26 o precedente."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate (legacy)"
+   },
+   "deprecationLink": {
+      "message": "qui"
+   },
+   "deprecationMessage": {
+      "message": "Dopo una certa data che verrà annunciata dal team di Google Chrome (la data di deprecazione), il browser Chrome non supporterà più le estensioni Web create con Manifest V2. L'estensione Web in uso è stata creata con Manifest V2 ed è compatibile con Power Automate per desktop versione 2.26 o precedente. Non sarà pertanto più operativa a partire dalla data di deprecazione. Per continuare ad automatizzare gli scenari Web con questo browser oltre la data di deprecazione, devi aggiornare Power Automate per desktop all'ultima versione (2.27 o successive) e installare la nuova estensione Web di Microsoft Power Automate. Altre informazioni "
+   }
+}

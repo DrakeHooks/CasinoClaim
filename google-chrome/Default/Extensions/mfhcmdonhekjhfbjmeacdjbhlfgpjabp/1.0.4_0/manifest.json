@@ -1,0 +1,36 @@
+{
+   "author": "Lavasoft",
+   "background": {
+      "page": "background.html"
+   },
+   "browser_action": {
+      "default_icon": {
+         "19": "img/browsericons/icon19.png",
+         "38": "img/browsericons/icon38.png"
+      },
+      "default_title": "Web Safety"
+   },
+   "content_scripts": [ {
+      "all_frames": false,
+      "css": [ "/css/contentscript.css" ],
+      "js": [ "/js/contentscript.js" ],
+      "matches": [ "https://*.yahoo.com/search*" ],
+      "run_at": "document_start"
+   } ],
+   "default_locale": "en",
+   "description": "__MSG_extShortDesc__",
+   "icons": {
+      "128": "img/icon_128.png",
+      "16": "img/icon_16.png"
+   },
+   "incognito": "split",
+   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAlyrX9xQiVq8KAnu06GO4uicqdvHfmgl8t4K1/TJEhBUs0WcyGC9q1igxPinJADjcw3AraCBsam1sfLGKNXRXc7i77guJcLqo2dFI995kkHfrt5RsfUGPPN8gq/EpeMKr90GowK76wx/Re/U/XUhXjAWU+F2DV5F3b+HNfEvUGLtQUO5YwifszceFzApoP7cbFJvxrDny1lyzsEH45ci34apPRcm87xl2Bke/3G50Tvo8S+wHXCl8q2GspPxrYXzdHCIumVhR68+QiM9I0mss0yzpopUlBkvyZYjdfbWcAB0kDRGs5n8UGtdQPTn07dh0nzuOObU6igTs40rn4IisoQIDAQAB",
+   "manifest_version": 2,
+   "minimum_chrome_version": "26.0",
+   "name": "Web Safety",
+   "permissions": [ "storage", "tabs", "unlimitedStorage", "webRequest", "webRequestBlocking", "http://*/*", "https://*/*" ],
+   "short_name": "Web Safety",
+   "update_url": "https://clients2.google.com/service/update2/crx",
+   "version": "1.0.4",
+   "web_accessible_resources": [ "img/*", "/loading-page.html" ]
+}

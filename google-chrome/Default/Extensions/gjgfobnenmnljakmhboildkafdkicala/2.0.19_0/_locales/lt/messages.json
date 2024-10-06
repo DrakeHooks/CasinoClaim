@@ -1,0 +1,14 @@
+{
+   "appDescription": {
+      "message": "Priedas žiniatinklio automatizavimui įjungti. Šis žiniatinklio plėtinys suderinamas su „Power Automate“ darbalaukiui 2.26 arba ankstesne versija."
+   },
+   "appName": {
+      "message": "„Microsoft Power Automate“ (senstelėjusi)"
+   },
+   "deprecationLink": {
+      "message": "čia"
+   },
+   "deprecationMessage": {
+      "message": "Po konkrečios datos, kurią paskelbs „Google Chrome“ komanda (uždraudimo data), „Chrome“ naršyklė nebepalaikys žiniatinklio plėtinių, sukurtų naudojant Deklaraciją V2. Jūsų naudojamas žiniatinklio plėtinys sukurtas naudojant Deklaraciją V2 ir yra suderinamas su „Power Automate“ darbalaukiui 2.26 arba ankstesne versija. Todėl nuo uždraudimo datos jis nebeveiks. Norėdami po uždraudimo datos toliau automatizuoti žiniatinklio scenarijus šioje naršyklėje, turite atnaujinti savo „Power Automate“ darbalaukiui versiją (2.27 arba naujesnę) ir įdiegti naują „Microsoft Power Automate“ žiniatinklio plėtinį. Sužinokite daugiau "
+   }
+}

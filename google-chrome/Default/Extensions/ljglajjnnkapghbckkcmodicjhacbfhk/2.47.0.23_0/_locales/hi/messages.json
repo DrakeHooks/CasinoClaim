@@ -1,0 +1,35 @@
+{
+   "appDescription": {
+      "message": "वेब ऑटोमेशन को सक्षम करने के लिए ऐड-ऑन. यह वेब एक्सटेंशन, डेस्कटॉप के लिए Power Automate के संस्करण 2.27 या उसे बाद के साथ संगत है."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate"
+   },
+   "consentAccept": {
+      "message": "स्वीकारें"
+   },
+   "consentCollectedData1": {
+      "message": "आपके ज़रिए इंटरैक्ट किए जाने वाले वेब पेज का URI जिसे हम डेस्कटॉप के लिए Power Automate की वेब ऑटोमेशन क्षमताओं को सक्षम करने के लिए एकत्रित करते हैं."
+   },
+   "consentDecline": {
+      "message": "अस्वीकार करें"
+   },
+   "consentHeader": {
+      "message": "Microsoft Power Automate गोपनीयता सहमति"
+   },
+   "consentParagraph1": {
+      "message": "अगर आप हमें अनाम डेटा एकत्रित करने की अनुमति नहीं देना चुनते हैं तो वेब ऑटोमेशन उपलब्ध नहीं होगा."
+   },
+   "consentParagraph2": {
+      "message": "हमारे द्वारा एकत्र किए जाने वाले अनाम डेटा और हम इसके साथ क्या करते हैं, इसके बारे में पूरी जानकारी हमारी "
+   },
+   "consentPrivacyLink": {
+      "message": "गोपनीयता नीति में दी गई है"
+   },
+   "consentQuestion": {
+      "message": "क्या हम Microsoft Power Automate वेब एक्सटेंशन के आपके उपयोग के बारे में नीचे दिए गए अनाम डेटा को एकत्र कर सकते हैं?"
+   },
+   "consentUninstall": {
+      "message": "इससे Microsoft Power Automate एक्सटेंशन अनइंस्टॉल हो जाएगा. क्या आप जारी रखना चाहते हैं?"
+   }
+}

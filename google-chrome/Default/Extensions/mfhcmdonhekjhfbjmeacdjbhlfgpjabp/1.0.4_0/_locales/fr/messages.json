@@ -1,0 +1,82 @@
+{
+   "backToSafety": {
+      "description": "back to safety prompt",
+      "message": "RETOUR À LA SÉCURITÉ"
+   },
+   "contactUs": {
+      "description": "navigation tab for warning page",
+      "message": "Contact"
+   },
+   "continueToSite": {
+      "description": "continue to site prompt",
+      "message": "CONTINUER SUR CE SITE"
+   },
+   "continueToSiteUserAgreement": {
+      "description": "continue to site user agreement",
+      "message": "En cliquant sur le bouton « Continuer sur ce site », vous comprenez que ce site a été signalé et peut nuire à votre ordinateur."
+   },
+   "documentBlockedPageName": {
+      "description": "Title for the document blocked page",
+      "message": "Web Safety | Page non sécurisée"
+   },
+   "dontWarnAboutSite": {
+      "description": "don't warn about site prompt",
+      "message": "Ne plus m'avertir à propos de ce site"
+   },
+   "extName": {
+      "description": "extension name.",
+      "message": "Web Safety"
+   },
+   "extShortDesc": {
+      "description": "this will be in the chrome web store: must be 132 characters or less",
+      "message": "Restez protégé pendant vos recherches et votre navigation sur le Web. Ne vous souciez plus des sites Internet malveillants."
+   },
+   "faq": {
+      "description": "navigation tab for warning page",
+      "message": "FAQ"
+   },
+   "freeDownload": {
+      "description": "navigation tab for warning page",
+      "message": "Télécharger Gratuitement"
+   },
+   "help": {
+      "description": "navigation tab for warning page",
+      "message": "Assistance"
+   },
+   "home": {
+      "description": "navigation tab for warning page",
+      "message": "Accueil"
+   },
+   "howTo": {
+      "description": "navigation tab for warning page",
+      "message": "Trucs & Astuces"
+   },
+   "malwareWarning": {
+      "description": "malware warning text for the document blocked page",
+      "message": "Vous tentez d'accéder à une URL ou à un programme qui semble contenir une faille de sécurité ou un logiciel malveillant. Ceux-ci peuvent nuire ou manipuler votre ordinateur sans votre consentement. La simple visite d’une page web qui contient un logiciel malveillant peut infecter votre ordinateur."
+   },
+   "searchPlaceholder": {
+      "description": "placeholder value",
+      "message": "Rechercher"
+   },
+   "securityWarning": {
+      "description": "security warning head for the document blocked page",
+      "message": "Alerte de sécurité"
+   },
+   "securityWarningHarm": {
+      "description": "security warning text for the document blocked page",
+      "message": "L'accès à ce site ou à ce fichier peut nuire à votre ordinateur."
+   },
+   "trustWebsitePrompt": {
+      "description": "ask user if website is trusted for the document blocked page",
+      "message": "Si vous faites confiance à ce site Web et ne souhaitez plus d'avertissement de notre part, ajoutez-le à votre liste de confiance en cochant la case en dessous, puis cliquez sur le bouton « CONTINUER SUR CE SITE ». Notez que cette action ne peut pas être annulée."
+   },
+   "updates": {
+      "description": "navigation tab for warning page",
+      "message": "Mise à jour"
+   },
+   "upgradeToPro": {
+      "description": "navigation tab for warning page",
+      "message": "Choisissez Pro"
+   }
+}

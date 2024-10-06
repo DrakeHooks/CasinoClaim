@@ -1,0 +1,14 @@
+{
+   "appDescription": {
+      "message": "Complement per habilitar l'automatització web. Aquesta extensió web és compatible amb la versió 2.26 o anterior del Power Automate per a dispositius d'escriptori."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate (llegat)"
+   },
+   "deprecationLink": {
+      "message": "aquí"
+   },
+   "deprecationMessage": {
+      "message": "Després d'una data determinada que anunciarà l'equip del Google Chrome (la data de retirada), el navegador Chrome ja no admetrà les extensions web creades amb el Manifest V2. L'extensió web que utilitzeu s'ha creat amb el Manifest V2 i és compatible amb la versió 2.26 o anterior del Power Automate per a dispositius d'escriptori. Per tant, no serà funcional a partir de la data de retirada en endavant. Per continuar automatitzant escenaris web amb aquest navegador després de la data de retirada, heu d'actualitzar el Power Automate per a dispositius d'escriptori a la versió més recent (versió 2.27 o posterior) i instal·lar la nova extensió web del Microsoft Power Automate. Més informació "
+   }
+}

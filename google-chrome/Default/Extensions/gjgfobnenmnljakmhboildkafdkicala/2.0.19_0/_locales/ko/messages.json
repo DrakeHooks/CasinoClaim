@@ -1,0 +1,14 @@
+{
+   "appDescription": {
+      "message": "웹 자동화를 사용하도록 설정하기 위한 추가 기능입니다. 이 웹 확장은 데스크톱용 Power Automate 2.26 버전 또는 이전 버전과 호환됩니다."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate(레거시)"
+   },
+   "deprecationLink": {
+      "message": "여기"
+   },
+   "deprecationMessage": {
+      "message": "Google Chrome 팀에서 발표할 특정 날짜(지원 중단 날짜) 이후 Chrome 브라우저는 Manifest V2로 만든 웹 확장 프로그램을 더 이상 지원하지 않습니다. 사용 중인 웹 확장은 Manifest V2로 생성되며 데스크톱용 Power Automate 2.26 이하 버전 과 호환됩니다. 따라서 사용 중단 날짜 이후에는 작동하지 않습니다. 사용 중단 날짜 이후에도 이 브라우저로 웹 시나리오 자동화를 계속하려면 데스크톱용 Power Automate를 최신 버전(2.27 이상)으로 업그레이드하고 새 Microsoft Power Automate 웹 확장을 설치해야 합니다. 자세히 알아보기 "
+   }
+}

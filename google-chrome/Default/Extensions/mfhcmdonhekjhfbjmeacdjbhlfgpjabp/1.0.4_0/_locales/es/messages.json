@@ -1,0 +1,82 @@
+{
+   "backToSafety": {
+      "description": "back to safety prompt",
+      "message": "VOLVER A SEGURIDAD"
+   },
+   "contactUs": {
+      "description": "navigation tab for warning page",
+      "message": "Contacto"
+   },
+   "continueToSite": {
+      "description": "continue to site prompt",
+      "message": "CONTINUAR AL SITIO"
+   },
+   "continueToSiteUserAgreement": {
+      "description": "continue to site user agreement",
+      "message": "Al hacer clic en \"Continuar al sitio\", entiendes que este sitio ha sido marcado y puede dañar tu equipo."
+   },
+   "documentBlockedPageName": {
+      "description": "Title for the document blocked page",
+      "message": "Web Safety | Inseguro"
+   },
+   "dontWarnAboutSite": {
+      "description": "don't warn about site prompt",
+      "message": "No advertirme de nuevo acerca de este sitio"
+   },
+   "extName": {
+      "description": "extension name.",
+      "message": "Web Safety"
+   },
+   "extShortDesc": {
+      "description": "this will be in the chrome web store: must be 132 characters or less",
+      "message": "Mantente protegido al navegar y hacer búsquedas en la web. Ya no tendrás que preocuparte por sitios web sospechosos."
+   },
+   "faq": {
+      "description": "navigation tab for warning page",
+      "message": "Preguntas frecuentes"
+   },
+   "freeDownload": {
+      "description": "navigation tab for warning page",
+      "message": "DESCARGA GRATUITA"
+   },
+   "help": {
+      "description": "navigation tab for warning page",
+      "message": "Ayuda"
+   },
+   "home": {
+      "description": "navigation tab for warning page",
+      "message": "Inicio"
+   },
+   "howTo": {
+      "description": "navigation tab for warning page",
+      "message": "Soporte"
+   },
+   "malwareWarning": {
+      "description": "malware warning text for the document blocked page",
+      "message": "La dirección URL o el programa al que estás intentando acceder parece contener software malicioso o ataques. El software malicioso puede dañar tu equipo u operar sin tu consentimiento. Tu ordenador puede infectarse solo con que visites un sitio web que aloje software malicioso."
+   },
+   "searchPlaceholder": {
+      "description": "placeholder value",
+      "message": "Buscar"
+   },
+   "securityWarning": {
+      "description": "security warning head for the document blocked page",
+      "message": "Advertencia de seguridad"
+   },
+   "securityWarningHarm": {
+      "description": "security warning text for the document blocked page",
+      "message": "El acceso a este sitio o archivo puede dañar tu equipo."
+   },
+   "trustWebsitePrompt": {
+      "description": "ask user if website is trusted for the document blocked page",
+      "message": "Si confías en este sitio web y no quieres que te volvamos a advertir, añádelo a tu lista segura marcando la casilla que aparece a continuación y haz clic en \"CONTINUAR EN EL SITIO\". Ten en cuenta que esta acción no se puede deshacer."
+   },
+   "updates": {
+      "description": "navigation tab for warning page",
+      "message": "Actualizar"
+   },
+   "upgradeToPro": {
+      "description": "navigation tab for warning page",
+      "message": "Actualizar a Pro"
+   }
+}
