@@ -42,9 +42,9 @@ This program is heavily inspired by auto-rsa from Nelson Dane. Go check it out a
 | Chumba         | ✓          | ✓               | No                          | $1 bonus/day     |
 | DingDingDing     | ✓          | ✓               | No                          | Varies between $0.50 SC and $1 SC    |
 | Stake          | ✗          | ✓               | Yes                         | $1 bonus/day. Auto Claim in development |
-| Zula  | ✓          | ✗               | No                          | $1 bonus/day |
+| Zula  | ✓          | ✓               | No                          | $1 bonus/day |
 | Fortune Coins      | ✓          | ✗               | No                          | $0.50-$1.20 SC bonus every 24 hours |
-| Sportzino      | ✓          | ✗               | No                          | $1 bonus/day |
+| Sportzino      | ✓          | ✓               | No                          | $1 bonus/day |
 | Goldnluck      | ✓          | ✓               | No                          | $2 bonus/day |
 | Luckybird      | ✓          | ✓               | No                          | $.25 bonus/day. Increases with VIP |
 | Crown Coins      | ✓          | ✓               | Yes                          | Varies between $0.00-$2 bonus/day Requires Usr Data Dir for auth. Social Auth support in development|
