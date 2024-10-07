@@ -57,9 +57,9 @@ options.add_argument('--disable-blink-features=AutomationControlled')
 options.add_argument('--no-sandbox')
 user_agent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36"
 options.add_argument(f"--user-agent={user_agent}")
-user_data_dir = "/app/google-chrome/"  # Change path for Linux environment
+user_data_dir = "/temp/google-chrome/User Data"  # Change path for Linux environment
 options.add_argument(f"--user-data-dir={user_data_dir}")
-options.add_extension('/app/CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx')
+options.add_extension('/temp/CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx')
 extension = "/root/.config/google-chrome/Default/Extensions"
 
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
