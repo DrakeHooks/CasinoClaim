@@ -7,6 +7,7 @@ services:
     volumes:
       - ./:/app  # Map the project directory
       - ./google-chrome:/temp/google-chrome  # Mount the google-chrome folder
+      - ./CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx:/temp/CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx  # Mounts the .crx file
     env_file:
       - .env  # Load user environment variables
     shm_size: '2g'  # Shared memory size to avoid Chrome crashing
