@@ -127,7 +127,6 @@ async def help(ctx):
     !crowncoins - Check CrownCoinsCasino for bonus
     !chumba - Check Chumba for bonus
     !dingdingding - Check DingDingDing for bonus
-    !stake - Check Stake for bonus
     !modo - Check Modo for bonus
     !sweepslots - Check SweepSlots for bonus
     !moonspin - Check MoonSpin for bonus
