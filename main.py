@@ -300,6 +300,17 @@ async def zula(ctx):
         await ctx.send("ZulaCasino automation is already running.")
 
 
+@bot.command(name="Sportzino")
+async def sportzino(ctx):
+    global sportzino_task
+    if not sportzino_task or sportzino_task.done():
+        channel = bot.get_channel(DISCORD_CHANNEL)
+        await ctx.send("Checking Sportzino for Bonus...")
+        sportzino_task = asyncio.create_task(Sportzino(ctx, driver, channel))
+    else:
+        await ctx.send("Sportzino automation is already running.")
+
+
 
 
 
