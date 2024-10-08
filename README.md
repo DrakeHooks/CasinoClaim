@@ -27,7 +27,7 @@ git clone https://github.com/DrakeHooks/CasinoClaim.git
 cd casinoclaim
 ```
 
-1. Sign in to Chanced, CrownCoins Casino, and Luckybird on a google chrome browser. Then, take the "User Data" folder (usually located in "AppData/Local/Google/Chrome"), rename it to "google-chrome" and place it in the root of the project.
+1. Sign in to Chanced, CrownCoins Casino, and Luckybird on a google chrome browser. Then, take the "User Data" folder (usually located in "AppData/Local/Google/Chrome"), and place it in the root of the project.
 
 2. Create a discord bot and invite it to your server. You can follow this guide to create a discord bot: https://discordpy.readthedocs.io/en/stable/discord.html
 
