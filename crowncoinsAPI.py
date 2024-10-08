@@ -15,6 +15,7 @@ def ccc_close_popups(driver):
     popup_xpaths = [
         "/html/body/div[2]/div[5]/div/div/div/div[1]/div[2]",
         "/html/body/div[2]/div[5]/div/div/div/div[1]/div",
+        "/html/body/div[2]/div[5]/div/div[1]/div[2]",
         "/html/body/div[2]/div[5]/div/div/div/div[2]/div/div[2]/button/div",
         "/html/body/div[4]/div/div[1]/div/div/button",
         "/html/body/div[3]/div/div[1]/div/div/button",
