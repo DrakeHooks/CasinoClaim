@@ -108,6 +108,7 @@ async def on_ready():
 
     if not casino_loop.is_running():
         casino_loop.start()
+    await asyncio.sleep(70)
     if not chanced_casino_loop.is_running():
         chanced_casino_loop.start()
     
@@ -342,21 +343,21 @@ async def casino_loop():
     try:
         # Run the casino tasks sequentially with 2-hour gaps
         try:
-            await asyncio.sleep(10)
+            await asyncio.sleep(40)
             await zula_casino(None, driver, channel)
         except:
             print("Error in Zula")
-        await asyncio.sleep(10)
+        await asyncio.sleep(60)
         try:
             await Sportzino(None, driver, channel)
         except:
             print("Error in Sportzino")
-        await asyncio.sleep(10)
+        await asyncio.sleep(60)
         try:
             await crowncoins_casino(None, driver, channel)
         except:
             print("Error in CrownCoinsCasino")
-        await asyncio.sleep(10)
+        await asyncio.sleep(30)
         try:
             await dingdingding_casino(channel, driver, bot)  # Pass channel and bot directly
         except:
