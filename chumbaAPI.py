@@ -100,7 +100,7 @@ async def claim_chumba_bonus(driver, channel):
                 continue
 
     except Exception as e:
-        await channel.send(f"Error claiming Chumba bonus: {e}")
+        await channel.send( "Error claiming Chumba bonus.")
 
 # Function to check countdown timer for next bonus
 async def check_chumba_countdown(driver, channel):
@@ -113,7 +113,7 @@ async def check_chumba_countdown(driver, channel):
         formatted_countdown = f"{hours:02}:{minutes:02}:00"
         await channel.send(f"Next Chumba Bonus Available in: {formatted_countdown}")
     except Exception as e:
-        await channel.send(f"Failed to retrieve countdown: {e}")
+        await channel.send(f"Failed to retrieve Chumba countdown.")
 
 # Main function for Chumba Casino bonus claiming
 async def chumba_casino(ctx, driver, bot):
