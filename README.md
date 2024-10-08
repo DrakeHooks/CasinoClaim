@@ -24,7 +24,7 @@ This program is heavily inspired by auto-rsa from Nelson Dane. Go check it out a
 2. Clone this repository and cd into it:
 ```bash
 git clone https://github.com/DrakeHooks/CasinoClaim.git
-cd casinoclaim
+cd CasinoClaim
 ```
 
 1. Sign in to Chanced, CrownCoins Casino, and Luckybird on a google chrome browser. Then, take the "User Data" folder (usually located in "AppData/Local/Google/Chrome"), and place it in the "google-chrome" folder in the project.
