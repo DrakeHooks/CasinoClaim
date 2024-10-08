@@ -29,7 +29,7 @@ cd casinoclaim
 
 1. Sign in to Chanced, CrownCoins Casino, and Luckybird on a google chrome browser. Then, take the "User Data" folder (usually located in "AppData/Local/Google/Chrome"), and place it in the root of the project.
 
-2. Create a discord bot and invite it to your server. You can follow this guide to create a discord bot: https://discordpy.readthedocs.io/en/stable/discord.html
+2. Create a discord bot and invite it to your server. You can follow this guide to create a discord bot: [guide](discordBot.md)
 
 3. Open the .env file in the root directory of the project and add the following:
     1. Add `DISCORD_TOKEN` and `DISCORD_CHANNEL` to your `.env` file.
