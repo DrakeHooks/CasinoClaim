@@ -98,9 +98,8 @@ async def claim_chumba_bonus(driver, channel):
                 break
             except TimeoutException:
                 continue
-
-    except Exception as e:
-        await channel.send( "Error claiming Chumba bonus.")
+    except:
+        await channel.send("Error claiming Chumba bonus.")
 
 # Function to check countdown timer for next bonus
 async def check_chumba_countdown(driver, channel):
