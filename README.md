@@ -18,13 +18,22 @@ I am not responsible for any financial loss or gain incurred with the use of thi
 This program is heavily inspired by auto-rsa from Nelson Dane. Go check it out and give it a star here: https://github.com/NelsonDane/auto-rsa
 
 # Installation 🛠️
-1. Sign in to CrownCoins Casino and Luckybird on a google chrome browser. Then, take the "User Data" folder (usually located in "AppData/Local/Google/Chrome"), rename it to "google-chrome" and place it in the root of the project.
+
+1. Install `git` for your operating system. Then, install `docker` and `docker-compose` for your operating system. You can follow this guide to install docker and docker-compose: https://docs.docker.com/get-docker/ Note: If you are using Windows, i strongly recommend docker desktop for Windows.
+
+2. Clone this repository and cd into it:
+```bash
+git clone https://github.com/DrakeHooks/CasinoClaim.git
+cd casinoclaim
+```
+
+1. Sign in to Chanced, CrownCoins Casino, and Luckybird on a google chrome browser. Then, take the "User Data" folder (usually located in "AppData/Local/Google/Chrome"), rename it to "google-chrome" and place it in the root of the project.
 
 2. Create a discord bot and invite it to your server. You can follow this guide to create a discord bot: https://discordpy.readthedocs.io/en/stable/discord.html
 
-3. Open the .env file in the /app directory of the project and add the following:
+3. Open the .env file in the root directory of the project and add the following:
     1. Add `DISCORD_TOKEN` and `DISCORD_CHANNEL` to your `.env` file.
-    2. Add your casino login credentials to .env file
+    2. Add your casino login credentials to .env file. Note: some casino logins are currently only supported through the User Data directory.
 4. run `docker compose up -d`
 
 
