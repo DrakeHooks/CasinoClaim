@@ -1,3 +1,5 @@
+# Rolling Riches API
+
 import re
 import os
 import asyncio
