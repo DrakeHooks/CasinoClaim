@@ -130,7 +130,6 @@ async def help(ctx):
     !dingdingding - Check DingDingDing for bonus
     !modo - Check Modo for bonus
     !sweepslots - Check SweepSlots for bonus
-    !moonspin - Check MoonSpin for bonus
     !zula - Check Zula for bonus
     !rollingriches - Check RollingRiches for bonus
     !sportzino - Check Sportzino for bonus
