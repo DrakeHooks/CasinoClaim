@@ -12,10 +12,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # LuckyBird credentials from the .env file
-luckybird_credentials = os.getenv("LUCKYBIRD").split(":")
-username_text = luckybird_credentials[0]
-password_text = luckybird_credentials[1]
-
+try:
+    luckybird_credentials = os.getenv("LUCKYBIRD").split(":")
+    username_text = luckybird_credentials[0]
+    password_text = luckybird_credentials[1]
+except:
+    print("LuckyBird credentials not found in environment variables.")
+    
 # Function to extract countdown information
 async def extract_countdown_info(channel, driver):
     try:
