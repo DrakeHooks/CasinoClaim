@@ -31,7 +31,7 @@ cd CasinoClaim
 
 2. Create a discord bot and invite it to your server. You can follow this guide to create a discord bot: [guide](discordBot.md)
 
-3. Open the .env file in the root directory of the project and add the following:
+3. Create the .env file in the root directory of the project and add the following:
     1. Add `DISCORD_TOKEN` and `DISCORD_CHANNEL` to your `.env` file.
     2. Add your casino login credentials to .env file. Note: some casino logins are currently only supported through the User Data directory.
 4. run `docker compose up -d`
