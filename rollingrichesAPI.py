@@ -45,7 +45,7 @@ async def rolling_riches_casino(ctx, driver, channel):
             password_input = driver.find_element(By.ID, "password")
             password_input.send_keys(password)
             password_input.send_keys(Keys.ENTER)
-            await asyncio.sleep(5)  # Wait for login process to complete
+            await asyncio.sleep(15)  # Wait for login process to complete
         else:
             # If no login button is found, assume already logged in
             await channel.send("Session already active, proceeding without login.")
