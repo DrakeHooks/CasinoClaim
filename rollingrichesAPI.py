@@ -29,8 +29,6 @@ async def rolling_riches_casino(ctx, driver, channel):
         # Get the URL and allow page to load
         driver.get("https://rollingriches.com/login")
         await asyncio.sleep(5)
-
-        # Check if the login button is present, indicating the need to log in
         try:
             email_input = WebDriverWait(driver, 5).until(
                 EC.presence_of_element_located((By.ID, "email"))
@@ -45,7 +43,7 @@ async def rolling_riches_casino(ctx, driver, channel):
             password_input = driver.find_element(By.ID, "password")
             password_input.send_keys(password)
             password_input.send_keys(Keys.ENTER)
-            await asyncio.sleep(15)  # Wait for login process to complete
+            await asyncio.sleep(5)  # Wait for login process to complete
         else:
             # If no login button is found, assume already logged in
             await channel.send("Session already active, proceeding without login.")
@@ -57,31 +55,25 @@ async def rolling_riches_casino(ctx, driver, channel):
         print(f"Login timeout: {e}")
         await channel.send("Login to Rolling Riches failed.")
     except Exception as e:
-        print(f"Error in rolling_riches_casino: {e}")
+        print(f"Error in rolling_riches_casino")
 
 
 # Function to claim the 6-hour bonus
 async def claim_rolling_riches_bonus(ctx, driver, channel):
     try:
         # Navigate to the main page to claim the bonus
-        driver.get("https://rollingriches.com")
+        driver.get("https://www.rollingriches.com/get-coins")
         await asyncio.sleep(5)
-
-        # Click the button to open the coin store
-        coin_store_btn = WebDriverWait(driver, 5).until(
-            EC.element_to_be_clickable((By.XPATH, "/html/body/app-root/app-main-header/div/div/div/header/div[2]/div/button"))
-        )
-        coin_store_btn.click()
-
+        
         # Click the daily bonus label
         daily_bonus_label = WebDriverWait(driver, 5).until(
-            EC.element_to_be_clickable((By.XPATH, "/html/body/div[4]/div[2]/div/mat-dialog-container/div/div/app-get-coin/div/div[1]/div/label[2]"))
+            EC.element_to_be_clickable((By.XPATH, "/html/body/app-root/app-get-coin/div/div[1]/div/label[2]"))
         )
         daily_bonus_label.click()
 
         # Click the claim button
         claim_btn = WebDriverWait(driver, 5).until(
-            EC.element_to_be_clickable((By.XPATH, "/html/body/div[4]/div[2]/div/mat-dialog-container/div/div/app-get-coin/div/div[2]/div/app-hourly-bonus/div/div/div[3]/button"))
+            EC.element_to_be_clickable((By.XPATH, "/html/body/app-root/app-get-coin/div/div[2]/div/app-hourly-bonus/div/div/div[4]/button"))
         )
         claim_btn.click()
         await channel.send("Rolling Riches 6-Hour Bonus Claimed!")
@@ -94,8 +86,8 @@ async def claim_rolling_riches_bonus(ctx, driver, channel):
         
         # List of possible XPaths for the countdown element
         countdown_xpaths = [
-            "/html/body/div[4]/div[2]/div/mat-dialog-container/div/div/app-get-coin/div/div[2]/div/app-hourly-bonus/div/div/div[3]/div/label",
-            "/html/body/div[2]/div[2]/div/mat-dialog-container/div/div/app-get-coin/div/div[2]/div/app-hourly-bonus/div/div/div[3]/div/label"
+            "/html/body/app-root/app-get-coin/div/div[2]/div/app-hourly-bonus/div/div/div[4]/div/label",
+            "/html/body/app-root/app-get-coin/div/div[2]/div/app-hourly-bonus/div/div/div[5]/div/label"
         ]
         countdown_element = None
         for xpath in countdown_xpaths:
