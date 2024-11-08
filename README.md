@@ -43,25 +43,25 @@ cd CasinoClaim
 
 
 # Supported Casinos ✅
-| Casino         | Auto Claim | Countdown Timer | Require User Data Directory | Notes            |
-|----------------|------------|-----------------|-----------------------------|------------------|
-| Chanced        | ✓          | ✓               | No                          | $.10 bonus/hr    |
-| Global Poker      | ✓          | ✓               | No                          | $0.00-$2 SC bonus/day |
-| Rolling Riches | ✓          | ✓               | No                          | $.20 bonus every 6 hours |
-| Chumba         | ✓          | ✓               | No                          | $1 bonus/day     |
-| DingDingDing     | ✓          | ✓               | No                          | Varies between $0.50 SC and $1 SC    |
-| Stake          | ✗          | ✓               | Yes                         | $1 bonus/day. Auto Claim in development |
-| Zula  | ✓          | ✓               | No                          | $1 bonus/day |
-| Fortune Coins      | ✓          | ✗               | No                          | $0.50-$1.20 SC bonus every 24 hours |
-| Sportzino      | ✓          | ✓               | No                          | $1 bonus/day |
-| Goldnluck      | ✓          | ✓               | No                          | $2 bonus/day |
-| Luckybird      | ✓          | ✓               | No                          | $.25 bonus/day. Increases with VIP |
-| Crown Coins      | ✓          | ✓               | Yes                          | Varies between $0.00-$2 bonus/day Requires Usr Data Dir for auth. Social Auth support in development|
-| Modo     | ✓          | ✓               | No                          | $.30-$1 SC bonus/day |
-| Hello Millions     | IN DEVELOPMENT          | IN DEVELOPMENT | IN DEVELOPMENT  | $.25 SC bonus/day |
-| Scratchful     | IN DEVELOPMENT  | IN DEVELOPMENT     | IN DEVELOPMENT                          | $.25 SC bonus/day |
-| McLuck     | IN DEVELOPMENT   | IN DEVELOPMENT  | IN DEVELOPMENT                          | $.25 SC bonus/day |
-| Pulsz     | IN DEVELOPMENT   | IN DEVELOPMENT  | IN DEVELOPMENT                          | Varies between $.20-$3 SC bonus/day |
+| Casino         | Auto Claim | Countdown Timer | Require User Data Directory | Notes            | Trusted? (payment proof) |
+|----------------|------------|-----------------|-----------------------------|------------------|---------|
+| Chanced        | ✓          | ✓               | No                          | $.10 bonus/hr    | Yes     |
+| Global Poker   | ✓          | ✓               | No                          | $0.00-$2 SC bonus/day | Yes     |
+| Rolling Riches | ✓          | ✓               | No                          | $.20 bonus every 6 hours | Yes     |
+| Chumba         | ✓          | ✓               | No                          | $1 bonus/day     | Yes     |
+| DingDingDing   | ✓          | ✓               | No                          | Varies between $0.50 SC and $1 SC | Yes     |
+| Stake          | ✗          | ✓               | Yes                         | $1 bonus/day. Auto Claim in development | Yes     |
+| Zula           | ✓          | ✓               | No                          | $1 bonus/day     | Yes     |
+| Fortune Coins  | ✓          | ✗               | No                          | $0.50-$1.20 SC bonus every 24 hours | Yes     |
+| Sportzino      | ✓          | ✓               | No                          | $1 bonus/day     | Yes     |
+| Goldnluck      | ✗          | ✗               | No                          | $2 bonus/day     | No     |
+| Luckybird      | ✓          | ✓               | No                          | $.25 bonus/day. Increases with VIP | Yes     |
+| Crown Coins    | ✓          | ✓               | Yes                         | Varies between $0.00-$2 bonus/day. Requires Usr Data Dir for auth. Social Auth support in development | Yes     |
+| Modo           | ✓          | ✓               | No                          | $.30-$1 SC bonus/day | Yes     |
+| Hello Millions | IN DEVELOPMENT | IN DEVELOPMENT | IN DEVELOPMENT            | $.25 SC bonus/day | No      |
+| Scratchful     | IN DEVELOPMENT | IN DEVELOPMENT | IN DEVELOPMENT            | $.25 SC bonus/day | No      |
+| McLuck         | IN DEVELOPMENT | IN DEVELOPMENT | IN DEVELOPMENT            | $.25 SC bonus/day | No      |
+| Pulsz          | IN DEVELOPMENT | IN DEVELOPMENT | IN DEVELOPMENT            | Varies between $.20-$3 SC bonus/day | No      |
 
 
 
