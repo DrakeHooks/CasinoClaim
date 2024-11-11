@@ -66,7 +66,7 @@ cd CasinoClaim
 
 
 # Support 🔮 
-Browser automation breaks. It is just a matter of when. Casino Claim is the only free and open source social casino claim bot. If you would like to see this project grow, consider sponsoring or donating via ko-fi.  I will do my best to push updates quickly for changes in website structure as well as overall efficiency of the bot. Over time, the bot should become more 'robust' so that if website structure changes, it will adapt or bypass. This is a passion project for me and I may not always have time to push changes the second something breaks. If you identify a fix, feel free to submit a pull request and I will review it.
+Browser automation breaks. It is just a matter of when. Casino Claim is the only free and open source social casino claim bot. If you would like to see this project grow, consider sponsoring or donating via ko-fi. I will do my best to push updates quickly for changes in website structure as well as overall efficiency of the bot. If you identify a fix, feel free to submit a pull request and I will review it.
 
 
 # Problem Gambling 🎲
