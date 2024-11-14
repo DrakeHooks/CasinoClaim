@@ -74,7 +74,7 @@ def close_popups_zula(driver):
     
     for xpath in popup_xpaths_zula:
         try:
-            popup_close_button = WebDriverWait(driver, 3).until(
+            popup_close_button = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.XPATH, xpath))
             )
             popup_close_button.click()
