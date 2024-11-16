@@ -139,6 +139,7 @@ async def help(ctx):
     !sportzino - Check Sportzino for bonus
     !fortunecoins - Check Fortunecoins for bonus
     !ping - Check if the bot is online
+    !restart - Restart the bot               
     """)
 
 
