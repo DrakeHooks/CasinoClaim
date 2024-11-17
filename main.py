@@ -140,7 +140,8 @@ async def help(ctx):
     !fortunecoins - Check Fortunecoins for bonus
     !ping - Check if the bot is online
     !restart - Restart the bot     
-    !help - Display the available commands     
+    !help - Display the available commands
+    !stop - Stop the bot                    
     """)
 
 
