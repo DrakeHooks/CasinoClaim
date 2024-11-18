@@ -1,0 +1,14 @@
+{
+   "appDescription": {
+      "message": "Module complémentaire pour l’activation de l’automatisation web. Cette extension web est compatible avec la version 2.26 ou antérieure de Power Automate pour le bureau."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate (hérité)"
+   },
+   "deprecationLink": {
+      "message": "ici"
+   },
+   "deprecationMessage": {
+      "message": "Après une certaine date qui sera annoncée par l’équipe Google Chrome (la date d’obsolescence), le navigateur Chrome ne prendra plus en charge les extensions web créées avec Manifest V2. L’extension web que vous utilisez est créée avec Manifest V2 et elle est compatible avec la version ou antérieure 2.26 de Power Automate pour le bureau. Par conséquent, elle ne sera pas opérationnelle à partir de la date d’obsolescence. Pour continuer à automatiser les scénarios web avec ce navigateur après la date d’obsolescence, vous devez procéder à la mise à jour de votre Power Automate pour le bureau vers la dernière version (2.27 ou ultérieure) et installer la nouvelle extension web Microsoft Power Automate. Pour en savoir plus "
+   }
+}

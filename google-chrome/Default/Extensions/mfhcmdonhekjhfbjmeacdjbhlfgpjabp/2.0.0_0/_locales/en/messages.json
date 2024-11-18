@@ -1,0 +1,82 @@
+{
+   "backToSafety": {
+      "description": "back to safety prompt",
+      "message": "BACK TO SAFETY"
+   },
+   "contactUs": {
+      "description": "navigation tab for warning page",
+      "message": "Contact us"
+   },
+   "continueToSite": {
+      "description": "continue to site prompt",
+      "message": "CONTINUE TO SITE"
+   },
+   "continueToSiteUserAgreement": {
+      "description": "continue to site user agreement",
+      "message": "By clicking on the \"Continue to site\" button, you understand that this site has been flagged and may harm your computer."
+   },
+   "documentBlockedPageName": {
+      "description": "Title for the document blocked page",
+      "message": "Web Safety | Unsafe"
+   },
+   "dontWarnAboutSite": {
+      "description": "don't warn about site prompt",
+      "message": "Don't warn me about this site again"
+   },
+   "extName": {
+      "description": "extension name.",
+      "message": "Web Safety"
+   },
+   "extShortDesc": {
+      "description": "this will be in the chrome web store: must be 132 characters or less",
+      "message": "Stay protected while searching and surfing the Web. Never worry about suspicious websites again."
+   },
+   "faq": {
+      "description": "navigation tab for warning page",
+      "message": "Faq"
+   },
+   "freeDownload": {
+      "description": "navigation tab for warning page",
+      "message": "Free Download"
+   },
+   "help": {
+      "description": "navigation tab for warning page",
+      "message": "Help"
+   },
+   "home": {
+      "description": "navigation tab for warning page",
+      "message": "Home"
+   },
+   "howTo": {
+      "description": "navigation tab for warning page",
+      "message": "How-to"
+   },
+   "malwareWarning": {
+      "description": "malware warning text for the document blocked page",
+      "message": "The URL or program you are trying to access appears to contain malware or exploits. Malware can harm your computer or otherwise operate without your consent. Just visiting a website that hosts malware may infect your computer."
+   },
+   "searchPlaceholder": {
+      "description": "placeholder value",
+      "message": "Search"
+   },
+   "securityWarning": {
+      "description": "security warning head for the document blocked page",
+      "message": "Security Warning"
+   },
+   "securityWarningHarm": {
+      "description": "security warning text for the document blocked page",
+      "message": "Accessing this site or file may harm your computer."
+   },
+   "trustWebsitePrompt": {
+      "description": "ask user if website is trusted for the document blocked page",
+      "message": "If you trust this website and don't want us to warn you again, add it to your safelist by checking the box below, then click the \"CONTINUE TO SITE\" button. Note that this action cannot be undone."
+   },
+   "updates": {
+      "description": "navigation tab for warning page",
+      "message": "Updates"
+   },
+   "upgradeToPro": {
+      "description": "navigation tab for warning page",
+      "message": "Upgrade to Pro"
+   }
+}

@@ -1,0 +1,35 @@
+{
+   "appDescription": {
+      "message": "Verkkoautomaation käyttöönottolisäosa. Tämä web-laajennus sopii yhteen Power Automate -työpöytäsovelluksen v. 2.27/uudemman kanssa."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate"
+   },
+   "consentAccept": {
+      "message": "Hyväksy"
+   },
+   "consentCollectedData1": {
+      "message": "Sen verkkosivun URI-osoite, jonka kanssa olet tekemisissä ja jonka me keräämme, jotta voit ottaa Power Automate -työpöytäsovelluksen verkkoautomaatio-ominaisuudet käyttöön."
+   },
+   "consentDecline": {
+      "message": "Hylkää"
+   },
+   "consentHeader": {
+      "message": "Microsoft Power Automaten tietosuojan hyväksyntä"
+   },
+   "consentParagraph1": {
+      "message": "Jos et salli anonyymien tietojen keräämistä, verkkoautomaatio ei ole käytettävissä."
+   },
+   "consentParagraph2": {
+      "message": "Kaikki tiedot keräämistämme anonyymeistä tiedoista ja siitä, mitä teemme niiden kanssa, on annettu "
+   },
+   "consentPrivacyLink": {
+      "message": "Tietosuojakäytäntö"
+   },
+   "consentQuestion": {
+      "message": "Voimmeko kerätä seuraavat anonyymit tiedot Microsoft Power Automate -verkkolaajennuksen käytöstä?"
+   },
+   "consentUninstall": {
+      "message": "Tämä poistaa Microsoft Power Automate -verkkolaajennuksen. Haluatko jatkaa?"
+   }
+}

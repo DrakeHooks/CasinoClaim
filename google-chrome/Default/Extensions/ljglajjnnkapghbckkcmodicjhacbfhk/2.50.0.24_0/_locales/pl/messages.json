@@ -1,0 +1,35 @@
+{
+   "appDescription": {
+      "message": "Dodatek włączający automatyzację sieci web. Rozszerzenie jest zgodne z aplikacją klasyczną Power Automate w wersji 2.27 i nowszych."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate"
+   },
+   "consentAccept": {
+      "message": "Akceptuj"
+   },
+   "consentCollectedData1": {
+      "message": "Identyfikator URI strony internetowej, z którą wchodzisz w interakcję. Zbieramy dane dotyczące tej interakcji, aby umożliwić Ci korzystanie z możliwości automatyzacji sieci web dostępnych w aplikacji klasycznej Power Automate."
+   },
+   "consentDecline": {
+      "message": "Odrzuć"
+   },
+   "consentHeader": {
+      "message": "Microsoft Power Automate — zgoda dotycząca prywatności"
+   },
+   "consentParagraph1": {
+      "message": "Jeśli nie zezwolisz nam na zbieranie anonimowych danych, automatyzacja sieci web nie będzie dostępna."
+   },
+   "consentParagraph2": {
+      "message": "Pełne szczegółowe informacje dotyczące tego, jakie anonimowe dane zbieramy i jak je wykorzystujemy, możesz znaleźć w naszych "
+   },
+   "consentPrivacyLink": {
+      "message": "Zasadach ochrony prywatności"
+   },
+   "consentQuestion": {
+      "message": "Czy możemy zbierać wymienione poniżej anonimowe dane dotyczące używania przez Ciebie rozszerzenia sieci web Microsoft Power Automate?"
+   },
+   "consentUninstall": {
+      "message": "Spowoduje to odinstalowanie rozszerzenia sieci web Microsoft Power Automate. Czy chcesz kontynuować?"
+   }
+}

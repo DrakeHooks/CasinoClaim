@@ -1,0 +1,35 @@
+{
+   "appDescription": {
+      "message": "Tillegg for aktivering av nettautomatisering. Nettutvidelsen er kompatibel med Power Automate for skrivebord versjon 2.27 og nyere."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate"
+   },
+   "consentAccept": {
+      "message": "Godta"
+   },
+   "consentCollectedData1": {
+      "message": "URI-en for nettsiden du samhandler med som vi samler inn for aktivering av nettautomatiseringsfunksjonene i Power Automate for skrivebord."
+   },
+   "consentDecline": {
+      "message": "Avslå"
+   },
+   "consentHeader": {
+      "message": "Personvernsamtykke for Microsoft Power Automate"
+   },
+   "consentParagraph1": {
+      "message": "Hvis du velger ikke å tillate oss å samle inn anonyme data, er ikke nettautomatisering tilgjengelig."
+   },
+   "consentParagraph2": {
+      "message": "Fullstendig informasjon om de anonyme dataene vi samler inn, og hva vi gjør med dem, er oppgitt i "
+   },
+   "consentPrivacyLink": {
+      "message": "personvernerklæringen"
+   },
+   "consentQuestion": {
+      "message": "Kan vi samle inn følgende anonyme data om din bruk av Microsoft Power Automate-nettutvidelsen?"
+   },
+   "consentUninstall": {
+      "message": "Dette avinstallerer Microsoft Power Automate-nettutvidelsen. Vil du fortsette?"
+   }
+}

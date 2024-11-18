@@ -1,0 +1,14 @@
+{
+   "appDescription": {
+      "message": "Doplnok na povolenie webovej automatizácie. Toto webové rozšírenie je kompatibilné s Power Automatom pre počítače verzie 2.26 alebo staršej."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate (staršia verzia)"
+   },
+   "deprecationLink": {
+      "message": "sem"
+   },
+   "deprecationMessage": {
+      "message": "Po určitom dátume, ktorý oznámi tím prehliadača Google Chrome (dátum zastarania), už prehliadač Chrome nebude podporovať webové rozšírenia vytvorené nástrojom Manifest V2. Webové rozšírenie, ktoré používate, je vytvorené nástrojom Manifest V2 a je kompatibilné s Power Automatom pre počítače verzie 2.26 alebo staršej. Preto od dátumu zastarania nebude funkčné. Ak chcete pokračovať v automatizácii webových scenárov s týmto prehliadačom aj po dátume zastarania, musíte inovovať Power Automate pre počítače na najnovšiu verziu (2.27 alebo novšiu) a nainštalovať nové webové rozšírenie Microsoft Power Automate. Ďalšie informácie "
+   }
+}

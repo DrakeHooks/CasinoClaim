@@ -1,0 +1,72 @@
+﻿:root {
+	height: 20em;
+	width: 40em;
+}
+
+body {
+	font-family: Segoe UI, system, serif;
+}
+
+.outer-container {
+	position: fixed;
+	top: 0;
+	z-index: 99;
+	width: 100vw;
+	height: 100vh;
+	display: flex;
+	flex-flow: column;
+	place-items: center;
+	place-content: center;
+	overflow: auto;
+}
+
+.logo {
+	height: 12em;
+	margin-right: 2em;
+}
+
+.logo-container {
+	display: flex;
+	flex-flow: column;
+	place-content: center;
+}
+
+.container {
+	display: flex;
+	flex-flow: column;
+	place-items: center;
+	max-width:80%;
+	max-height:80%;
+}
+
+h1 {
+	margin-top: 0;
+}
+
+.inner-container {
+	display: flex;
+	flex-flow: row;
+}
+
+button {
+	background-color: #0066ff;
+	color: white;
+	border-radius: 0.15em;
+	border: none;
+	padding: 0.4em 2em 0.4em 2em;
+	margin-left: 0.5em;
+}
+
+button:hover {
+	background-color: #005ce6;
+	cursor: pointer;
+}
+
+button:active {
+	background-color: #0047b3;
+}
+
+.button-container {
+	display: flex;
+	place-content: end;
+}

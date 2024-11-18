@@ -1,0 +1,35 @@
+{
+   "appDescription": {
+      "message": "Добавка за уеб автоматизация. Това уеб разширение е съвместимо с Power Automate за настолни компютри версия 2.27 или по-нова."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate"
+   },
+   "consentAccept": {
+      "message": "Приемане"
+   },
+   "consentCollectedData1": {
+      "message": "URI на уеб страницата, с която взаимодействате. Събираме тази информация, за да активираме възможностите за уеб автоматизация на Power Automate за настолни компютри."
+   },
+   "consentDecline": {
+      "message": "Отхвърляне"
+   },
+   "consentHeader": {
+      "message": "Съгласие за поверителност на Microsoft Power Automate"
+   },
+   "consentParagraph1": {
+      "message": "Ако не ни позволите да събираме анонимни данни, уеб автоматизацията няма да бъде налична."
+   },
+   "consentParagraph2": {
+      "message": "Пълни подробности за анонимните данни, които събираме, и какво правим с тях са предоставени в нашата "
+   },
+   "consentPrivacyLink": {
+      "message": "Декларация за поверителност"
+   },
+   "consentQuestion": {
+      "message": "Можем ли да събираме следните анонимни данни за използването на уеб разширението Microsoft Power Automate от вас?"
+   },
+   "consentUninstall": {
+      "message": "Това ще деинсталира уеб разширението Microsoft Power Automate. Искате ли да продължите?"
+   }
+}

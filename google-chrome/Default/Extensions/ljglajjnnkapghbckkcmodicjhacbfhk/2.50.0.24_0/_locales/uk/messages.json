@@ -1,0 +1,35 @@
+{
+   "appDescription": {
+      "message": "Додатковий компонент для ввімкнення веб-автоматизації. Сумісний з Power Automate для настільних комп’ютерів 2.27 або пізніше."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate"
+   },
+   "consentAccept": {
+      "message": "Прийняти"
+   },
+   "consentCollectedData1": {
+      "message": "URI веб-сторінки, з якою ви взаємодієте. Ми отримали ці дані, щоб забезпечити можливості веб-автоматизації в Power Automate для настільних комп’ютерів."
+   },
+   "consentDecline": {
+      "message": "Відхилити"
+   },
+   "consentHeader": {
+      "message": "Згода з правилами захисту конфіденційності стосовно Microsoft Power Automate"
+   },
+   "consentParagraph1": {
+      "message": "Якщо ви вирішили не дозволяти нам збирати анонімні дані, веб-автоматизація буде недоступною."
+   },
+   "consentParagraph2": {
+      "message": "Повні відомості про анонімні дані, які ми збираємо, і про те, що ми робимо з ними, наведено в нашій "
+   },
+   "consentPrivacyLink": {
+      "message": "Політиці конфіденційності"
+   },
+   "consentQuestion": {
+      "message": "Чи можна нам збирати зазначені далі анонімні дані про використання вами веб-розширення Microsoft Power Automate?"
+   },
+   "consentUninstall": {
+      "message": "Це призведе до видалення веб-розширення Microsoft Power Automate. Продовжити?"
+   }
+}

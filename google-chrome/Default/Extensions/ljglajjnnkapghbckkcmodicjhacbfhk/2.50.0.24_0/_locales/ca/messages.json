@@ -1,0 +1,35 @@
+{
+   "appDescription": {
+      "message": "Complement per habilitar l'automatització web. És compatible amb el Power Automate per a dispositius d'escriptori 2.27 o posterior."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate"
+   },
+   "consentAccept": {
+      "message": "Accepta"
+   },
+   "consentCollectedData1": {
+      "message": "URI de la pàgina web amb la qual interactueu, que recollim per habilitar les capacitats d'automatització web del Power Automate per a dispositius d'escriptori."
+   },
+   "consentDecline": {
+      "message": "Rebutja"
+   },
+   "consentHeader": {
+      "message": "Consentiment de privadesa del Microsoft Power Automate"
+   },
+   "consentParagraph1": {
+      "message": "Si decidiu no permetre'ns recopilar dades anònimes, l'automatització web no estarà disponible."
+   },
+   "consentParagraph2": {
+      "message": "Per veure tots els detalls sobre les dades anònimes que recollim i què fem amb aquestes dades, consulteu la nostra "
+   },
+   "consentPrivacyLink": {
+      "message": "Declaració de privadesa"
+   },
+   "consentQuestion": {
+      "message": "Podem recopilar les dades anònimes següents sobre l'ús que feu de l'extensió web del Microsoft Power Automate?"
+   },
+   "consentUninstall": {
+      "message": "Es desinstal·larà l'extensió web del Microsoft Power Automate. Voleu continuar?"
+   }
+}

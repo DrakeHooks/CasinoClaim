@@ -1,0 +1,14 @@
+{
+  "appName": {
+    "message": "Microsoft Power Automate (zastarelo)"
+  },
+  "appDescription": {
+    "message": "Dodatak za omogućavanje veb-automatizacije. Ovo veb-proširenje je kompatibilno sa uslugom Power Automate za računare 2.26 ili ranijom verzijom."
+  },
+  "deprecationMessage": {
+    "message": "Nakon određenog datuma koji će objaviti Google Chrome tim (datum zastarevanja), pregledač Chrome više neće podržavati veb-proširenja kreirana sa uslugom Manifest V2. Veb-proširenje koje koristite kreirano je sa uslugom Manifest V2 i kompatibilna je sa Power Automate za računare 2.26 ili ranijom verzijom. Zbog toga neće biti funkcionalna počev od datuma zastarevanja. Da biste nastavili automatizaciju veb-scenarija sa ovim pregledačem i posle datuma zastarevanja, morate nadograditi Power Automate za računare na najnoviju verziju (2.27 ili noviju) i instalirati novo Microsoft Power Automate veb-proširenje. Saznajte više "
+  },
+  "deprecationLink": {
+    "message": "ovde"
+  }
+}

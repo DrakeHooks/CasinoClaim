@@ -1,0 +1,14 @@
+{
+   "appDescription": {
+      "message": "Doplněk pro povolení automatizace akcí na webu. Toto webové rozšíření je kompatibilní s Power Automate pro desktopy verze 2.26 nebo novější."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate (Zastaralé)"
+   },
+   "deprecationLink": {
+      "message": "tady"
+   },
+   "deprecationMessage": {
+      "message": "Po určitém datu (datum vyřazení) bude týmem Google Chrome oznámeno, že prohlížeč Chrome už nebude podporovat webová rozšíření vytvořená pomocí manifestu V2. Webové rozšíření, které používáte, je vytvořeno pomocí manifestu V2 a je kompatibilní s Power Automate pro desktopy verze 2.26 nebo starší. Proto od data vyřazení nebude fungovat. Chcete-li pokračovat v automatizaci webových scénářů s tímto prohlížečem i po tomto datu, musíte upgradovat Power Automate pro desktopy na nejnovější verzi (2.27 nebo novější) a nainstalovat nové webové rozšíření Microsoft Power Automate. Další informace"
+   }
+}

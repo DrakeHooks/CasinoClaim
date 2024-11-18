@@ -1,0 +1,14 @@
+{
+   "appDescription": {
+      "message": "Web オートメーションを有効化するアドオン。この Web 拡張機能は、デスクトップ用 Power Automate の 2.26 のバージョンまで互換性があります。"
+   },
+   "appName": {
+      "message": "Microsoft Power Automate (レガシ)"
+   },
+   "deprecationLink": {
+      "message": "ここ"
+   },
+   "deprecationMessage": {
+      "message": "Google Chrome チームより今後通知される日付 (廃止日) を過ぎると、Chrome ブラウザーは、Manifest V2 で作成された Web 拡張機能をサポートしなくなります。使用中の Web 拡張機能は Manifest V2 で作成され、2.26 までのバージョンのデスクトップ用 Power Automate と互換性があります。したがって、廃止日を過ぎると機能しなくなります。このブラウザーを使用し、廃止日を過ぎても Web の自動化シナリオを継続するには、デスクトップ用 Power Automate を最新バージョン (2.27 以降) にアップグレードし、新しい Microsoft Power Automate Web 拡張機能をインストールする必要があります。詳細情報"
+   }
+}

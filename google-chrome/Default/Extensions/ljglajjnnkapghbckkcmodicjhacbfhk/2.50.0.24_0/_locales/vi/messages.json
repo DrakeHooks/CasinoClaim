@@ -1,0 +1,35 @@
+{
+   "appDescription": {
+      "message": "Tiện ích bổ sung hỗ trợ tự động hóa cho web. Phần mở rộng web này tương thích với Power Automate cho máy tính để bàn v2.27 trở lên."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate"
+   },
+   "consentAccept": {
+      "message": "Chấp nhận"
+   },
+   "consentCollectedData1": {
+      "message": "URI của trang web mà bạn tương tác mà chúng tôi thu thập để kích hoạt khả năng tự động hóa cho web của Power Automate cho máy tính để bàn."
+   },
+   "consentDecline": {
+      "message": "Từ chối"
+   },
+   "consentHeader": {
+      "message": "Chấp thuận về quyền riêng tư của Microsoft Power Automate"
+   },
+   "consentParagraph1": {
+      "message": "Nếu bạn chọn không cho phép chúng tôi thu thập dữ liệu ẩn danh thì tự động hóa cho web sẽ không hoạt động."
+   },
+   "consentParagraph2": {
+      "message": "Chi tiết đầy đủ về dữ liệu ẩn danh mà chúng tôi thu thập và những gì chúng tôi làm với dữ liệu đó được cung cấp trong "
+   },
+   "consentPrivacyLink": {
+      "message": "Chính sách về quyền riêng tư"
+   },
+   "consentQuestion": {
+      "message": "Chúng tôi có thể thu thập dữ liệu ẩn danh sau đây về việc bạn sử dụng tiện ích mở rộng web Microsoft Power Automate không?"
+   },
+   "consentUninstall": {
+      "message": "Thao tác này sẽ gỡ cài đặt tiện ích mở rộng web Microsoft Power Automate. Bạn có muốn tiếp tục không?"
+   }
+}

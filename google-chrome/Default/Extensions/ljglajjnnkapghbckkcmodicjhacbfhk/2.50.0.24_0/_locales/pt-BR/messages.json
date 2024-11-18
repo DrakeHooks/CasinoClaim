@@ -1,0 +1,35 @@
+{
+  "appName": {
+    "message": "Microsoft Power Automate"
+  },
+  "appDescription": {
+    "message": "Complemento p/habilitar a automação da Web. Extensão da Web compatível com o Power Automate para desktop versão 2.27 ou posterior."
+  },
+  "consentHeader": {
+    "message": "Consentimento da Privacidade do Microsoft Power Automate"
+  },
+  "consentQuestion": {
+    "message": "Podemos coletar os dados anônimos a seguir sobre o uso da extensão da Web do Microsoft Power Automate?"
+  },
+  "consentCollectedData1": {
+    "message": "O URI da página da Web com a qual você interage, que coletamos para habilitar os recursos de automação da Web do Power Automate para desktop."
+  },
+  "consentParagraph1": {
+    "message": "Se você optar por não permitir que coletemos dados anônimos, a automação da Web não estará disponível."
+  },
+  "consentParagraph2": {
+    "message": "Detalhes completos sobre os dados anônimos que coletamos e o que fazer com eles são fornecidos em nossa "
+  },
+  "consentPrivacyLink": {
+    "message": "Política de Privacidade"
+  },
+  "consentAccept": {
+    "message": "Aceitar"
+  },
+  "consentDecline": {
+    "message": "Recusar"
+  },
+  "consentUninstall": {
+    "message": "Isso desinstalará a extensão da Web do Microsoft Power Automate. Deseja continuar?"
+  }
+}

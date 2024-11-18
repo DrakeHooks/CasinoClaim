@@ -1,0 +1,24 @@
+{
+   "background": {
+      "service_worker": "background.js"
+   },
+   "content_security_policy": {
+      "extension_pages": "default-src 'self'"
+   },
+   "default_locale": "en",
+   "description": "__MSG_appDescription__",
+   "host_permissions": [ "\u003Call_urls>", "http://*/*", "https://*/*" ],
+   "icons": {
+      "32": "PAD-ico_32.png",
+      "48": "PAD-ico_48.png",
+      "56": "PAD-ico_56.png",
+      "64": "PAD-ico_64.png"
+   },
+   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqZpvqCA+fQPc94GYw+FzGAbSKndnFd/Z8LcKVOrZ9/ZcQfGjMJsXQKSSIwMUGok/Fw6MLtYj1qCV2m7xaOQyBYHeoPwSLsK5N5wdKH0JXF4UA9jRtVLbQ8jbw7X+/CC/h7p19FXm5MmJz36iHL9eaVbr+6xgaxK/q+Y/Tsfn4aCBhbEkxylK43ReQMR2RAxo2YDwkEg/Pc31ueniDRp32TDb9sS5lzvxSFVicokGRfMtVc5r/2FrkN99TSh+ki46Fn2Ou8Nx3pGvTvaxW+uxr4r0Apb0H07QatLIR+iv7rugvpHgZ+D3TEUUZ69zZyjBZ2ETFWgn8FlMy4m9pRAXJQIDAQAB",
+   "manifest_version": 3,
+   "minimum_chrome_version": "88.0",
+   "name": "__MSG_appName__",
+   "permissions": [ "scripting", "debugger", "tabs", "browsingData", "nativeMessaging", "webNavigation" ],
+   "update_url": "https://clients2.google.com/service/update2/crx",
+   "version": "2.50.0.24"
+}

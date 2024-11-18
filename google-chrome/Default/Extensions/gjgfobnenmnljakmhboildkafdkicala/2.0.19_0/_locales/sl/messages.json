@@ -1,0 +1,14 @@
+{
+   "appDescription": {
+      "message": "Dodatek za omogočanje spletne avtomatizacije. Spletna razširitev je združljiva z različico aplikacije Power Automate za namizje 2.26 ali starejšo."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate (starejša različica)"
+   },
+   "deprecationLink": {
+      "message": "tukaj"
+   },
+   "deprecationMessage": {
+      "message": "Po določenem datumu, ki ga bo sporočila ekipa za Google Chrome (datum opustitve), brskalnik Chrome ne bo več podpiral spletnih razširitev, ustvarjenih z manifestom V2. Spletna razširitev, ki jo uporabljate, je ustvarjena z manifestom V2 in je združljiva z različico aplikacije Power Automate za namizje 2.26 ali starejšo. Zato od datuma opustitve ne bo več delovala. Če želite nadaljevati avtomatizacijo spletnih scenarijev s tem brskalnikom po datumu opustitve, morate nadgraditi aplikacijo Power Automate za namizje na najnovejšo različico (2.27 ali novejšo) in namestiti novo spletno razširitev za Microsoft Power Automate. Več o tem "
+   }
+}

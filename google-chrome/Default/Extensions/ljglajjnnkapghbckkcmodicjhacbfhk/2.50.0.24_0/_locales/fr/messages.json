@@ -1,0 +1,35 @@
+{
+   "appDescription": {
+      "message": "Complément d’activation de l’automatisation web. Cette extension répond à Power Automate pour le bureau (2.27 ou ultérieure)."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate"
+   },
+   "consentAccept": {
+      "message": "Accepter"
+   },
+   "consentCollectedData1": {
+      "message": "URI de la page web avec laquelle vous interagissez et que nous collectons pour activer les fonctionnalités d’automatisation web de Power Automate pour le bureau."
+   },
+   "consentDecline": {
+      "message": "Refuser"
+   },
+   "consentHeader": {
+      "message": "Consentement à la confidentialité de Microsoft Power Automate"
+   },
+   "consentParagraph1": {
+      "message": "Si vous choisissez de ne pas nous autoriser à collecter des données anonymes, l’automatisation web ne sera pas disponible."
+   },
+   "consentParagraph2": {
+      "message": "Tous les détails des données anonymes que nous collectons et de ce que nous en faisons sont fournis dans notre "
+   },
+   "consentPrivacyLink": {
+      "message": "Politique de confidentialité"
+   },
+   "consentQuestion": {
+      "message": "Pouvons-nous collecter les données anonymes suivantes concernant votre utilisation de l’extension web Microsoft Power Automate ?"
+   },
+   "consentUninstall": {
+      "message": "Cette action va désinstaller l’extension web Microsoft Power Automate. Voulez-vous continuer ?"
+   }
+}

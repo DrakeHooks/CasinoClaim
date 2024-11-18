@@ -1,0 +1,14 @@
+{
+   "appDescription": {
+      "message": "Add-on für dieWebautomatisierung. Diese Web-Erweiterung ist mit Power Automate für Desktop Version 2.26 oder früher kompatibel."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate (veraltet)"
+   },
+   "deprecationLink": {
+      "message": "hier"
+   },
+   "deprecationMessage": {
+      "message": "Nach einem bestimmten Datum, das vom Google Chrome-Team angekündigt wird (dem Abkündigungsdatum), unterstützt der Chrome-Browser keine Weberweiterungen mehr, die mit Manifest V2 erstellt wurden. Die von Ihnen verwendete Weberweiterung wurde mit Manifest V2 erstellt und ist mit der Version 2.26 Power Automate für Desktop oder früher kompatibel. Daher wird sie ab dem Abkündigungsdatum nicht mehr funktionieren. Sie müssen daher Power Automate für Desktop auf die neueste Version (2.27 oder höher) upgraden und die neue Microsoft Power Automate-Weberweiterung installieren, um mit diesem Browser nach dem Abkündigungsdatum weiterhin Webszenarien automatisieren zu können. Weitere Informationen "
+   }
+}

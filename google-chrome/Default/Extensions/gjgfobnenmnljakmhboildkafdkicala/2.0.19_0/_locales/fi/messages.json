@@ -1,0 +1,14 @@
+{
+   "appDescription": {
+      "message": "Lisäosa verkkoautomaation käyttöönottoon. Tämä verkkolaajennus on yhteensopiva Power Automate -työpöytäsovelluksen version 2.26 tai sitä aikaisemman version kanssa."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate (vanha)"
+   },
+   "deprecationLink": {
+      "message": "täältä"
+   },
+   "deprecationMessage": {
+      "message": "Kun Google Chrome -ryhmä on ilmoittanut tietyn päivämäärän (vanhentumispäivämäärä), Chrome-selain ei enää tue Manifest V2 -versiolla luotuja verkkolaajennuksia. Käytössäsi on verkkolaajennus, joka on luotu Manifest V2 -versiolla, ja se on yhteensopiva Power Automate -työpöytäsovelluksen version 2.26 tai sitä aikaisempien versioiden kanssa. Siksi se ei toimi vanhentumispäivämäärästä eteenpäin. Jos haluat jatkaa verkkoskenaarioiden automatisointeja tällä selaimella vanhentumispäivämäärän jälkeen, Power Automate -työpöytäsovellus on päivitettävä uusimpaan versioon (2.27 tai uudempi) ja asennettava Microsoft Power Automate -verkkolaajennus. Lisätietoja "
+   }
+}

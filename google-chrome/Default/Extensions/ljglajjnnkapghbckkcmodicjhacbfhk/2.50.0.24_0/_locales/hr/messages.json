@@ -1,0 +1,35 @@
+{
+   "appDescription": {
+      "message": "Dodatak za omogućivanje automacije weba. Ovo web-prošir. je kompat. s usl. Power Automate za radne površine verz. 2.27 ili novije."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate"
+   },
+   "consentAccept": {
+      "message": "Prihvati"
+   },
+   "consentCollectedData1": {
+      "message": "URI web-stranice s kojom imate interakciju, a koji prikupljamo kako bismo omogućili mogućnosti automacije weba usluge Power Automate za radne površine."
+   },
+   "consentDecline": {
+      "message": "Odbij"
+   },
+   "consentHeader": {
+      "message": "Pristanak na privatnost usluge Microsoft Power Automate"
+   },
+   "consentParagraph1": {
+      "message": "Ako odlučite da nam nećete dozvoliti prikupljanje anonimnih podataka, automacija weba neće biti dostupna."
+   },
+   "consentParagraph2": {
+      "message": "Sve pojedinosti o anonimnim podacima koje prikupljamo i što s njima radimo navedeno je u našim "
+   },
+   "consentPrivacyLink": {
+      "message": "Pravilima o zaštiti privatnosti"
+   },
+   "consentQuestion": {
+      "message": "Možemo li prikupiti sljedeće anonimne podatke o vašoj upotrebi web-proširenja Microsoft Power Automate?"
+   },
+   "consentUninstall": {
+      "message": "Time ćete deinstalirati web-proširenje Microsoft Power Automate. Želite li nastaviti?"
+   }
+}

@@ -1,0 +1,35 @@
+{
+   "appDescription": {
+      "message": "Надстройка для включения веб-автоматизации. Это веб-расширение совместимо с Power Automate для компьютеров версии 2.27 или выше."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate"
+   },
+   "consentAccept": {
+      "message": "Принять"
+   },
+   "consentCollectedData1": {
+      "message": "URI-идентификатор веб-страницы, с которой вы взаимодействуете. Мы собираем эти данные для включения возможностей веб-автоматизации Power Automate для компьютеров."
+   },
+   "consentDecline": {
+      "message": "Отклонить"
+   },
+   "consentHeader": {
+      "message": "Согласие на обеспечение конфиденциальности Microsoft Power Automate"
+   },
+   "consentParagraph1": {
+      "message": "Если вы не разрешите нам сбор анонимных данных, то веб-автоматизация будет недоступна."
+   },
+   "consentParagraph2": {
+      "message": "Полные сведения об анонимных данных, которые мы собираем, и о том, что мы с ними делаем, предоставлены в нашем документе "
+   },
+   "consentPrivacyLink": {
+      "message": "Политика конфиденциальности"
+   },
+   "consentQuestion": {
+      "message": "Мы можем получить следующие анонимные данные о вашем использовании веб-расширения Microsoft Power Automate?"
+   },
+   "consentUninstall": {
+      "message": "В результате этого действия будет удалено веб-расширение Microsoft Power Automate. Продолжить?"
+   }
+}

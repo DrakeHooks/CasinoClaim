@@ -1,0 +1,14 @@
+{
+   "appDescription": {
+      "message": "Add-on for enabling web automation. This web extension is compatible with Power Automate for desktop version 2.26 or earlier."
+   },
+   "appName": {
+      "message": "Microsoft Power Automate (Legacy)"
+   },
+   "deprecationLink": {
+      "message": "here"
+   },
+   "deprecationMessage": {
+      "message": "After a certain date that will be announced by the Google Chrome team (the deprecation date), Chrome browser will no longer support web extensions created with Manifest V2. The web extension that you are using is created with Manifest V2 and it is compatible with Power Automate for desktop version 2.26 or earlier. Therefore, it will not be functional from the deprecation date and onwards. To continue automating web scenarios with this browser beyond the deprecation date, you must upgrade your Power Automate for desktop to the latest version (2.27 or later) and install the new Microsoft Power Automate web extension. Learn more "
+   }
+}
