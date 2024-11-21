@@ -18,7 +18,7 @@ async def authenticate_dingdingding(driver, bot, ctx):
     try:
         web = "https://www.dingdingding.com/login"
         driver.get(web)
-        await asyncio.sleep(50)
+        await asyncio.sleep(80)
 
         # Wait for email and password fields, enter credentials from environment variables
         email_field = WebDriverWait(driver, 30).until(
@@ -32,13 +32,15 @@ async def authenticate_dingdingding(driver, bot, ctx):
         password_field.send_keys(os.getenv("DINGDINGDING").split(":")[1])
         
         await asyncio.sleep(3)
-
+        try:
         # Click login button
-        login_btn = WebDriverWait(driver, 10).until(
+            login_btn = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.XPATH, "/html/body/div[1]/div/div/div[1]/div[1]/div/div/div[2]/form/button[2]"))
-        )
-        login_btn.click()
-
+            )
+            login_btn.click()
+        except:
+            await ctx.send("Unable to solve captcha. Try again later.")
+            return False
         await asyncio.sleep(5)
 
         # Check if login was successful
