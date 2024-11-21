@@ -27,6 +27,12 @@ RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add
 # Set the working directory to the root of the project
 WORKDIR /app
 
+# Copy the .crx file to a temporary directory
+COPY ./CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx /temp/CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx
+
+# Copy the google-chrome directory to a temporary directory
+COPY ./google-chrome /temp/google-chrome
+
 # Copy the entire project to /app in the container
 COPY . /app
 
