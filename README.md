@@ -19,7 +19,7 @@ This program is heavily inspired by auto-rsa from Nelson Dane. Go check it out a
 
 # Installation 🛠️
 
-1. Install `git` for your operating system. Then, install `docker` and `docker-compose` for your operating system. You can follow this guide to install docker and docker-compose: https://docs.docker.com/get-docker/ Note: If you are using Windows, i strongly recommend docker desktop for Windows.
+1. Install `git` for your operating system. Then, install `docker` and `docker-compose` for your operating system. You can follow this guide to install docker and docker-compose: https://docs.docker.com/get-docker/ Note: If you are using Windows, I strongly recommend docker desktop for Windows.
 
 2. Clone this repository and cd into it:
 ```bash
