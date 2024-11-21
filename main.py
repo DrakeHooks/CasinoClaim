@@ -29,7 +29,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 
 #import custom API functions
 # from fortunecoinsAPI import *
-# from googleauthAPI import *
+from googleauthAPI import *
 from chancedAPI import *
 from rollingrichesAPI import *
 from globalpokerAPI import *
@@ -165,6 +165,23 @@ async def restart(ctx):
     await ctx.send("Restarting...")
     await bot.close()
     os._exit(0)  # Special exit code to restart docker container
+
+
+@bot.command(name="googleauth")
+async def googleauth(ctx):
+    await ctx.send("Authenticating Google Account...")
+    # Load credentials from environment variables
+    google_credentials = os.getenv("GOOGLE_LOGIN")
+
+    if google_credentials:
+        google_username, google_password = google_credentials.split(':')
+        credentials = (google_username, google_password)
+    else:
+        await ctx.send("Google credentials not found in .env file.")
+        credentials = (None, None)  
+
+    channel = bot.get_channel(DISCORD_CHANNEL)
+    await google_auth(ctx, driver, channel, credentials)
 
 
 @bot.event
