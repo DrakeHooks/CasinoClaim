@@ -27,13 +27,13 @@ git clone https://github.com/DrakeHooks/CasinoClaim.git
 cd CasinoClaim
 ```
 
-1. Sign in to Chanced, CrownCoins Casino, and Luckybird on a google chrome browser. Then, take the "User Data" folder (usually located in "AppData/Local/Google/Chrome"), and place it in the "google-chrome" folder in the project.
+1. Sign in to CrownCoins Casino, and Luckybird in a chrome browser. Then, take the "User Data" folder (usually located in "AppData/Local/Google/Chrome"), and place it in the "google-chrome" folder in the project.
 
 2. Create a discord bot and invite it to your server. You can follow this guide to create a discord bot: [guide](discordBot.md)
 
 3. Create the .env file in the root directory of the project and add the following:
     1. Add `DISCORD_TOKEN` and `DISCORD_CHANNEL` to your `.env` file.
-    2. Add your casino login credentials to .env file. Note: some casino logins are currently only supported through the User Data directory.
+    2. Add your casino login credentials by editing the .env.example file. After editing, rename the file to .env and save. Note: some casino logins are currently only supported through the User Data directory.
 4. run `docker compose up -d`
 
 
