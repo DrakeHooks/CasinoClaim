@@ -28,7 +28,7 @@ async def authenticate_chumba(driver, bot, channel):
 
         # Check if we are redirected to the lobby
         if driver.current_url.startswith("https://lobby.chumbacasino.com/"):
-            await channel.send("Chumba Casino authenticated successfully!")
+            print("Chumba Casino authenticated successfully!")
             return True
 
         # Handle 2FA input if required
