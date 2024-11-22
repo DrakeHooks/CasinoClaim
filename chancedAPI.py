@@ -20,7 +20,7 @@ async def logout_and_login(ctx, driver, channel, credentials):
         await asyncio.sleep(5)
         # Click the menu button to open the dropdown
         menu_button = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.ID, "headlessui-menu-button-8"))
+            EC.element_to_be_clickable((By.ID, "headlessui-menu-button-v-7"))
         )
         menu_button.click()
         
