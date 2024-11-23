@@ -28,17 +28,22 @@ from seleniumbase import Driver
 from selenium.webdriver.common.action_chains import ActionChains
 
 #import custom API functions
+
+
+try:
 # from fortunecoinsAPI import *
-from googleauthAPI import *
-from chancedAPI import *
-from rollingrichesAPI import *
-from globalpokerAPI import *
-from dingdingdingAPI import *
-from chumbaAPI import *
-from crowncoinsAPI import *
-from zulaAPI import *
-from luckybirdAPI import *
-from sportzinoAPI import *
+    from googleauthAPI import *
+    from chancedAPI import *
+    from rollingrichesAPI import *
+    from globalpokerAPI import *
+    from dingdingdingAPI import *
+    from chumbaAPI import *
+    from crowncoinsAPI import *
+    from zulaAPI import *
+    from luckybirdAPI import *
+    from sportzinoAPI import *
+except Exception as e:
+    print(f"Error importing API libraries: {str(e)}")
 
 
 load_dotenv()
