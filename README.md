@@ -58,9 +58,6 @@ cd CasinoClaim
 | Luckybird      | ✓          | ✓               | No                          | $.25 bonus/day. Increases with VIP | Yes     |
 | Crown Coins    | ✓          | ✓               | Yes                         | Varies between $0.00-$2 bonus/day. Requires Usr Data Dir for auth. Social Auth support in development | Yes     |
 | Modo           | ✓          | ✓               | No                          | $.30-$1 SC bonus/day | Yes     |
-| Hello Millions | IN DEVELOPMENT | IN DEVELOPMENT | IN DEVELOPMENT            | $.25 SC bonus/day | Yes      |
-| Scratchful     | IN DEVELOPMENT | IN DEVELOPMENT | IN DEVELOPMENT            | $.25 SC bonus/day | Yes      |
-| McLuck         | IN DEVELOPMENT | IN DEVELOPMENT | IN DEVELOPMENT            | $.25 SC bonus/day | Yes      |
 | Pulsz          | IN DEVELOPMENT | IN DEVELOPMENT | IN DEVELOPMENT            | Varies between $.20-$3 SC bonus/day | Yes      |
 
 
