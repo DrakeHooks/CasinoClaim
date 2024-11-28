@@ -18,7 +18,7 @@ async def authenticate_dingdingding(driver, bot, ctx):
     try:
         web = "https://www.dingdingding.com/login"
         driver.get(web)
-        await asyncio.sleep(80)
+        await asyncio.sleep(55)
 
         # Wait for email and password fields, enter credentials from environment variables
         email_field = WebDriverWait(driver, 30).until(
