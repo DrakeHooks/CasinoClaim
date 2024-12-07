@@ -397,12 +397,15 @@ async def casino_loop():
             await zula_casino(None, driver, channel)
         except:
             print("Error in Zula")
-        await asyncio.sleep(60)
+            await asyncio.sleep(50)
+        await asyncio.sleep(80)
         try:
             await Sportzino(None, driver, channel)
+            await asyncio.sleep(50)
         except:
             print("Error in Sportzino")
-        await asyncio.sleep(60)
+            await asyncio.sleep(50)
+        await asyncio.sleep(80)
         try:
             await crowncoins_casino(None, driver, channel)
         except:
