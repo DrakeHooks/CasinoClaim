@@ -45,12 +45,12 @@ cd CasinoClaim
 # Supported Casinos ✅
 | Casino         | Auto Claim | Countdown Timer | Require User Data Directory | Notes            | Trusted? (payment proof) |
 |----------------|------------|-----------------|-----------------------------|------------------|---------|
-| Chanced        | ✓          | ✓               | No                          | Varies between $.3-$1 SC bonus/day    | Yes     |
+| Chanced        | ✗          | ✓               | No                          | Varies between $.3-$1 SC bonus/day    | Yes     |
 | Global Poker   | ✓          | ✓               | No                          | $0.00-$2 SC bonus/day | Yes     |
 | Rolling Riches | ✓          | ✓               | No                          | $.20 bonus every 6 hours | Yes     |
 | Chumba         | ✓          | ✓               | No                          | $1 bonus/day     | Yes     |
 | DingDingDing   | ✓          | ✓               | No                          | Varies between $0.50 SC and $1 SC | Yes     |
-| Stake          | ✗          | ✓               | Yes                         | $1 bonus/day. Auto Claim in development | Yes     |
+| Stake          | ✗          | ✓               | No                         | $1 bonus/day. Auto Claim in development | Yes     |
 | Zula           | ✓          | ✓               | No                          | $1 bonus/day     | Yes     |
 | Fortune Coins  | ✓          | ✗               | No                          | $0.50-$1.20 SC bonus every 24 hours | Yes     |
 | Sportzino      | ✓          | ✓               | No                          | $1 bonus/day     | Yes     |

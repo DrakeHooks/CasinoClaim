@@ -144,7 +144,7 @@ async def claim_chanced_bonus(ctx, driver, channel):
         yes_button.click()
         await asyncio.sleep(1)
 
-        await channel.send("Chanced.com Daily Bonus Claimed!")
+        await channel.send("Chanced.com Daily Bonus Available!")
     except TimeoutException as e:
         print(f"Error claiming bonus: {e}")
         print("Chanced.com Bonus is unavailable right now.")

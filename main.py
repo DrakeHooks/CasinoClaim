@@ -32,6 +32,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 
 try:
 # from fortunecoinsAPI import *
+    from stakeAPI import *
     from googleauthAPI import *
     from chancedAPI import *
     from rollingrichesAPI import *
@@ -238,6 +239,17 @@ async def rollingriches(ctx):
     else:
         await ctx.send("RollingRiches automation is already running.")
 
+@bot.command(name="Stake")
+async def stake(ctx):
+    global stake_task
+    if not stake_task or stake_task.done():
+        await ctx.send("Checking Stake for Bonus...")
+        channel = bot.get_channel(DISCORD_CHANNEL)
+        await stake_claim(ctx, driver, channel)
+    else:
+        await ctx.send("Stake automation is already running.")
+
+
 @bot.command(name="chanced")
 async def chanced(ctx):
     await ctx.send("Checking Chanced.com for Bonus...")
@@ -437,6 +449,10 @@ async def casino_loop():
         except:
             print("Error in Chumba")
         await asyncio.sleep(10)
+        try:
+            await stake_claim(None, driver, channel)
+        except:
+            print("Error in Stake")
 
 
     except Exception as e:
