@@ -449,10 +449,11 @@ async def casino_loop():
         except:
             print("Error in Chumba")
         await asyncio.sleep(10)
-        try:
-            await stake_claim(None, driver, channel)
-        except:
-            print("Error in Stake")
+        # Stake still in development 💀
+        # try:
+        #     await stake_claim(None, driver, channel)
+        # except:
+        #     print("Error in Stake")
 
 
     except Exception as e:
