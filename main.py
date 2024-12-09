@@ -321,10 +321,10 @@ async def DingDingDing(ctx):
         driver.get("https://www.dingdingding.com/lobby")
 
         # Attempt to claim the daily bonus (but proceed to check countdown regardless)
-        await claim_dingdingding_bonus(driver, ctx)
+        await claim_dingdingding_bonus(driver, ctx, bot)
 
         # Always check for the countdown, even if the bonus claim was unsuccessful
-        await check_dingdingding_countdown(driver, ctx)
+        await check_dingdingding_countdown(driver, ctx, bot)
     else:
         await ctx.send("Authentication failed. Unable to proceed.")
 
