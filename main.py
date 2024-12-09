@@ -32,7 +32,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 
 try:
 # from fortunecoinsAPI import *
-    from stakeAPI import *
+# from stakeAPI import *
     from googleauthAPI import *
     from chancedAPI import *
     from rollingrichesAPI import *
@@ -424,7 +424,7 @@ async def casino_loop():
             print("Error in CrownCoinsCasino")
         await asyncio.sleep(30)
         try:
-            await dingdingding_casino(channel, driver, bot)  # Pass channel and bot directly
+            await dingdingding_casino(None, driver, bot)  # Pass channel and bot directly
         except:
             print("Error in DingDingDing")
         await asyncio.sleep(10)
