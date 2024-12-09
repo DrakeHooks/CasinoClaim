@@ -239,15 +239,15 @@ async def rollingriches(ctx):
     else:
         await ctx.send("RollingRiches automation is already running.")
 
-@bot.command(name="Stake")
-async def stake(ctx):
-    global stake_task
-    if not stake_task or stake_task.done():
-        await ctx.send("Checking Stake for Bonus...")
-        channel = bot.get_channel(DISCORD_CHANNEL)
-        await stake_claim(ctx, driver, channel)
-    else:
-        await ctx.send("Stake automation is already running.")
+# @bot.command(name="Stake")
+# async def stake(ctx):
+#     global stake_task
+#     if not stake_task or stake_task.done():
+#         await ctx.send("Checking Stake for Bonus...")
+#         channel = bot.get_channel(DISCORD_CHANNEL)
+#         await stake_claim(ctx, driver, channel)
+#     else:
+#         await ctx.send("Stake automation is already running.")
 
 
 @bot.command(name="chanced")
@@ -427,7 +427,7 @@ async def casino_loop():
             await dingdingding_casino(None, driver, bot)  # Pass channel and bot directly
         except:
             print("Error in DingDingDing")
-        await asyncio.sleep(10)
+        await asyncio.sleep(100)
         try:
             await rolling_riches_casino(None, driver, channel)
         except:
