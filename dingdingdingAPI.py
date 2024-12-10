@@ -13,10 +13,8 @@ load_dotenv()
 authenticated = False
 
 # Function to authenticate into DingDingDing
-async def authenticate_dingdingding(driver, ctx, bot):
-    channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
+async def authenticate_dingdingding(driver, bot, ctx):
     global authenticated
-    
     try:
         web = "https://www.dingdingding.com/login"
         driver.get(web)
@@ -61,16 +59,7 @@ async def authenticate_dingdingding(driver, ctx, bot):
     return True
 
 # Function to claim DingDingDing daily bonus
-async def claim_dingdingding_bonus(driver, ctx, bot):
-    channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
-
-    if ctx:
-        send = ctx.send
-    elif channel:
-        send = channel.send
-    else:
-        print("No valid Discord context or channel found.")
-        return
+async def claim_dingdingding_bonus(driver, ctx):
     try:
         # Click the bonus button in the lobby
         bonus_button = WebDriverWait(driver, 10).until(
@@ -85,7 +74,7 @@ async def claim_dingdingding_bonus(driver, ctx, bot):
         )
         collect_button.click()
 
-        await send("DingDingDing Daily Bonus Claimed!")
+        await ctx.send("DingDingDing Daily Bonus Claimed!")
 
     except TimeoutException:
         print("COLLECT button not found! Check XPATH of claim button!")
@@ -94,16 +83,7 @@ async def claim_dingdingding_bonus(driver, ctx, bot):
     return True
 
 # Function to check the countdown for the next bonus
-async def check_dingdingding_countdown(driver, ctx, bot):
-    channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
-
-    if ctx:
-        send = ctx.send
-    elif channel:
-        send = channel.send
-    else:
-        print("No valid Discord context or channel found.")
-        return
+async def check_dingdingding_countdown(driver, ctx):
     try:
         # Retrieve countdown elements
         hours_element = WebDriverWait(driver, 10).until(
@@ -118,10 +98,10 @@ async def check_dingdingding_countdown(driver, ctx, bot):
 
         # Format countdown time
         countdown_message = f"Next DingDingDing Bonus Available in: {hours_element.text.zfill(2)}:{minutes_element.text.zfill(2)}:{seconds_element.text.zfill(2)}"
-        await send(countdown_message)
+        await ctx.send(countdown_message)
 
     except TimeoutException:
-        await send("Failed to retrieve DingDingDing countdown timer.")
+        await ctx.send("Failed to retrieve DingDingDing countdown timer.")
         return False
 
     return True
@@ -133,23 +113,15 @@ async def dingdingding_casino(ctx, driver, bot):
     # Get the Discord channel
     channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
 
-    if ctx:
-        send = ctx.send
-    elif channel:
-        send = channel.send
-    else:
-        print("No valid Discord context or channel found.")
-        return
-    
     # Check if the user is already authenticated, if not, authenticate first
     if not authenticated:
-        await send("Authenticating into DingDingDing...")
+        await ctx.send("Authenticating into DingDingDing...")
         authenticated = await authenticate_dingdingding(driver, bot, ctx)
 
     # Proceed to claim the bonus if authenticated
     if authenticated:
-        await claim_dingdingding_bonus(driver, ctx, bot)
-        await asyncio.sleep(5)
+        await claim_dingdingding_bonus(driver, ctx)
+        await asyncio.sleep(50)
 
     # Check the countdown for the next available bonus
-    await check_dingdingding_countdown(driver, ctx, bot)
+    await check_dingdingding_countdown(driver, ctx)
