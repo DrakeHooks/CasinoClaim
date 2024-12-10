@@ -146,8 +146,8 @@ async def dingdingding_casino(ctx, driver, bot):
 
     # Proceed to claim the bonus if authenticated
     if authenticated:
-        await claim_dingdingding_bonus(driver, ctx)
+        await claim_dingdingding_bonus(driver, ctx, bot)
         await asyncio.sleep(5)
 
     # Check the countdown for the next available bonus
-    await check_dingdingding_countdown(driver, ctx)
+    await check_dingdingding_countdown(driver, ctx, bot)
