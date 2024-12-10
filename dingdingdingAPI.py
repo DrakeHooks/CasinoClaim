@@ -16,6 +16,7 @@ authenticated = False
 async def authenticate_dingdingding(driver, ctx, bot):
     channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
     global authenticated
+    
     try:
         web = "https://www.dingdingding.com/login"
         driver.get(web)
@@ -40,21 +41,21 @@ async def authenticate_dingdingding(driver, ctx, bot):
             )
             login_btn.click()
         except:
-            await channel.send("Unable to solve captcha. Try again later.")
+            await ctx.send("Unable to solve captcha. Try again later.")
             return False
         await asyncio.sleep(5)
 
         # Check if login was successful
         if driver.current_url == "https://dingdingding.com/lobby/":
-            await channel.send("Authenticated into DingDingDing successfully!")
+            await ctx.send("Authenticated into DingDingDing successfully!")
             authenticated = True
         else:
-            await channel.send("Authentication failed. Did not reach the lobby.")
+            await ctx.send("Authentication failed. Did not reach the lobby.")
             authenticated = False
 
     except TimeoutException:
         authenticated = False
-        await channel.send("Authentication timeout. Please check your credentials or XPaths.")
+        await ctx.send("Authentication timeout. Please check your credentials or XPaths.")
         return False
 
     return True
