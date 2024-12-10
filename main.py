@@ -425,6 +425,7 @@ async def casino_loop():
         await asyncio.sleep(30)
         try:
             await dingdingding_casino(None, driver, bot)  # Pass channel and bot directly
+            await asyncio.sleep(100)
         except:
             print("Error in DingDingDing")
         await asyncio.sleep(100)
