@@ -45,7 +45,7 @@ cd CasinoClaim
 # Supported Casinos ✅
 | Casino         | Auto Claim | Countdown Timer | Require User Data Directory | Notes            | Trusted? (payment proof) |
 |----------------|------------|-----------------|-----------------------------|------------------|---------|
-| Chanced        | ✗          | ✓               | No                          | Varies between $.3-$1 SC bonus/day    | Yes     |
+| Chanced        | ✓          | ✓               | No                          | Varies between $.3-$1 SC bonus/day    | Yes     |
 | Global Poker   | ✓          | ✓               | No                          | $0.00-$2 SC bonus/day | Yes     |
 | Rolling Riches | ✓          | ✓               | No                          | $.20 bonus every 6 hours | Yes     |
 | Chumba         | ✓          | ✓               | No                          | $1 bonus/day     | Yes     |
