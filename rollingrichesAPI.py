@@ -109,7 +109,7 @@ async def claim_rolling_riches_bonus(ctx, driver, channel):
             while len(time_parts) < 3:  # Ensure we have 3 parts (HH:MM:SS)
                 time_parts.insert(0, "00")
             formatted_countdown = ":".join(time_parts)
-
+            await asyncio.sleep(2)
             await channel.send(f"Next Rolling Riches Bonus Available in: {formatted_countdown}")
         else:
             print("Unable to retrieve Rolling Riches countdown value.")
