@@ -45,11 +45,11 @@ async def rolling_riches_casino(ctx, driver, channel):
             password_input.send_keys(Keys.ENTER)
             await asyncio.sleep(5)  # Wait for login process to complete
         else:
-            await claim_rolling_riches_bonus(ctx, driver, channel)
             # If no login button is found, assume already logged in
             await channel.send("Session already active, proceeding without login.")
 
         # Now proceed with claiming the bonus
+        await claim_rolling_riches_bonus(ctx, driver, channel)
 
     except TimeoutException as e:
         print(f"Login timeout: {e}")
@@ -109,7 +109,7 @@ async def claim_rolling_riches_bonus(ctx, driver, channel):
             while len(time_parts) < 3:  # Ensure we have 3 parts (HH:MM:SS)
                 time_parts.insert(0, "00")
             formatted_countdown = ":".join(time_parts)
-            await asyncio.sleep(2)
+
             await channel.send(f"Next Rolling Riches Bonus Available in: {formatted_countdown}")
         else:
             print("Unable to retrieve Rolling Riches countdown value.")
