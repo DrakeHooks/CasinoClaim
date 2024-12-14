@@ -83,6 +83,14 @@ async def claim_dingdingding_bonus(ctx, driver, channel):
 # Function to check the countdown for the next bonus
 async def check_dingdingding_countdown(ctx, driver, channel):
     try:
+        driver.get("https://dingdingding.com/lobby/")
+        await asyncio.sleep(5)
+
+        bonus_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, "#__nuxt > div > div:nth-child(1) > aside.sidenav > div.sidenav__cont > div > div.sidenav__actions > button.btn.btn--nav.btn--rewards > span.btn__label"))
+        )
+        bonus_button.click()
+
         # Retrieve countdown elements
         hours_element = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div/div[1]/div[6]/div/div[2]/div/div/div/span/div[1]/span"))
@@ -98,7 +106,7 @@ async def check_dingdingding_countdown(ctx, driver, channel):
         countdown_message = f"Next DingDingDing Bonus Available in: {hours_element.text.zfill(2)}:{minutes_element.text.zfill(2)}:{seconds_element.text.zfill(2)}"
         await channel.send(countdown_message)
 
-    except TimeoutException:
+    except:
         await channel.send("Failed to retrieve DingDingDing countdown timer.")
         return False
 
@@ -114,8 +122,11 @@ async def dingdingding_casino(ctx, driver, channel):
 
     # Proceed to claim the bonus if authenticated
     if authenticated:
-        await claim_dingdingding_bonus(ctx, driver, channel)
-        await asyncio.sleep(5)
+        try:
+            await claim_dingdingding_bonus(ctx, driver, channel)
+        except:
+            print("Failed to claim DingDingDing bonus.")
+            await check_dingdingding_countdown(ctx, driver, channel)
+            return False
 
-    # Check the countdown for the next available bonus
-    await check_dingdingding_countdown(ctx, driver, channel)
+        await asyncio.sleep(5)
