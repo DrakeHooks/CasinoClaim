@@ -86,7 +86,7 @@ async def check_dingdingding_countdown(ctx, driver, channel):
         driver.get("https://dingdingding.com/lobby/")
         await asyncio.sleep(5)
 
-        bonus_button = WebDriverWait(driver, 10).until(
+        bonus_button = WebDriverWait(driver, 30).until(
             EC.element_to_be_clickable((By.CSS_SELECTOR, "#__nuxt > div > div:nth-child(1) > aside.sidenav > div.sidenav__cont > div > div.sidenav__actions > button.btn.btn--nav.btn--rewards > span.btn__label"))
         )
         bonus_button.click()
