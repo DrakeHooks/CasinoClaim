@@ -32,13 +32,16 @@ async def authenticate_dingdingding(driver, channel, ctx):
         password_field.send_keys(os.getenv("DINGDINGDING").split(":")[1])
         
         await asyncio.sleep(3)
-
+        
+        try:
         # Click login button
-        login_btn = WebDriverWait(driver, 10).until(
+            login_btn = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.XPATH, "/html/body/div[1]/div/div/div[1]/div[1]/div/div/div[2]/form/button[2]"))
-        )
-        login_btn.click()
-
+            )
+            login_btn.click()
+        except:
+            await ctx.send("Login button not accessed. Try again.")
+            return False
         await asyncio.sleep(5)
 
         # Check if login was successful
