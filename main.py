@@ -307,13 +307,13 @@ async def crowncoinscasino(ctx):
 @bot.command(name="dingdingding")
 async def DingDingDing(ctx):
     global authenticated
-    channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
     await ctx.send("Checking DingDingDing for bonus...")
+    channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
 
     # Check if already authenticated
     if not authenticated:
         await ctx.send("Authenticating DingDingDing first...")
-        authenticated = await authenticate_dingdingding(ctx, driver, channel)
+        authenticated = await authenticate_dingdingding(driver, channel, ctx)
 
     # Proceed if authentication was successful
     if authenticated:
@@ -321,10 +321,10 @@ async def DingDingDing(ctx):
         driver.get("https://www.dingdingding.com/lobby")
 
         # Attempt to claim the daily bonus (but proceed to check countdown regardless)
-        await claim_dingdingding_bonus(ctx, driver, channel)
+        await claim_dingdingding_bonus(driver, ctx)
 
         # Always check for the countdown, even if the bonus claim was unsuccessful
-        await check_dingdingding_countdown(ctx, driver, channel)
+        await check_dingdingding_countdown(driver, ctx)
     else:
         await channel.send("Authentication failed. Unable to proceed.")
 
@@ -424,8 +424,8 @@ async def casino_loop():
             print("Error in CrownCoinsCasino")
         await asyncio.sleep(30)
         try:
-            await dingdingding_casino(None, driver, channel)  # Pass channel and bot directly
-            await asyncio.sleep(100)
+            await dingdingding_casino(channel, driver, bot)  
+            # await asyncio.sleep(100)
         except:
             print("Error in DingDingDing")
         await asyncio.sleep(100)
