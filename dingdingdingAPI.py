@@ -40,27 +40,27 @@ async def authenticate_dingdingding(driver, channel, ctx):
             )
             login_btn.click()
         except:
-            await ctx.send("Unable to solve captcha. Try again later.")
+            await channel.send("Unable to solve captcha. Try again later.")
             return False
         await asyncio.sleep(5)
 
         # Check if login was successful
         if driver.current_url == "https://dingdingding.com/lobby/":
-            await ctx.send("Authenticated into DingDingDing successfully!")
+            await channel.send("Authenticated into DingDingDing successfully!")
             authenticated = True
         else:
-            await ctx.send("Authentication failed. Did not reach the lobby.")
+            await channel.send("Authentication failed. Did not reach the lobby.")
             authenticated = False
 
     except TimeoutException:
         authenticated = False
-        await ctx.send("Authentication timeout. Please check your credentials or XPaths.")
+        await channel.send("Authentication timeout. Please check your credentials or XPaths.")
         return False
 
     return True
 
 # Function to claim DingDingDing daily bonus
-async def claim_dingdingding_bonus(driver, ctx):
+async def claim_dingdingding_bonus(driver, ctx, channel):
     try:
         # Click the bonus button in the lobby
         bonus_button = WebDriverWait(driver, 10).until(
@@ -75,7 +75,7 @@ async def claim_dingdingding_bonus(driver, ctx):
         )
         collect_button.click()
 
-        await ctx.send("DingDingDing Daily Bonus Claimed!")
+        await channel.send("DingDingDing Daily Bonus Claimed!")
 
     except TimeoutException:
         print("COLLECT button not found! Check XPATH of claim button!")
@@ -84,7 +84,7 @@ async def claim_dingdingding_bonus(driver, ctx):
     return True
 
 # Function to check the countdown for the next bonus
-async def check_dingdingding_countdown(driver, ctx):
+async def check_dingdingding_countdown(driver, ctx, channel):
     try:
         driver.get("https://dingdingding.com/lobby/")
         await asyncio.sleep(5)
@@ -107,31 +107,31 @@ async def check_dingdingding_countdown(driver, ctx):
 
         # Format countdown time
         countdown_message = f"Next DingDingDing Bonus Available in: {hours_element.text.zfill(2)}:{minutes_element.text.zfill(2)}:{seconds_element.text.zfill(2)}"
-        await ctx.send(countdown_message)
+        await channel.send(countdown_message)
 
     except:
-        await ctx.send("Failed to retrieve DingDingDing countdown timer.")
+        await channel.send("Failed to retrieve DingDingDing countdown timer.")
         return False
 
     return True
 
 # Main function to handle DingDingDing
-async def dingdingding_casino(ctx, driver, bot):
+async def dingdingding_casino(ctx, driver, bot, channel):
     global authenticated
     # Check if the user is already authenticated, if not, authenticate first
 
     channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
 
     if not authenticated:
-        await ctx.send("Authenticating into DingDingDing...")
-        authenticated = await authenticate_dingdingding(driver, bot, ctx)
+        await channel.send("Authenticating into DingDingDing...")
+        authenticated = await authenticate_dingdingding(driver, bot, ctx, channel)
 
     # Proceed to claim the bonus if authenticated
     if authenticated:
         try:
-            await claim_dingdingding_bonus(driver, ctx)
+            await claim_dingdingding_bonus(driver, ctx, channel)
             await asyncio.sleep(5)
         except:
             print("Failed to claim DingDingDing bonus.")
-            await check_dingdingding_countdown(driver, ctx)
+            await check_dingdingding_countdown(driver, ctx, channel)
 
