@@ -13,9 +13,11 @@ load_dotenv()
 authenticated = False
 
 # Function to authenticate into DingDingDing
-async def authenticate_dingdingding(driver, channel, ctx):
+async def authenticate_dingdingding(driver, bot, ctx, channel):
     global authenticated
     try:
+        channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
+
         web = "https://www.dingdingding.com/login"
         driver.get(web)
         await asyncio.sleep(80)
@@ -60,8 +62,10 @@ async def authenticate_dingdingding(driver, channel, ctx):
     return True
 
 # Function to claim DingDingDing daily bonus
-async def claim_dingdingding_bonus(driver, ctx, channel):
+async def claim_dingdingding_bonus(driver, bot, ctx, channel):
     try:
+        channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
+
         # Click the bonus button in the lobby
         bonus_button = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.CSS_SELECTOR, "#__nuxt > div > div:nth-child(1) > aside.sidenav > div.sidenav__cont > div > div.sidenav__actions > button.btn.btn--nav.btn--rewards > span.btn__label"))
@@ -84,8 +88,10 @@ async def claim_dingdingding_bonus(driver, ctx, channel):
     return True
 
 # Function to check the countdown for the next bonus
-async def check_dingdingding_countdown(driver, ctx, channel):
+async def check_dingdingding_countdown(driver, bot, ctx, channel):
     try:
+        channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
+
         driver.get("https://dingdingding.com/lobby/")
         await asyncio.sleep(5)
 
@@ -116,7 +122,7 @@ async def check_dingdingding_countdown(driver, ctx, channel):
     return True
 
 # Main function to handle DingDingDing
-async def dingdingding_casino(ctx, driver, bot, channel):
+async def dingdingding_casino(driver, bot, ctx, channel):
     global authenticated
     # Check if the user is already authenticated, if not, authenticate first
 
@@ -129,9 +135,9 @@ async def dingdingding_casino(ctx, driver, bot, channel):
     # Proceed to claim the bonus if authenticated
     if authenticated:
         try:
-            await claim_dingdingding_bonus(driver, ctx, channel)
+            await claim_dingdingding_bonus(driver, bot, ctx, channel)
             await asyncio.sleep(5)
         except:
             print("Failed to claim DingDingDing bonus.")
-            await check_dingdingding_countdown(driver, ctx, channel)
+            await check_dingdingding_countdown(driver, bot, ctx, channel)
 

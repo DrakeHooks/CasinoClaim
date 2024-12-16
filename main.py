@@ -430,7 +430,7 @@ async def casino_loop():
         await asyncio.sleep(30)
         try:
             channel = bot.get_channel(DISCORD_CHANNEL)
-            await dingdingding_casino(None, driver, bot, channel)  
+            await dingdingding_casino(driver, bot, None, channel)  
             # await asyncio.sleep(100)
         except:
             print("Error in DingDingDing")
