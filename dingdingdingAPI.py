@@ -40,7 +40,7 @@ async def authenticate_dingdingding(driver, channel, ctx):
             )
             login_btn.click()
         except:
-            await ctx.send("Login button not accessed. Try again.")
+            await ctx.send("Unable to solve captcha. Try again.")
             return False
         await asyncio.sleep(5)
 
