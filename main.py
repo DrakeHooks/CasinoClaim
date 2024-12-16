@@ -328,6 +328,13 @@ async def DingDingDing(ctx):
     else:
         await channel.send("Authentication failed. Unable to proceed.")
 
+        # Screenshot the page to show unsolved CAPTCHA
+        screenshot_path = "dingdingding_screenshot.png"
+        driver.save_screenshot(screenshot_path)
+        await ctx.send("Authentication failed. Unable to proceed", 
+                       file=discord.File(screenshot_path))
+        os.remove(screenshot_path)
+     
      
 @bot.command(name="Zula")
 async def zula(ctx):
