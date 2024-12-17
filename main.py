@@ -313,7 +313,7 @@ async def DingDingDing(ctx):
     # Check if already authenticated
     if not authenticated:
         await ctx.send("Authenticating DingDingDing first...")
-        authenticated = await authenticate_dingdingding(driver, channel, ctx)
+        authenticated = await authenticate_dingdingding(driver, bot, ctx, channel)
 
     # Proceed if authentication was successful
     if authenticated:
