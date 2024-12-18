@@ -31,12 +31,15 @@ async def authenticate_dingdingding(driver, bot, ctx, channel):
         
         await asyncio.sleep(3)
 
+        try:
         # Click login button
-        login_btn = WebDriverWait(driver, 10).until(
+            login_btn = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.XPATH, "/html/body/div[1]/div/div/div[1]/div[1]/div/div/div[2]/form/button[2]"))
         )
-        login_btn.click()
-
+            login_btn.click()
+        except:
+            await channel.send("Unable to solve captcha!")
+            return False
         await asyncio.sleep(5)
 
         # Check if login was successful
