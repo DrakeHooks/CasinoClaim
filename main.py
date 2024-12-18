@@ -352,7 +352,12 @@ async def authenticate_command(ctx, site: str):
         if auth_status["dingdingding"]:
             await ctx.send("DingDingDing authentication succeeded.")
         else:
-            await ctx.send("DingDingDing authentication failed.")
+            screenshot_path = "auth_screenshot.png"
+            driver.save_screenshot(screenshot_path)
+            await ctx.send("Authentication failed. Unable to proceed.", 
+                       file=discord.File(screenshot_path))
+        os.remove(screenshot_path)
+     
     else:
         await ctx.send(f"Authentication for '{site}' is not implemented.")
 
