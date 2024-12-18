@@ -155,7 +155,13 @@ async def help(ctx):
     !ping - Check if the bot is online
     !restart - Restart the bot     
     !help - Display the available commands
-    !stop - Stop the bot                    
+    !stop - Stop the bot               
+
+    -------------------------------
+    Auth Commands:
+    !googleauth - Authenticate Google Account
+    !auth <site> - Authenticate into a specific site      
+                                    
     """)
 
 

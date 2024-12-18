@@ -46,10 +46,8 @@ async def rolling_riches_casino(ctx, driver, channel):
             await asyncio.sleep(5)  # Wait for login process to complete
         else:
             # If no login button is found, assume already logged in
+            await claim_rolling_riches_bonus(ctx, driver, channel)
             await channel.send("Session already active, proceeding without login.")
-
-        # Now proceed with claiming the bonus
-        await claim_rolling_riches_bonus(ctx, driver, channel)
 
     except TimeoutException as e:
         print(f"Login timeout: {e}")
