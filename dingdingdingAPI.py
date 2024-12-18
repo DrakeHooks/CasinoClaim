@@ -121,10 +121,8 @@ async def check_dingdingding_countdown(driver, bot, ctx, channel):
 
     return True
 
-# Main function to handle DingDingDing
 async def dingdingding_casino(driver, bot, ctx, channel):
     global authenticated
-    # Check if the user is already authenticated, if not, authenticate first
 
     channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
 
@@ -132,12 +130,16 @@ async def dingdingding_casino(driver, bot, ctx, channel):
         await channel.send("Authenticating into DingDingDing...")
         authenticated = await authenticate_dingdingding(driver, bot, ctx, channel)
 
-    # Proceed to claim the bonus if authenticated
     if authenticated:
         try:
             await claim_dingdingding_bonus(driver, bot, ctx, channel)
             await asyncio.sleep(5)
         except:
             print("Failed to claim DingDingDing bonus.")
-            await check_dingdingding_countdown(driver, bot, ctx, channel)
+        
+        # Always run countdown regardless of success
+        await check_dingdingding_countdown(driver, bot, ctx, channel)
+    else:
+        await channel.send("Unable to claim DingDingDing bonus or check countdown.")
+
 
