@@ -75,6 +75,13 @@ bot = commands.Bot(command_prefix='!', intents=intents, case_insensitive=True)
 bot.remove_command("help")
 bot.two_fa_code = None  # Variable to store the 2FA code
 
+
+# Dictionary to manage authentication status for different casinos
+auth_status = {
+    "dingdingding": False
+}
+
+
 # Tasks
 chanced_casino_task = None
 luckybird_task = None
@@ -120,6 +127,8 @@ async def on_ready():
         new_chanced_session.start()
     if not casino_loop.is_running():
         casino_loop.start()
+    if not dingdingding_auth_task.is_running():
+        dingdingding_auth_task.start()
     
 
 @bot.command(name="ping")
@@ -334,6 +343,22 @@ async def DingDingDing(ctx):
         os.remove(screenshot_path)
      
 
+@bot.command(name="auth")
+async def authenticate_command(ctx, site: str):
+    channel = bot.get_channel(DISCORD_CHANNEL)
+    if site.lower() == "dingdingding":
+        await ctx.send("Authenticating DingDingDing...")
+        auth_status["dingdingding"] = await authenticate_dingdingding(driver, bot, ctx, channel)
+        if auth_status["dingdingding"]:
+            await ctx.send("DingDingDing authentication succeeded.")
+        else:
+            await ctx.send("DingDingDing authentication failed.")
+    else:
+        await ctx.send(f"Authentication for '{site}' is not implemented.")
+
+     
+
+
 @bot.command(name="Zula")
 async def zula(ctx):
     global zula_task
@@ -396,6 +421,19 @@ async def chanced_casino_loop():
     except Exception as e:
         print(f"Error in loop: {str(e)}")
         await channel.send(f"Error in Chanced Casino loop: {str(e)}")
+
+
+
+@tasks.loop(hours=48)
+async def dingdingding_auth_task():
+    channel = bot.get_channel(DISCORD_CHANNEL)
+    await channel.send("Running scheduled DingDingDing authentication...")
+    auth_status["dingdingding"] = await authenticate_dingdingding(driver, bot, None, channel)
+    if auth_status["dingdingding"]:
+        await channel.send("DingDingDing authentication succeeded during the scheduled task.")
+    else:
+        await channel.send("DingDingDing authentication failed during the scheduled task.")
+
 
 @tasks.loop(hours=2, )
 async def casino_loop():
