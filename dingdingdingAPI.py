@@ -1,3 +1,8 @@
+# Drake Hooks
+# Casino Claim
+# DingDingDing API
+
+
 import os
 import asyncio
 from dotenv import load_dotenv
@@ -16,7 +21,7 @@ async def authenticate_dingdingding(driver, bot, ctx, channel):
 
         web = "https://www.dingdingding.com/login"
         driver.get(web)
-        await asyncio.sleep(80)  # Delay for manual CAPTCHA solving if needed
+        await asyncio.sleep(10)  
 
         # Wait for email and password fields, enter credentials from environment variables
         email_field = WebDriverWait(driver, 30).until(
@@ -32,8 +37,16 @@ async def authenticate_dingdingding(driver, bot, ctx, channel):
         await asyncio.sleep(3)
 
         try:
+            WebDriverWait(driver, 300).until_not(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "iframe[title*='recaptcha']"))
+            )
+            print("CAPTCHA resolved, proceeding to click the login button.")
+        except TimeoutException:
+            return False
+
+        try:
         # Click login button
-            login_btn = WebDriverWait(driver, 10).until(
+            login_btn = WebDriverWait(driver, 20).until(
             EC.element_to_be_clickable((By.XPATH, "/html/body/div[1]/div/div/div[1]/div[1]/div/div/div[2]/form/button[2]"))
         )
             login_btn.click()
