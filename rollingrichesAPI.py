@@ -1,5 +1,6 @@
 # Rolling Riches API
 
+import discord
 import re
 import os
 import asyncio
@@ -47,7 +48,15 @@ async def rolling_riches_casino(ctx, driver, channel):
         else:
             # If no login button is found, assume already logged in
             await channel.send("Session already active, proceeding without login.")
-
+            screenshot_path = "rr_screenshot.png"
+            driver.save_screenshot(screenshot_path)
+        
+        # Send the screenshot as a message
+            await channel.send("Authentication failed. Unable to proceed", 
+                       file=discord.File(screenshot_path))
+        
+        # Optionally, remove the screenshot file after sending
+        os.remove(screenshot_path)
         # Now proceed with claiming the bonus
         await claim_rolling_riches_bonus(ctx, driver, channel)
 

@@ -321,32 +321,14 @@ async def crowncoinscasino(ctx):
 
 @bot.command(name="dingdingding")
 async def DingDingDing(ctx):
-    global authenticated
     await ctx.send("Checking DingDingDing for bonus...")
     channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
-
-    # Check if already authenticated
-    if not authenticated:
-        await ctx.send("Authenticating DingDingDing first...")
-        authenticated = await authenticate_dingdingding(driver, bot, ctx, channel)
-
-    # Proceed if authentication was successful
-    if authenticated:
-        # Navigate to the lobby
-        driver.get("https://www.dingdingding.com/lobby")
-
-        # Attempt to claim the daily bonus (but proceed to check countdown regardless)
+    try:
         await claim_dingdingding_bonus(driver, bot, ctx, channel)
-
+    except:
         # Always check for the countdown, even if the bonus claim was unsuccessful
         await check_dingdingding_countdown(driver, bot, ctx, channel)
-    else:
-        # Screenshot the page to show unsolved CAPTCHA
-        screenshot_path = "dingdingding_screenshot.png"
-        driver.save_screenshot(screenshot_path)
-        await ctx.send("Authentication failed. Unable to proceed.", 
-                       file=discord.File(screenshot_path))
-        os.remove(screenshot_path)
+
      
 
 @bot.command(name="auth")
