@@ -73,6 +73,8 @@ async def claim_dingdingding_bonus(driver, bot, ctx, channel):
     try:
         channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
 
+        driver.get("https://dingdingding.com/lobby/")
+
         # Click the bonus button in the lobby
         bonus_button = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.CSS_SELECTOR, "#__nuxt > div > div:nth-child(1) > aside.sidenav > div.sidenav__cont > div > div.sidenav__actions > button.btn.btn--nav.btn--rewards > span.btn__label"))
