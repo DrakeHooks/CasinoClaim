@@ -44,11 +44,12 @@ async def rolling_riches_casino(ctx, driver, channel):
             password_input.send_keys(password)
             password_input.send_keys(Keys.ENTER)
             await asyncio.sleep(5)  # Wait for login process to complete
-            await claim_rolling_riches_bonus(ctx, driver, channel)
         else:
             # If no login button is found, assume already logged in
-            await claim_rolling_riches_bonus(ctx, driver, channel)
             await channel.send("Session already active, proceeding without login.")
+
+        # Now proceed with claiming the bonus
+        await claim_rolling_riches_bonus(ctx, driver, channel)
 
     except TimeoutException as e:
         print(f"Login timeout: {e}")
@@ -65,13 +66,13 @@ async def claim_rolling_riches_bonus(ctx, driver, channel):
         await asyncio.sleep(5)
         
         # Click the daily bonus label
-        daily_bonus_label = WebDriverWait(driver, 5).until(
+        daily_bonus_label = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.XPATH, "/html/body/app-root/app-get-coin/div/div[1]/div/label[2]"))
         )
         daily_bonus_label.click()
 
         # Click the claim button
-        claim_btn = WebDriverWait(driver, 5).until(
+        claim_btn = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.XPATH, "/html/body/app-root/app-get-coin/div/div[2]/div/app-hourly-bonus/div/div/div[4]/button"))
         )
         claim_btn.click()

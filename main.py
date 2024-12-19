@@ -484,10 +484,7 @@ async def casino_loop():
         except:
             print("Error in DingDingDing")
         await asyncio.sleep(100)
-        try:
-            await rolling_riches_casino(None, driver, channel)
-        except:
-            print("Error in RollingRiches")
+
         await asyncio.sleep(10)
         try:
             await global_poker(None, driver, channel)
@@ -505,6 +502,10 @@ async def casino_loop():
         except:
             print("Error in Chumba")
         await asyncio.sleep(10)
+        try:
+            await rolling_riches_casino(None, driver, channel)
+        except:
+            print("Error in RollingRiches")
         # Stake still in development 💀
         # try:
         #     await stake_claim(None, driver, channel)
