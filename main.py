@@ -323,11 +323,13 @@ async def crowncoinscasino(ctx):
 async def DingDingDing(ctx):
     await ctx.send("Checking DingDingDing for bonus...")
     channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
-    try:
-        await claim_dingdingding_bonus(driver, bot, ctx, channel)
-    except:
-        # Always check for the countdown, even if the bonus claim was unsuccessful
+    bonus_claimed = await claim_dingdingding_bonus(driver, bot, ctx, channel)
+
+    # If claiming the bonus failed, always check the countdown
+    if not bonus_claimed:
+        print("Failed to claim DingDingDing bonus. Checking countdown timer...")
         await check_dingdingding_countdown(driver, bot, ctx, channel)
+
 
      
 
@@ -338,7 +340,7 @@ async def authenticate_command(ctx, site: str):
         await ctx.send("Authenticating DingDingDing...")
         auth_status["dingdingding"] = await authenticate_dingdingding(driver, bot, ctx, channel)
         if auth_status["dingdingding"]:
-            await ctx.send("DingDingDing authentication succeeded.")
+            print("DingDingDing authentication succeeded.")
         else:
             screenshot_path = "auth_screenshot.png"
             driver.save_screenshot(screenshot_path)
