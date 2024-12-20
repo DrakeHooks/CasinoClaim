@@ -419,7 +419,7 @@ async def chanced_casino_loop():
 
 
 
-@tasks.loop(hours=48)
+@tasks.loop(hours=24)
 async def dingdingding_auth_task():
     channel = bot.get_channel(DISCORD_CHANNEL)
     await channel.send("Running scheduled DingDingDing authentication...")
