@@ -30,7 +30,7 @@ async def rolling_riches_casino(ctx, driver, channel):
         driver.get("https://rollingriches.com/login")
         await asyncio.sleep(10)
         try:
-            email_input = WebDriverWait(driver, 5).until(
+            email_input = WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.ID, "email"))
             )
             login_button_present = True
