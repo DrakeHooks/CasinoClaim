@@ -110,7 +110,7 @@ async def claim_global_poker_bonus(ctx, driver, channel):
         if bonus_claimed:
             await channel.send("Global Poker Daily Bonus Claimed!")
         else:
-            await channel.send("No bonus was claimed. All buttons were attempted, but none were clickable.")
+            await channel.send("(Global Poker) No bonus was claimed. All buttons were attempted, but none were clickable.")
             
     except Exception as e:
         await channel.send(f"Error claiming Global Poker bonus: {str(e)}")
