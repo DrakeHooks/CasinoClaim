@@ -28,7 +28,7 @@ async def rolling_riches_casino(ctx, driver, channel):
 
         # Get the URL and allow page to load
         driver.get("https://rollingriches.com/login")
-        await asyncio.sleep(5)
+        await asyncio.sleep(10)
         try:
             email_input = WebDriverWait(driver, 5).until(
                 EC.presence_of_element_located((By.ID, "email"))
@@ -46,7 +46,7 @@ async def rolling_riches_casino(ctx, driver, channel):
             await asyncio.sleep(5)  # Wait for login process to complete
         else:
             # If no login button is found, assume already logged in
-            await channel.send("Session already active, proceeding without login.")
+            await channel.send("Rolling Riches session active, proceeding without login.")
 
         # Now proceed with claiming the bonus
         await claim_rolling_riches_bonus(ctx, driver, channel)
@@ -81,7 +81,7 @@ async def claim_rolling_riches_bonus(ctx, driver, channel):
     except Exception as e:
         print(f"Error: {str(e)}")
     finally:
-        await asyncio.sleep(4)
+        await asyncio.sleep(10)
         print("Checking for countdown element.")
         
         # List of possible XPaths for the countdown element
