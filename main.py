@@ -127,6 +127,7 @@ async def on_ready():
         new_chanced_session.start()
     if not casino_loop.is_running():
         casino_loop.start()
+    await asyncio.sleep(260)
     if not dingdingding_auth_task.is_running():
         dingdingding_auth_task.start()
     
