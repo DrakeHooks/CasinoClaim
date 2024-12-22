@@ -51,11 +51,10 @@ async def authenticate_modo(driver, bot, ctx, channel):
         )
             login_btn.click()
             await asyncio.sleep(10)
-            driver.refresh()
         except:
             await channel.send("Unable to solve Modo captcha!")
             return False
-
+        await asyncio.sleep(10)
         # Check if login was successful
         if driver.current_url == "https://modo.us/lobby":
             await channel.send("Authenticated into modo successfully!")
