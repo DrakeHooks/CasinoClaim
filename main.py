@@ -33,6 +33,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 try:
 # from fortunecoinsAPI import *
 # from stakeAPI import *
+    from modoAPI import *
     from googleauthAPI import *
     from chancedAPI import *
     from rollingrichesAPI import *
@@ -78,7 +79,8 @@ bot.two_fa_code = None  # Variable to store the 2FA code
 
 # Dictionary to manage authentication status for different casinos
 auth_status = {
-    "dingdingding": False
+    "dingdingding": False,
+    "modo": False
 }
 
 
@@ -158,10 +160,10 @@ async def help(ctx):
     !help - Display the available commands
     !stop - Stop the bot               
 
-    -------------------------------
+    ---------------------------------------
     Auth Commands:
     !googleauth - Authenticate Google Account
-    !auth <site> - Authenticate into a specific site      
+    !auth <site> - Authenticate into a specific site (e.g. Modo, DingDingDing)     
                                     
     """)
 
@@ -331,26 +333,55 @@ async def DingDingDing(ctx):
         print("Failed to claim DingDingDing bonus. Checking countdown timer...")
         await check_dingdingding_countdown(driver, bot, ctx, channel)
 
+@bot.command(name="modo")
+async def modo(ctx):
+    await ctx.send("Checking Modo for bonus...")
+    channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
+
+    # Attempt to claim the bonus
+    bonus_claimed = await claim_modo_bonus(driver, bot, ctx, channel)
+
+    # Check countdown if claiming fails
+    if not bonus_claimed:
+        print("Failed to claim Modo bonus. Checking countdown timer...")
+        await check_modo_countdown(driver, bot, ctx, channel)
 
      
 
 @bot.command(name="auth")
 async def authenticate_command(ctx, site: str):
     channel = bot.get_channel(DISCORD_CHANNEL)
+
+    # DingDingDing Authentication
     if site.lower() == "dingdingding":
         await ctx.send("Authenticating DingDingDing...")
         auth_status["dingdingding"] = await authenticate_dingdingding(driver, bot, ctx, channel)
         if auth_status["dingdingding"]:
             print("DingDingDing authentication succeeded.")
         else:
-            screenshot_path = "auth_screenshot.png"
+            screenshot_path = "dingdingding_auth_failed.png"
             driver.save_screenshot(screenshot_path)
             await ctx.send("Authentication failed. Unable to proceed.", 
                        file=discord.File(screenshot_path))
-        os.remove(screenshot_path)
-     
+            os.remove(screenshot_path)
+
+    # Modo Authentication
+    elif site.lower() == "modo":
+        await ctx.send("Authenticating Modo...")
+        auth_status["modo"] = await authenticate_modo(driver, bot, ctx, channel)
+        if auth_status["modo"]:
+            print("Modo authentication succeeded.")
+        else:
+            screenshot_path = "modo_auth_failed.png"
+            driver.save_screenshot(screenshot_path)
+            await ctx.send("Modo authentication failed. Unable to proceed.", 
+                       file=discord.File(screenshot_path))
+            os.remove(screenshot_path)
+
+    # Unsupported Sites
     else:
         await ctx.send(f"Authentication for '{site}' is not implemented.")
+
 
      
 
@@ -462,6 +493,14 @@ async def casino_loop():
         except:
             print("Error in CrownCoinsCasino")
         await asyncio.sleep(30)
+        try:
+            bonus_claimed = await claim_modo_bonus(driver, bot, None, channel)
+            if not bonus_claimed:
+                print("Failed to claim Modo bonus. Checking countdown timer...")
+                await check_modo_countdown(driver, bot, None, channel)
+        except:
+            print("Error in DingDingDing")
+        await asyncio.sleep(100)
         try:
             bonus_claimed = await claim_dingdingding_bonus(driver, bot, None, channel)
             if not bonus_claimed:
