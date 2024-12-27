@@ -32,7 +32,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 
 try:
 # from fortunecoinsAPI import *
-# from stakeAPI import *
+    from stakeAPI import *
     from modoAPI import *
     from googleauthAPI import *
     from chancedAPI import *
@@ -257,15 +257,15 @@ async def rollingriches(ctx):
     else:
         await ctx.send("RollingRiches automation is already running.")
 
-# @bot.command(name="Stake")
-# async def stake(ctx):
-#     global stake_task
-#     if not stake_task or stake_task.done():
-#         await ctx.send("Checking Stake for Bonus...")
-#         channel = bot.get_channel(DISCORD_CHANNEL)
-#         await stake_claim(ctx, driver, channel)
-#     else:
-#         await ctx.send("Stake automation is already running.")
+@bot.command(name="Stake")
+async def stake(ctx):
+    global stake_task
+    if not stake_task or stake_task.done():
+        await ctx.send("Checking Stake for Bonus...")
+        channel = bot.get_channel(DISCORD_CHANNEL)
+        await stake_claim(ctx, driver, channel)
+    else:
+        await ctx.send("Stake automation is already running.")
 
 
 @bot.command(name="chanced")

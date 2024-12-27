@@ -13,6 +13,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
+import discord
 
 # Load environment variables from the .env file
 load_dotenv()
@@ -32,8 +33,11 @@ async def stake_auth(ctx, driver, channel):
         googleLogoBtn.click()
         await asyncio.sleep(5)
     except:
-        print("Error in stake_auth")
-        return
+        screenshot_path = "stake_auth_error.png"
+        driver.save_screenshot(screenshot_path)
+        await channel.send("Stake authentication failed",
+                           file=discord.File(screenshot_path))
+        os.remove(screenshot_path)
 
 async def stake_claim(ctx, driver, channel):
     try:
