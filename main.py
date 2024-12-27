@@ -531,11 +531,10 @@ async def casino_loop():
             await rolling_riches_casino(None, driver, channel)
         except:
             print("Error in RollingRiches")
-        # Stake still in development 💀
-        # try:
-        #     await stake_claim(None, driver, channel)
-        # except:
-        #     print("Error in Stake")
+        try:
+            await stake_claim(None, driver, channel)
+        except:
+            print("Error in Stake")
 
 
     except Exception as e:
