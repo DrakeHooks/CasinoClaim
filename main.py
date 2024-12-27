@@ -547,7 +547,7 @@ async def casino_loop():
         except:
             print("Error in RollingRiches")
         try:
-            await stake_claim(None, driver, channel)
+            await stake_claim(driver, bot, None, channel)
         except:
             print("Error in Stake")
 
