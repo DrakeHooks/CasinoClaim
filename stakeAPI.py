@@ -18,7 +18,7 @@ import discord
 # Load environment variables from the .env file
 load_dotenv()
 
-async def stake_auth(ctx, driver, channel):
+async def stake_auth(driver, bot, ctx, channel):
     try:
         # Get the URL and allow page to load
         driver.get("https://stake.us/casino/home")
@@ -33,19 +33,12 @@ async def stake_auth(ctx, driver, channel):
             EC.element_to_be_clickable((By.XPATH, "/html/body/div[1]/div[1]/div[2]/div[2]/div/div/div[2]/div[2]/div[2]/button")))
         googleLogoBtn.click()
         await asyncio.sleep(5)
+        await channel.send("Stake Auth Successful!")
     except:
-        screenshot_path = "stake_auth_error.png"
-        driver.save_screenshot(screenshot_path)
-        await channel.send("Stake authentication failed",
-                           file=discord.File(screenshot_path))
-        os.remove(screenshot_path)
+        await channel.send("Stake authentication failed or already authenticated.")
         return
 
-async def stake_claim(ctx, driver, channel):
-    try:
-        await stake_auth(ctx, driver, channel)
-    except:
-        print("Error in stake_auth")
+async def stake_claim(driver, bot, ctx, channel):
     try:
         # Open the initial website
         driver.get("https://stake.us/casino/home?tab=dailyBonus&currency=btc&modal=wallet")

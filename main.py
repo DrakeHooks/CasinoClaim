@@ -80,7 +80,8 @@ bot.two_fa_code = None  # Variable to store the 2FA code
 # Dictionary to manage authentication status for different casinos
 auth_status = {
     "dingdingding": False,
-    "modo": False
+    "modo": False,
+    "stake": False,
 }
 
 
@@ -377,6 +378,20 @@ async def authenticate_command(ctx, site: str):
             await ctx.send("Modo authentication failed. Unable to proceed.", 
                        file=discord.File(screenshot_path))
             os.remove(screenshot_path)
+
+    # Stake Authentication
+    elif site.lower() == "stake":
+        await ctx.send("Authenticating Stake...")
+        auth_status["stake"] = await stake_auth(driver, bot, ctx, channel)
+        if auth_status["stake"]:
+            print("Stake authentication succeeded.")
+        else:
+            screenshot_path = "stake_auth_failed.png"
+            driver.save_screenshot(screenshot_path)
+            await ctx.send("Stake authentication failed. Unable to proceed.", 
+                       file=discord.File(screenshot_path))
+            os.remove(screenshot_path)
+
 
     # Unsupported Sites
     else:
