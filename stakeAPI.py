@@ -23,8 +23,9 @@ async def stake_auth(ctx, driver, channel):
         # Get the URL and allow page to load
         driver.get("https://stake.us/casino/home")
         await asyncio.sleep(20)
+        driver.maximize_window()
         signInBtn = WebDriverWait(driver, 90).until(
-            EC.element_to_be_clickable((By.XPATH, "/html/body/div[1]/div[2]/div[1]/div[2]/div/div/div/section/div/button[1]"))
+            EC.element_to_be_clickable((By.XPATH, "/html/body/div[1]/div[2]/div[2]/div[2]/div/div/div/section/div/button[1]]"))
         )
         signInBtn.click()
         await asyncio.sleep(15)
