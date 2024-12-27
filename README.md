@@ -26,15 +26,12 @@ This program is heavily inspired by auto-rsa from Nelson Dane. Go check it out a
 git clone https://github.com/DrakeHooks/CasinoClaim.git
 cd CasinoClaim
 ```
+3. Create a discord bot and invite it to your server. You can follow this guide to create a discord bot: [guide](discordBot.md)
 
-1. Sign in to CrownCoins Casino, and Luckybird in a chrome browser. Then, take the "User Data" folder (usually located in "AppData/Local/Google/Chrome"), and place it in the "google-chrome" folder in the project.
-
-2. Create a discord bot and invite it to your server. You can follow this guide to create a discord bot: [guide](discordBot.md)
-
-3. Create the .env file in the root directory of the project by editing the .env.example file and add the following:
+4. Create the .env file in the root directory of the project by editing the .env.example file and add the following:
     1. Add `DISCORD_TOKEN` and `DISCORD_CHANNEL` to your `.env` file.
     2. Add your casino login credentials by editing the .env.example file. After editing, rename the file to .env and save. Note: some casino logins are currently only supported through the User Data directory.
-4. run `docker compose up -d`
+5. run `docker compose up -d`
 
 
 
