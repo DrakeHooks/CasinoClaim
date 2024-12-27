@@ -21,34 +21,29 @@ async def authenticate_modo(driver, bot, ctx, channel):
 
         web = "https://login.modo.us/login"
         driver.get(web)
-        await asyncio.sleep(10)  
-
-        # Wait for email and password fields, enter credentials from environment variables
-        email_field = WebDriverWait(driver, 30).until(
-            EC.presence_of_element_located((By.XPATH, "/html/body/main/div/div[2]/form/div/div/div/div/div[2]/div[2]/span/div/div/div/div/div/div/div/div/div[2]/div[3]/div[1]/div/input"))
-        )
-        email_field.send_keys(os.getenv("MODO").split(":")[0])
-
-        password_field = WebDriverWait(driver, 30).until(
-            EC.presence_of_element_located((By.XPATH, "/html/body/main/div/div[2]/form/div/div/div/div/div[2]/div[2]/span/div/div/div/div/div/div/div/div/div[2]/div[3]/div[2]/div/div/input"))
-        )
-        password_field.send_keys(os.getenv("MODO").split(":")[1])
-        
-        await asyncio.sleep(3)
-
         try:
-            WebDriverWait(driver, 300).until_not(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "iframe[title*='recaptcha']"))
+        # Wait for email and password fields, enter credentials from environment variables
+            email_field = WebDriverWait(driver, 30).until(
+            EC.presence_of_element_located((By.XPATH, "/html/body/main/div/div[2]/form/div/div/div/div/div[2]/div[2]/span/div/div/div/div/div/div/div/div/div[2]/div[3]/div[1]/div/input"))
             )
-            print("CAPTCHA resolved, proceeding to click the login button.")
-        except TimeoutException:
+            email_field.send_keys(os.getenv("MODO").split(":")[0])
+
+            password_field = WebDriverWait(driver, 30).until(
+            EC.presence_of_element_located((By.XPATH, "/html/body/main/div/div[2]/form/div/div/div/div/div[2]/div[2]/span/div/div/div/div/div/div/div/div/div[2]/div[3]/div[2]/div/div/input"))
+            )
+            password_field.send_keys(os.getenv("MODO").split(":")[1])
+        
+            await asyncio.sleep(120)
+
+        except:
+            await channel.send("Unable to auth Modo!")
             return False
 
         try:
         # Click login button
             login_btn = WebDriverWait(driver, 20).until(
             EC.element_to_be_clickable((By.XPATH, "/html/body/main/div/div[2]/form/div/div/div/button"))
-        )
+            )
             login_btn.click()
             await asyncio.sleep(10)
         except:
@@ -62,7 +57,6 @@ async def authenticate_modo(driver, bot, ctx, channel):
         else:
             await channel.send("Authentication failed. Did not reach the lobby.")
             return False
-
     except TimeoutException:
         await channel.send("Authentication timeout. Please check your credentials or XPaths.")
         return False
