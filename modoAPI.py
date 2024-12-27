@@ -21,6 +21,7 @@ async def authenticate_modo(driver, bot, ctx, channel):
 
         web = "https://login.modo.us/login"
         driver.get(web)
+        await asyncio.sleep(10)
         try:
         # Wait for email and password fields, enter credentials from environment variables
             email_field = WebDriverWait(driver, 30).until(
