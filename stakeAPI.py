@@ -24,7 +24,7 @@ async def stake_auth(ctx, driver, channel):
         driver.get("https://stake.us/casino/home")
         await asyncio.sleep(20)
         signInBtn = WebDriverWait(driver, 90).until(
-            EC.element_to_be_clickable((By.XPATH, "/html/body/div[1]/div[2]/div[2]/div[2]/div/div/div/section/div/button[1]"))
+            EC.element_to_be_clickable((By.XPATH, "/html/body/div[1]/div[2]/div[1]/div[2]/div/div/div/section/div/button[1]"))
         )
         signInBtn.click()
         await asyncio.sleep(15)
@@ -38,6 +38,7 @@ async def stake_auth(ctx, driver, channel):
         await channel.send("Stake authentication failed",
                            file=discord.File(screenshot_path))
         os.remove(screenshot_path)
+        return
 
 async def stake_claim(ctx, driver, channel):
     try:
