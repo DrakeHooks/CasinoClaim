@@ -1,6 +1,7 @@
 # Google Authentication API
 # This API is used to authenticate a Google account using the provided credentials for casinos that require Google authentication.
 
+
 import re
 import os
 import asyncio
@@ -10,7 +11,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
-
+import discord
 # Load environment variables from the .env file
 load_dotenv()
 
@@ -59,5 +60,10 @@ async def google_auth(ctx, driver, channel, credentials):
         else:
              await channel.send("Google credentials not found")
     except:
-            await channel.send("Error in google_auth")
+            screenshot_path = "google_auth_error.png"
+            driver.save_screenshot(screenshot_path)
+            await channel.send("Google authentication failed",
+                           file=discord.File(screenshot_path))
+            os.remove(screenshot_path)
+            return
     return
