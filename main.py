@@ -74,7 +74,9 @@ driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), opti
 
 bot = commands.Bot(command_prefix='!', intents=intents, case_insensitive=True)
 bot.remove_command("help")
-bot.two_fa_code = None  # Variable to store the 2FA code
+
+# Variable to store the 2FA code. Needed for Chumba, LuckyBird
+bot.two_fa_code = None  
 
 
 # Dictionary to manage authentication status for different casinos
@@ -82,6 +84,7 @@ auth_status = {
     "dingdingding": False,
     "modo": False,
     "stake": False,
+    "luckybird": False,
 }
 
 
@@ -156,6 +159,7 @@ async def help(ctx):
     !rollingriches - Check RollingRiches for bonus
     !sportzino - Check Sportzino for bonus
     !fortunecoins - Check Fortunecoins for bonus
+
     !ping - Check if the bot is online
     !restart - Restart the bot     
     !help - Display the available commands
@@ -164,7 +168,8 @@ async def help(ctx):
     ---------------------------------------
     Auth Commands:
     !googleauth - Authenticate Google Account
-    !auth <site> - Authenticate into a specific site (e.g. Modo, DingDingDing)     
+    !auth <site> - Authenticate into a specific site 
+    (e.g. Modo, DingDingDing, Stake, LuckyBird)     
                                     
     """)
 
@@ -264,7 +269,7 @@ async def stake(ctx):
     if not stake_task or stake_task.done():
         await ctx.send("Checking Stake for Bonus...")
         channel = bot.get_channel(DISCORD_CHANNEL)
-        await stake_claim(ctx, driver, channel)
+        await stake_claim(driver, bot, ctx, channel)
     else:
         await ctx.send("Stake automation is already running.")
 
@@ -389,6 +394,19 @@ async def authenticate_command(ctx, site: str):
             screenshot_path = "stake_auth_failed.png"
             driver.save_screenshot(screenshot_path)
             await ctx.send("Stake authentication failed. Unable to proceed.", 
+                       file=discord.File(screenshot_path))
+            os.remove(screenshot_path)
+
+    # LuckyBird Authentication
+    elif site.lower() == "luckybird":
+        await ctx.send("Authenticating LuckyBird...")
+        auth_status["luckybird"] = await authenticate_luckybird(driver, bot, ctx, channel)
+        if auth_status["luckybird"]:
+            print("LuckyBird authentication succeeded.")
+        else:
+            screenshot_path = "luckybird_auth_failed.png"
+            driver.save_screenshot(screenshot_path)
+            await ctx.send("LuckyBird authentication failed. Unable to proceed.", 
                        file=discord.File(screenshot_path))
             os.remove(screenshot_path)
 
@@ -533,7 +551,10 @@ async def casino_loop():
             print("Error in GlobalPoker")
         await asyncio.sleep(10)
         try:
-            await LuckyBird(None, driver, bot)
+            bonus_claimed = await luckyBird_claim(driver, bot, None, channel)
+            if not bonus_claimed:
+                print("Failed to claim LuckyBird bonus. Checking countdown timer...")
+                await extract_countdown_info(driver, bot, None, channel)
         except:
             print("Error in LuckyBird")
         await asyncio.sleep(10)

@@ -1,3 +1,9 @@
+# Drake Hooks
+# Casino Claim
+# LuckyBird API
+# Enable Luckybird 2FA for your account and set the credentials in the .env file as LUCKYBIRD=username:password.
+
+
 import os
 import datetime
 import asyncio
@@ -11,16 +17,70 @@ from dotenv import load_dotenv
 # Load environment variables from .env
 load_dotenv()
 
-# LuckyBird credentials from the .env file
-try:
-    luckybird_credentials = os.getenv("LUCKYBIRD").split(":")
-    username_text = luckybird_credentials[0]
-    password_text = luckybird_credentials[1]
-except:
-    print("LuckyBird credentials not found in environment variables.")
-    
+
+
+async def authenticate_luckybird(driver, bot, ctx, channel):
+    # LuckyBird credentials from the .env file
+    try:
+        luckybird_credentials = os.getenv("LUCKYBIRD").split(":")
+        username_text = luckybird_credentials[0]
+        password_text = luckybird_credentials[1]
+    except:
+        print("LuckyBird credentials not found in environment variables.")
+    try:
+        driver.get("https://luckybird.io/")
+        # Step 2: Check if login is required
+        loginButton = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "tab-login"))
+        )
+        if loginButton:
+            loginButton.click()
+        else:
+            await channel.send("LuckyBird login button not found.")
+            # Enter email
+        emailField = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div/div[1]/div/div/div[1]/div/div[1]/div/div[2]/div[2]/div/form[2]/div[1]/div/div/input"))
+            
+            )
+        emailField.send_keys(username_text)
+
+            # Enter password
+        passwordField = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div/div[1]/div/div/div[1]/div/div[1]/div/div[2]/div[2]/div/form[2]/div[2]/div/div/input"))
+            )
+        passwordField.send_keys(password_text)
+        passwordField.send_keys(Keys.ENTER)
+
+        await asyncio.sleep(10)
+        # Check if 2FA is required
+        try:
+            twoFA_button = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, "/html/body/section/div[1]/div/button"))
+            )
+            if twoFA_button:
+                await channel.send("Waiting 60 seconds for LuckyBird 2FA code...")
+
+                # Wait for the 2FA code from Discord
+                while bot.two_fa_code is None:
+                    await asyncio.sleep(1)
+
+                # Enter the 2FA code
+                twoFA_input = WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.XPATH, "/html/body/section/div[1]/div/div/input"))
+                )
+                twoFA_input.send_keys(bot.two_fa_code)
+                await asyncio.sleep(1)
+                twoFA_input.send_keys(Keys.ENTER)
+
+                await channel.send("LuckyBird authenticated successfully!")
+        except TimeoutException:
+            await channel.send("Enable 2FA for your LuckyBird Account!")
+    except Exception as e:
+
+        print("LuckyBird Login flow failed")
+
 # Function to extract countdown information
-async def extract_countdown_info(channel, driver):
+async def extract_countdown_info(driver, bot, ctx, channel):
     try:
         # Locate the countdown element
         countdown_element = WebDriverWait(driver, 90).until(
@@ -48,10 +108,8 @@ async def extract_countdown_info(channel, driver):
         await channel.send("Failed to extract countdown timer.")
 
 # Main function to handle LuckyBird
-async def LuckyBird(ctx, driver, bot):
+async def luckyBird_claim(driver, bot, ctx, channel):
     channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
-    if ctx is not None:
-        channel = bot.get_channel(int(ctx.channel.id))
 
     driver.get("https://luckybird.io/")
     await asyncio.sleep(5)
@@ -77,53 +135,6 @@ async def LuckyBird(ctx, driver, bot):
         return  # End the function if the bonus was successfully claimed
     except TimeoutException:
         print("LuckyBird Bonus Unavailable or login required.")
-    
-    try:
-        # Step 2: Check if login is required
-        loginButton = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.ID, "tab-login"))
-        )
-        if loginButton:
-            loginButton.click()
-
-            # Enter email
-            emailField = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div/div[1]/div/div/div[1]/div/div[1]/div/div[2]/div[2]/div/form[2]/div[1]/div/div[1]/input"))
-            )
-            emailField.send_keys(username_text)
-
-            # Enter password
-            passwordField = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div/div[1]/div/div/div[1]/div/div[1]/div/div[2]/div[2]/div/form[2]/div[2]/div/div/input"))
-            )
-            passwordField.send_keys(password_text)
-            passwordField.send_keys(Keys.ENTER)
-
-        await asyncio.sleep(10)
-        # Check if 2FA is required
-        try:
-            twoFA_button = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.XPATH, "/html/body/section/div[1]/div/button"))
-            )
-            if twoFA_button:
-                await channel.send("Waiting for 2FA code...")
-
-                # Wait for the 2FA code from Discord
-                while bot.two_fa_code is None:
-                    await asyncio.sleep(1)
-
-                # Enter the 2FA code
-                twoFA_input = WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.XPATH, "/html/body/section/div[1]/div/div/input"))
-                )
-                twoFA_input.send_keys(bot.two_fa_code)
-                twoFA_input.send_keys(Keys.ENTER)
-
-                await channel.send("LuckyBird authenticated successfully!")
-        except TimeoutException:
-            print("No 2FA required. Proceeding.")
-    except Exception as e:
-        print(f"LuckyBird Login flow failed: {str(e)}")
     finally:
         # Step 4: Try to extract the countdown in the finally block
         await extract_countdown_info(channel, driver)

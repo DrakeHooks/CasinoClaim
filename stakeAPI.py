@@ -1,7 +1,9 @@
 # Drake Hooks
+# Casino Claim
 # Stake API
 # Requires Google Account linked to Stake.us. Other auth methods are in development.
-
+# For first time use, make sure to set the GOOGLE_LOGIN environment variable in the .env file.
+# Then, run !googleauth followed by !stakeauth
 
 
 import re

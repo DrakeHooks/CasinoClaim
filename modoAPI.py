@@ -88,7 +88,7 @@ async def claim_modo_bonus(driver, bot, ctx, channel):
                     EC.element_to_be_clickable((By.XPATH, xpath))
                 )
                 claim_button.click()
-                await channel.send("Modo Bonus Claimed!")
+                await channel.send("Modo Daily Bonus Claimed!")
                 button_found = True
                 break
             except TimeoutException:

@@ -40,21 +40,26 @@ cd CasinoClaim
 
 
 # Supported Casinos ✅
-| Casino         | Auto Claim | Countdown Timer | Require User Data Directory | Notes            | Trusted? (payment proof) |
+| Casino         | Auto Claim | Countdown Timer | Backend API | Notes            | Trusted? (payment proof) |
 |----------------|------------|-----------------|-----------------------------|------------------|---------|
 | Chanced        | ✓          | ✓               | No                          | Varies between $.3-$1 SC bonus/day    | Yes     |
-| Global Poker   | ✓          | ✓               | No                          | $0.00-$2 SC bonus/day | Yes     |
+| Global Poker   | ✓          | ✓               | No                          | $0.00-$4 SC bonus/day | Yes     |
 | Rolling Riches | ✓          | ✓               | No                          | $.20 bonus every 6 hours | Yes     |
 | Chumba         | ✓          | ✓               | No                          | $1 bonus/day     | Yes     |
 | DingDingDing   | ✓          | ✓               | No                          | Varies between $0.50 SC and $1 SC | Yes     |
-| Stake          | ✗          | ✓               | No                         | $1 bonus/day. Auto Claim in development | Yes     |
+| Stake          | ✗          | ✓               | Yes                         | $1 bonus/day. Auto Claim in development | Yes     |
 | Zula           | ✓          | ✓               | No                          | $1 bonus/day     | Yes     |
 | Fortune Coins  | ✓          | ✗               | No                          | $0.50-$1.20 SC bonus every 24 hours | Yes     |
-| Sportzino      | ✓          | ✓               | No                          | $1 bonus/day     | Yes     |
-| Goldnluck      | ✗          | ✗               | No                          | $2 bonus/day     | No     |
+| Sportzino      | ✓          | ✓               | No                          | $.50-$1 bonus/day     | Yes     |
 | Luckybird      | ✓          | ✓               | No                          | $.25 bonus/day. Increases with VIP | Yes     |
-| Crown Coins    | ✓          | ✓               | Yes                         | Varies between $0.00-$2 bonus/day. Requires Usr Data Dir for auth. Social Auth support in development | Yes     |
+| Crown Coins    | ✓          | ✓               | No                         | Varies between $0.00-$2 bonus/day. Social Auth support in development | Yes     |
 | Modo           | ✓          | ✓               | No                          | $.30-$1 SC bonus/day | Yes     |
+| Goldnluck      | ✗          | ✗               | No                          | $2 bonus/day     | No 🤢     |
+| Luckyland          | ✗          | ✗               | No                          | $.30-$1 SC bonus/day | Yes     |
+| iCasino          | ✗          | ✗               | No                          | $1.70 SC bonus/day | Yes     |
+| RealPrize         | ✗          | ✗               | No                          | $1.20 SC bonus/day | Yes     |
+| Spin Pals          | ✗          | ✗               | No                          | $1 SC bonus/day | Yes     |
+| Dara Casino          | ✗          | ✗               | No                          | $1 SC bonus/day | Yes     |
 | Pulsz          | IN DEVELOPMENT | IN DEVELOPMENT | IN DEVELOPMENT            | Varies between $.20-$3 SC bonus/day | Yes      |
 
 
