@@ -293,10 +293,11 @@ async def chanced(ctx):
 
 @bot.command(name="luckybird")
 async def luckybird(ctx):
+    channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
     global luckybird_task
     if not luckybird_task or luckybird_task.done():
         await ctx.send("Checking LuckyBird for Bonus...")
-        luckybird_task = asyncio.create_task(LuckyBird(ctx, driver, bot))
+        luckybird_task = asyncio.create_task(luckyBird_claim(driver, bot, ctx, channel))
     else:
         await ctx.send("LuckyBird automation is already running.")
 
