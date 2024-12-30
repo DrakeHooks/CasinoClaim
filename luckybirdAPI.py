@@ -86,7 +86,7 @@ async def authenticate_luckybird(driver, bot, ctx, channel):
 # Function to extract countdown information
 async def extract_countdown_info(driver, bot, ctx, channel):
     try:
-
+        channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
         driver.get("https://luckybird.io/")
         await asyncio.sleep(5)
 
