@@ -60,17 +60,21 @@ async def authenticate_luckybird(driver, bot, ctx, channel):
             if twoFA_button:
                 await channel.send("Waiting 60 seconds for LuckyBird 2FA code...")
 
-                # Wait for the 2FA code from Discord
-                while bot.two_fa_code is None:
+                # Wait for the LuckyBird 2FA code from Discord
+                while bot.luckybird_2fa_code is None:
                     await asyncio.sleep(1)
 
-                # Enter the 2FA code
+                # Enter the LuckyBird 2FA code
                 twoFA_input = WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.XPATH, "/html/body/section/div[1]/div/div/input"))
-                )
-                twoFA_input.send_keys(bot.two_fa_code)
+                EC.presence_of_element_located((By.XPATH, "/html/body/section/div[1]/div/div/input"))
+                    )
+                twoFA_input.send_keys(bot.luckybird_2fa_code)
                 await asyncio.sleep(1)
                 twoFA_input.send_keys(Keys.ENTER)
+
+                # Reset LuckyBird 2FA code after usage
+                bot.luckybird_2fa_code = None
+
 
                 await channel.send("LuckyBird authenticated successfully!")
         except TimeoutException:

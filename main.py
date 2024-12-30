@@ -75,9 +75,8 @@ driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), opti
 bot = commands.Bot(command_prefix='!', intents=intents, case_insensitive=True)
 bot.remove_command("help")
 
-# Variable to store the 2FA code. Needed for Chumba, LuckyBird
-bot.two_fa_code = None  
-
+bot.luckybird_2fa_code = None  
+bot.chumba_2fa_code = None    
 
 # Dictionary to manage authentication status for different casinos
 auth_status = {
@@ -215,14 +214,19 @@ async def googleauth(ctx):
 
 @bot.event
 async def on_message(message):
-    """Capture the 2FA code from the channel messages."""
+    """Capture 2FA codes for LuckyBird and Chumba."""
     if message.channel.id == DISCORD_CHANNEL:
         content = message.content.strip()
         if len(content) == 6 and content.isdigit():
-            bot.two_fa_code = content  # Store 2FA code in the variable
-            print(f"2FA code {bot.two_fa_code} received.")
+            if "luckybird" in message.content.lower():  # Check if it's for LuckyBird
+                bot.luckybird_2fa_code = content
+                print(f"LuckyBird 2FA code {bot.luckybird_2fa_code} received.")
+            elif "chumba" in message.content.lower():  # Check if it's for Chumba
+                bot.chumba_2fa_code = content
+                print(f"Chumba 2FA code {bot.chumba_2fa_code} received.")
 
     await bot.process_commands(message)
+
 
 @bot.command(name="chumba")
 async def chumba(ctx):

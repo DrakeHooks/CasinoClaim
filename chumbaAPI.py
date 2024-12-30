@@ -43,14 +43,17 @@ async def authenticate_chumba(driver, bot, channel):
             sendCodeBtn.click()
             await channel.send("Please provide the Chumba 2FA code sent to your email in this channel.")
 
-            # Wait for the 2FA code to be provided by the user
-            while bot.two_fa_code is None:
-                await asyncio.sleep(1)  # Keep checking for the code
+            # Wait for the Chumba 2FA code from Discord
+            while bot.chumba_2fa_code is None:
+                await asyncio.sleep(1)
 
-            # Enter 2FA code
-            for i, digit in enumerate(bot.two_fa_code):
+            # Enter the Chumba 2FA code
+            for i, digit in enumerate(bot.chumba_2fa_code):
                 input_field = driver.find_element(By.ID, f"otp-code-input-{i}")
                 input_field.send_keys(digit)
+
+            # Reset Chumba 2FA code after usage
+            bot.chumba_2fa_code = None
 
             await channel.send("2FA code entered, completing the login process.")
 
