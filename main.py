@@ -241,7 +241,7 @@ async def chumba(ctx):
     if driver.current_url.startswith("https://login.chumbacasino.com/"):
 
         # Reset 2FA code before authentication
-        bot.two_fa_code = None
+        bot.chumba_2fa_code = None
 
         # Call authentication process and pass the bot object to share the two_fa_code
         authenticated = await authenticate_chumba(driver, bot, ctx)
@@ -297,13 +297,14 @@ async def chanced(ctx):
 
 @bot.command(name="luckybird")
 async def luckybird(ctx):
+    await ctx.send("Checking Luckybird for bonus...")
     channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
-    global luckybird_task
-    if not luckybird_task or luckybird_task.done():
-        await ctx.send("Checking LuckyBird for Bonus...")
-        luckybird_task = asyncio.create_task(luckyBird_claim(driver, bot, ctx, channel))
-    else:
-        await ctx.send("LuckyBird automation is already running.")
+    bonus_claimed = await luckyBird_claim(driver, bot, ctx, channel)
+
+    # If claiming the bonus failed, always check the countdown
+    if not bonus_claimed:
+        print("Failed to claim LuckyBird bonus. Checking countdown timer...")
+        await extract_countdown_info(driver, bot, ctx, channel)
 
 # Command to run the Global Poker bonus checker
 @bot.command(name="globalpoker")
