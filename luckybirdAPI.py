@@ -153,7 +153,5 @@ async def luckyBird_claim(driver, bot, ctx, channel):
         return  # End the function if the bonus was successfully claimed
     except TimeoutException:
         print("LuckyBird Bonus Unavailable or login required.")
-    finally:
-        # Step 4: Try to extract the countdown in the finally block
-        await extract_countdown_info(driver, bot, ctx, channel)
+
 
