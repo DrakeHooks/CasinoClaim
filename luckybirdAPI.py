@@ -86,6 +86,20 @@ async def authenticate_luckybird(driver, bot, ctx, channel):
 # Function to extract countdown information
 async def extract_countdown_info(driver, bot, ctx, channel):
     try:
+
+        driver.get("https://luckybird.io/")
+        await asyncio.sleep(5)
+
+        buyButton = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, "/html/body/div[1]/div/div[1]/div/section/section/header/div/div/ul[1]/li[2]/p"))
+        )
+        buyButton.click()
+
+        dailyBonusBtn = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, "/html/body/section/div[2]/div[2]/div[2]/div[1]/div/div/div/div[5]"))
+        )
+        dailyBonusBtn.click()
+        print("LuckyBird Daily Bonus Button found and clicked!")
         # Locate the countdown element
         countdown_element = WebDriverWait(driver, 90).until(
             EC.presence_of_element_located(
