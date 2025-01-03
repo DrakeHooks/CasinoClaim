@@ -76,6 +76,7 @@ async def claim_modo_bonus(driver, bot, ctx, channel):
         xpaths = [
             "/html/body/div[6]/div[3]/div/div[2]/button",
             "/html/body/div[4]/div[3]/div/div[3]/button",
+            "/html/body/div[5]/div[3]/div[3]/button",
             "/html/body/div[5]/div[3]/div/div[3]/button",
             "/html/body/div[6]/div[3]/div/div[3]/button",
             "/html/body/div[7]/div[3]/div/div[3]/button"
