@@ -130,7 +130,7 @@ async def luckyBird_claim(driver, bot, ctx, channel):
     channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
 
     driver.get("https://luckybird.io/")
-    await asyncio.sleep(5)
+    await asyncio.sleep(10)
     
     try:
         # Step 1: Click the buttons to get to the countdown element
