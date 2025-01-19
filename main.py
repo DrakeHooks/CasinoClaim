@@ -560,7 +560,7 @@ async def casino_loop():
             await asyncio.sleep(50)
         await asyncio.sleep(80)
         try:
-            await crowncoins_casino(None, driver, channel)
+            await crowncoins_casino(driver, bot, None, channel)
         except:
             print("Error in CrownCoinsCasino")
         await asyncio.sleep(30)
