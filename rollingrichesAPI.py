@@ -1,3 +1,5 @@
+# Drake Hooks
+# Casino Claim
 # Rolling Riches API
 
 import re

@@ -1,121 +1,164 @@
 # Drake Hooks
 # Casino Claim
-# CrownCoins API
-
+# CrownCoinsCasino API
 
 
 
 import re
 import os
 import asyncio
+import requests
+import json
+from datetime import timedelta
 from dotenv import load_dotenv
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 
 # Load environment variables from the .env file
 load_dotenv()
-# Function to close popups on Crown Coins Casino
-def ccc_close_popups(driver):
-    popup_xpaths = [
-        "/html/body/div[2]/div[5]/div/div/div/div[1]/div[2]",
-        "/html/body/div[2]/div[5]/div/div/div/div[1]/div",
-        "/html/body/div[2]/div[5]/div/div[1]/div[2]",
-        "/html/body/div[2]/div[5]/div/div/div/div[2]/div/div[2]/button/div",
-        "/html/body/div[4]/div/div[1]/div/div/button",
-        "/html/body/div[3]/div/div[1]/div/div/button",
-        "/html/body/div[5]/div/div/div[2]/button[2]",
-        "/html/body/div[2]/div[4]/div/div/div/div[2]/div"
-    ]
 
-    for xpath in popup_xpaths:
-        try:
-            WebDriverWait(driver, 3).until(EC.element_to_be_clickable((By.XPATH, xpath))).click()
-            print(f"Closed popup with XPath: {xpath}")
-        except TimeoutException:
-            pass  # Popup not found or already closed, continue with next one
-
-    # General popup close logic if "CLOSE" is detected
+# Function to authenticate into Crown Coins via google. Run !googleauth before running this function.
+async def auth_crown_google(driver, bot, ctx, channel):
     try:
-        close_buttons = WebDriverWait(driver, 3).until(
-            EC.presence_of_all_elements_located((By.XPATH, "//button[contains(text(), 'CLOSE')]"))
-        )
-        for close_button in close_buttons:
-            close_button.click()
-            print("Closed popup using 'CLOSE' button.")
-    except TimeoutException:
-        print("No 'CLOSE' button found.")
+        web = "https://crowncoinscasino.com/"
+        driver.get(web)
+        await asyncio.sleep(5)  # Give time for page to load
 
-
-# Main function for CrownCoinsCasino bonus claiming
-async def crowncoins_casino(ctx, driver, channel):
-    try:
-        driver.get("https://crowncoinscasino.com/")
-        await asyncio.sleep(10)
-        # Close popups if present
         try:
-            ccc_close_popups(driver)
-        except Exception as e:
-            print(f"Unable to close Crown Coins popups")
-
-        # Navigate to rewards page
-        try:
-            hamburger_btn_xpath = "/html/body/div[2]/div[1]/div[1]/div[2]/button"
-            WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH, hamburger_btn_xpath))).click()
-            await asyncio.sleep(2)
-
-            rewards_btn_xpath = "/html/body/div[2]/div[3]/div[2]/div/ul[2]/li[2]/button"
-            WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH, rewards_btn_xpath))).click()
-            await asyncio.sleep(2)
-
-            view_btn_xpath = "//button[contains(@class, 'button--main') and contains(@class, 'rewards__card_button')]"
-            WebDriverWait(driver, 30).until(EC.element_to_be_clickable((By.XPATH, view_btn_xpath))).click()
-        except Exception as e:
-            await channel.send(f"Unable to navigate to Crown Coins Rewards page")
-            return
-
-        await asyncio.sleep(5)
-
-        # Check for countdown or available bonus
-        try:
-            countdown_element = WebDriverWait(driver, 30).until(
-                EC.presence_of_element_located((By.XPATH, "/html/body/div[2]/div[5]/div[2]/div/div[4]"))
+            login_btn = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, "/html/body/div[2]/div/div[1]/div[1]/div[2]/button[2]"))
             )
-            countdown_value = countdown_element.text.strip()
+            login_btn.click()
 
-            # Check if the countdown says "TAP TO COLLECT YOUR DAILY BONUS"
-            if "TAP TO COLLECT YOUR DAILY BONUS" in countdown_value.upper():
-                print("Bonus is available. Attempting to claim the bonus...")
-                await claim_bonus(driver, channel)
-            elif "NEXT IN:" in countdown_value.upper():
-                # Strip the "NEXT IN:" part and format the time
-                time_remaining = countdown_value.replace("NEXT IN:", "").strip()
-                await channel.send(f"Next CrownCoins Bonus Available in: {time_remaining}")
-            else:
-                await channel.send(f"Next CrownCoins Bonus Available: {countdown_value}")
-        except TimeoutException:
-            await channel.send("Unable to find CrownCoins countdown.")
+            google_btn = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, "/html/body/div[2]/div[2]/div[2]/div/div/div[1]/div[2]/div[1]/button"))
+            )
+            google_btn.click()
 
+            await asyncio.sleep(5)
+            await channel.send("Authenticated into Crown Coins Casino!")
+        except:
+            await channel.send("Crown Coins login with google failed. Perhaps you need to run !googleauth.")
+    except:
+        print("Error in authenticate_crowncoins")
+        return
+
+# Function to authenticate into Crown Coins via .env creds.
+async def auth_crown_env(driver, bot, ctx, channel):
+    try:
+        web = "https://crowncoinscasino.com/"
+        driver.get(web)
+        await asyncio.sleep(5)  # Give time for page to load
+
+        try:
+            login_btn = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, "/html/body/div[2]/div/div[1]/div[1]/div[2]/button[2]"))
+            )
+            login_btn.click()
+
+            # If found, proceed with login
+            username = os.getenv("CROWNCOINS").split(":")[0]
+            password = os.getenv("CROWNCOINS").split(":")[1]
+            
+            username_field = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, "/html/body/div[2]/div[2]/div[2]/div/div/div[1]/div[2]/form/div[1]/input"))
+            )
+
+            password_field = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, "/html/body/div[2]/div[2]/div[2]/div/div/div[1]/div[2]/form/div[2]/div/input"))
+            )
+
+            # Input the username and password
+            username_field.send_keys(username)
+            password_field.send_keys(password)
+            await asyncio.sleep(2)
+
+            login_btn2 = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, "/html/body/div[2]/div[2]/div[2]/div/div/div[1]/div[2]/form/div[3]/button"))
+            )
+            login_btn2.click()
+
+            await asyncio.sleep(5)
+            await channel.send("Authenticated into Crown Coins Casino!")
+        except:
+            await channel.send("Crown Coins login button not found.")
+    except:
+        print("Error in authenticate_crowncoins")
+        return
+
+
+# Function to get the countdown timer
+async def get_countdown(driver, bot, ctx, channel):
+    try:
+        # Enable network logging via CDP
+        driver.execute_cdp_cmd("Network.enable", {})
+        await asyncio.sleep(10)  # Allow time for requests to be captured
+
+        # Fetch network logs
+        logs = driver.get_log("performance")
+        for entry in logs:
+            log = json.loads(entry["message"])
+
+            # Capture responses for daily-bonus
+            if log["message"]["method"] == "Network.responseReceived":
+                response = log["message"]["params"]["response"]
+                url = response.get("url", "")
+                status = response.get("status", "")
+
+                if "daily-bonus" in url and status == 200:
+                    request_id = log["message"]["params"]["requestId"]
+                    try:
+                        # Wait to ensure the response body is fully captured
+                        await asyncio.sleep(2)
+                        response_body = driver.execute_cdp_cmd("Network.getResponseBody", {"requestId": request_id})
+                        response_json = json.loads(response_body.get("body", "{}"))
+
+                        # Extract the `timeUntilNextBonusMS` value
+                        time_until_next_bonus_ms = response_json.get("data", {}).get("data", {}).get("timeUntilNextBonusMS")
+                        if time_until_next_bonus_ms is not None:
+                            # Convert milliseconds to HH:MM:SS format
+                            time_until_next_bonus = str(timedelta(milliseconds=time_until_next_bonus_ms)).split(".")[0]
+                            await channel.send(f"Next Crown Coins Bonus Available in: {time_until_next_bonus}")
+                        else:
+                            await channel.send("Key 'timeUntilNextBonusMS' not found in response.")
+                    except Exception as e:
+                        await channel.send(f"Failed to retrieve Daily-Bonus response body: {e}")
     except Exception as e:
-        print(f"An error occurred in the CrownCoinsCasino function: {e}")
+        await channel.send(f"Failed to log requests: {e}")
 
-
-# Function to claim the bonus on CrownCoinsCasino
-async def claim_bonus(driver, channel):
+# Function to claim the daily bonus
+async def claim_crown_bonus(driver, bot, ctx, channel):
     try:
         day1_btn_xpath = "/html/body/div[2]/div[5]/div[2]/div/div[3]/div"
         WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, day1_btn_xpath))).click()
         await asyncio.sleep(2)
-        print("CrownCoinsCasino Day 1 Bonus Claimed!")
-        await channel.send("CrownCoinsCasino Daily Bonus Claimed!")
-    except TimeoutException:
+        await channel.send("Crown Coins Daily Bonus Claimed!")
+        return True
+    except:
         try:
             day7_btn_xpath = "/html/body/div[2]/div[5]/div[2]/div/div[3]/div[7]"
             WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, day7_btn_xpath))).click()
             await asyncio.sleep(2)
-            print("CrownCoinsCasino Day 7 Bonus Claimed!")
-            await channel.send("CrownCoinsCasino Daily Bonus Claimed!")
-        except TimeoutException:
+            await channel.send("Crown Coins Daily Bonus Claimed!")
+            return True
+        except:
             print("Failed to click bonus buttons.")
+            return False
+
+# Main function for CrownCoinsCasino bonus claiming
+async def crowncoins_casino(driver, bot, ctx, channel):
+    try:
+        # Navigate to the website
+        driver.get("https://crowncoinscasino.com/")
+        await asyncio.sleep(10)  # Wait for page to load
+
+        # Attempt to claim the daily bonus
+        bonus_claimed = await claim_crown_bonus(driver, bot, ctx, channel)
+
+        # If bonus cannot be claimed, get the countdown timer
+        if not bonus_claimed:
+            await get_countdown(driver, bot, ctx, channel)
+    except Exception as e:
+        await channel.send(f"An error occurred: {e}")

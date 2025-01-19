@@ -167,8 +167,11 @@ async def help(ctx):
     ---------------------------------------
     Auth Commands:
     !googleauth - Authenticate Google Account
-    !auth <site> - Authenticate into a specific site 
-    (e.g. Modo, DingDingDing, Stake, LuckyBird)     
+    !auth <site> - Authenticate into a specific site           
+    (e.g. Modo, DingDingDing, Stake, LuckyBird)
+
+    !auth <site> <method> - Authenticate using a specific method
+    (e.g. !auth crowncoins google, !auth crowncoins env)                   
                                     
     """)
 
@@ -361,11 +364,44 @@ async def modo(ctx):
      
 
 @bot.command(name="auth")
-async def authenticate_command(ctx, site: str):
+async def authenticate_command(ctx, site: str, method: str = None):
     channel = bot.get_channel(DISCORD_CHANNEL)
 
-    # DingDingDing Authentication
-    if site.lower() == "dingdingding":
+    # CrownCoins Authentication
+    if site.lower() == "crowncoins":
+        if method is None:
+            await ctx.send("Please specify the authentication method: `google` or `env`.")
+            return
+
+        if method.lower() == "google":
+            await ctx.send("Authenticating CrownCoins using Google...")
+            auth_status["crowncoins_google"] = await auth_crown_google(driver, bot, ctx, channel)
+            if auth_status["crowncoins_google"]:
+                print("CrownCoins authentication via Google succeeded.")
+            else:
+                screenshot_path = "crowncoins_google_auth_failed.png"
+                driver.save_screenshot(screenshot_path)
+                await ctx.send("Google authentication failed. Unable to proceed.",
+                               file=discord.File(screenshot_path))
+                os.remove(screenshot_path)
+
+        elif method.lower() == "env":
+            await ctx.send("Authenticating CrownCoins using .env credentials...")
+            auth_status["crowncoins_env"] = await auth_crown_env(driver, bot, ctx, channel)
+            if auth_status["crowncoins_env"]:
+                print("CrownCoins authentication via .env credentials succeeded.")
+            else:
+                screenshot_path = "crowncoins_env_auth_failed.png"
+                driver.save_screenshot(screenshot_path)
+                await ctx.send("Authentication with .env credentials failed. Unable to proceed.",
+                               file=discord.File(screenshot_path))
+                os.remove(screenshot_path)
+
+        else:
+            await ctx.send("Invalid authentication method. Use `google` or `env`.")
+    
+    # Other Sites
+    elif site.lower() == "dingdingding":
         await ctx.send("Authenticating DingDingDing...")
         auth_status["dingdingding"] = await authenticate_dingdingding(driver, bot, ctx, channel)
         if auth_status["dingdingding"]:
@@ -373,11 +409,10 @@ async def authenticate_command(ctx, site: str):
         else:
             screenshot_path = "dingdingding_auth_failed.png"
             driver.save_screenshot(screenshot_path)
-            await ctx.send("Authentication failed. Unable to proceed.", 
-                       file=discord.File(screenshot_path))
+            await ctx.send("Authentication failed. Unable to proceed.",
+                           file=discord.File(screenshot_path))
             os.remove(screenshot_path)
 
-    # Modo Authentication
     elif site.lower() == "modo":
         await ctx.send("Authenticating Modo...")
         auth_status["modo"] = await authenticate_modo(driver, bot, ctx, channel)
@@ -386,11 +421,10 @@ async def authenticate_command(ctx, site: str):
         else:
             screenshot_path = "modo_auth_failed.png"
             driver.save_screenshot(screenshot_path)
-            await ctx.send("Modo authentication failed. Unable to proceed.", 
-                       file=discord.File(screenshot_path))
+            await ctx.send("Modo authentication failed. Unable to proceed.",
+                           file=discord.File(screenshot_path))
             os.remove(screenshot_path)
 
-    # Stake Authentication
     elif site.lower() == "stake":
         await ctx.send("Authenticating Stake...")
         auth_status["stake"] = await stake_auth(driver, bot, ctx, channel)
@@ -399,11 +433,10 @@ async def authenticate_command(ctx, site: str):
         else:
             screenshot_path = "stake_auth_failed.png"
             driver.save_screenshot(screenshot_path)
-            await ctx.send("Stake authentication failed. Unable to proceed.", 
-                       file=discord.File(screenshot_path))
+            await ctx.send("Stake authentication failed. Unable to proceed.",
+                           file=discord.File(screenshot_path))
             os.remove(screenshot_path)
 
-    # LuckyBird Authentication
     elif site.lower() == "luckybird":
         await ctx.send("Authenticating LuckyBird...")
         auth_status["luckybird"] = await authenticate_luckybird(driver, bot, ctx, channel)
@@ -412,14 +445,13 @@ async def authenticate_command(ctx, site: str):
         else:
             screenshot_path = "luckybird_auth_failed.png"
             driver.save_screenshot(screenshot_path)
-            await ctx.send("LuckyBird authentication failed. Unable to proceed.", 
-                       file=discord.File(screenshot_path))
+            await ctx.send("LuckyBird authentication failed. Unable to proceed.",
+                           file=discord.File(screenshot_path))
             os.remove(screenshot_path)
 
-
-    # Unsupported Sites
     else:
         await ctx.send(f"Authentication for '{site}' is not implemented.")
+
 
 
      

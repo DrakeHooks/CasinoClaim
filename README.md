@@ -4,15 +4,17 @@ Never miss a casino bonus again! A discord app for claiming social casino bonuse
 <p>
 <img src="https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54"/>
 <img src="https://img.shields.io/badge/-selenium-%43B02A?style=for-the-badge&logo=selenium&logoColor=white"/>
+<img src="https://img.shields.io/badge/-requests-%232c2f33?style=for-the-badge&logo=&logoColor=white"/>
 <img src="https://img.shields.io/badge/-discord.py-%232c2f33?style=for-the-badge&logo=discord&logoColor=white"/>
 <img src="https://img.shields.io/badge/-docker-%232c2f33?style=for-the-badge&logo=docker&logoColor=white"/>
+
 </p>
 
 # About 🧾
-Casino Claim is a selenium based python bot for claiming social casino bonuses. The bot will automatically claim your bonus, and provide a countdown for the next. If authentication is required, the bot will handle it. 
+Casino Claim is a discord bot for claiming social casino bonuses. The bot will automatically claim your bonus, provide a countdown for the next, and authenticate if needed.
 
 # DISCLAIMER ⚖️
-I am not responsible for any financial loss or gain incurred with the use of this tool. I have no relationship with any business or website. This tool is for educational purposes only. 
+I am not responsible for any financial loss or gain incurred with the use of this tool. I have no relationship with any business or website. This tool is for educational purposes only and is provided as is with no warranty.
 
 # Acknowledgement 🏆
 This program is heavily inspired by auto-rsa from Nelson Dane. Go check it out and give it a star here: https://github.com/NelsonDane/auto-rsa
@@ -30,7 +32,7 @@ cd CasinoClaim
 
 4. Create the .env file in the root directory of the project by editing the .env.example file and add the following:
     1. Add `DISCORD_TOKEN` and `DISCORD_CHANNEL` to your `.env` file.
-    2. Add your casino login credentials by editing the .env.example file. After editing, rename the file to .env and save. Note: some casino logins are currently only supported through the User Data directory.
+    2. Add your casino login credentials by editing the .env.example file. After editing, rename the file to .env and save. 
 5. run `docker compose up -d`
 
 
@@ -52,7 +54,7 @@ cd CasinoClaim
 | Fortune Coins  | ✓          | ✗               | No                          | $0.50-$1.20 SC bonus every 24 hours | Yes     |
 | Sportzino      | ✓          | ✓               | No                          | $.50-$1 bonus/day     | Yes     |
 | Luckybird      | ✓          | ✓               | No                          | $.25 bonus/day. Increases with VIP | Yes     |
-| Crown Coins    | ✓          | ✓               | No                         | Varies between $0.00-$2 bonus/day. Social Auth support in development | Yes     |
+| Crown Coins    | ✓          | ✓               | Yes                         | Varies between $0.00-$2 bonus/day. Social Auth support in development | Yes     |
 | Modo           | ✓          | ✓               | No                          | $.30-$1 SC bonus/day | Yes     |
 | Goldnluck      | ✗          | ✗               | No                          | $2 bonus/day     | No 🤢     |
 | Luckyland          | ✗          | ✗               | No                          | $.30-$1 SC bonus/day | Yes     |
