@@ -134,7 +134,7 @@ async def get_countdown(driver, bot, ctx, channel):
             else:
                 await channel.send("Key 'timeUntilNextBonusMS' not found in response.")
         except Exception as e:
-            await channel.send(f"Failed to retrieve Daily-Bonus response body: {e}")
+            await channel.send(f"Failed to retrieve Crown Coins Countdown Timer.")
     except Exception as e:
         await channel.send(f"An error occurred while retrieving the countdown: {e}")
 
