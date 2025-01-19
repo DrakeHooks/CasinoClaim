@@ -1,8 +1,6 @@
 selenium==4.10.0
 undetected-chromedriver
 webdriver-manager
-datetime
-json
 requests
 regex
 discord==2.3.2
