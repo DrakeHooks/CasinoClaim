@@ -94,10 +94,12 @@ async def get_countdown(driver, bot, ctx, channel):
     try:
         # Enable network logging via CDP
         driver.execute_cdp_cmd("Network.enable", {})
-        await asyncio.sleep(10)  # Allow time for requests to be captured
+        await asyncio.sleep(20)  # Allow time for requests to be captured
 
         # Fetch network logs
         logs = driver.get_log("performance")
+        request_id = None
+
         for entry in logs:
             log = json.loads(entry["message"])
 
@@ -109,24 +111,33 @@ async def get_countdown(driver, bot, ctx, channel):
 
                 if "daily-bonus" in url and status == 200:
                     request_id = log["message"]["params"]["requestId"]
-                    try:
-                        # Wait to ensure the response body is fully captured
-                        await asyncio.sleep(2)
-                        response_body = driver.execute_cdp_cmd("Network.getResponseBody", {"requestId": request_id})
-                        response_json = json.loads(response_body.get("body", "{}"))
+                    break
 
-                        # Extract the `timeUntilNextBonusMS` value
-                        time_until_next_bonus_ms = response_json.get("data", {}).get("data", {}).get("timeUntilNextBonusMS")
-                        if time_until_next_bonus_ms is not None:
-                            # Convert milliseconds to HH:MM:SS format
-                            time_until_next_bonus = str(timedelta(milliseconds=time_until_next_bonus_ms)).split(".")[0]
-                            await channel.send(f"Next Crown Coins Bonus Available in: {time_until_next_bonus}")
-                        else:
-                            await channel.send("Key 'timeUntilNextBonusMS' not found in response.")
-                    except Exception as e:
-                        await channel.send(f"Failed to retrieve Daily-Bonus response body: {e}")
+        if not request_id:
+            await channel.send("Failed to capture the daily-bonus request ID. Retrying...")
+            return
+
+        # Wait briefly to ensure the response body is available
+        await asyncio.sleep(10)
+
+        # Retrieve and process the response body
+        try:
+            response_body = driver.execute_cdp_cmd("Network.getResponseBody", {"requestId": request_id})
+            response_json = json.loads(response_body.get("body", "{}"))
+
+            # Extract the `timeUntilNextBonusMS` value
+            time_until_next_bonus_ms = response_json.get("data", {}).get("data", {}).get("timeUntilNextBonusMS")
+            if time_until_next_bonus_ms is not None:
+                # Convert milliseconds to HH:MM:SS format
+                time_until_next_bonus = str(timedelta(milliseconds=time_until_next_bonus_ms)).split(".")[0]
+                await channel.send(f"Next Crown Coins Bonus Available in: {time_until_next_bonus}")
+            else:
+                await channel.send("Key 'timeUntilNextBonusMS' not found in response.")
+        except Exception as e:
+            await channel.send(f"Failed to retrieve Daily-Bonus response body: {e}")
     except Exception as e:
-        await channel.send(f"Failed to log requests: {e}")
+        await channel.send(f"An error occurred while retrieving the countdown: {e}")
+
 
 # Function to claim the daily bonus
 async def claim_crown_bonus(driver, bot, ctx, channel):
