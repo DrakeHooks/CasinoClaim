@@ -17,6 +17,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 import datetime
 from dotenv import load_dotenv
@@ -56,6 +57,9 @@ DISCORD_CHANNEL = int(os.getenv("DISCORD_CHANNEL"))
 intents = Intents.default()
 intents.message_content = True
 
+caps = DesiredCapabilities.CHROME
+caps["goog:loggingPrefs"] = {"performance": "ALL"}
+
 # Setup Chrome options
 options = Options()
 options.add_argument('--ignore-certificate-errors')
@@ -68,6 +72,8 @@ options.add_argument(f"--user-agent={user_agent}")
 user_data_dir = "/temp/google-chrome/"  # Change path for Linux environment
 options.add_argument(f"--user-data-dir={user_data_dir}")
 options.add_extension('/temp/CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx')
+options.set_capability("goog:loggingPrefs", caps["goog:loggingPrefs"])
+
 # extension = "/root/.config/google-chrome/Default/Extensions"
 
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
@@ -333,7 +339,8 @@ async def crowncoinscasino(ctx):
     global CrownCoinsCasino_task
     if not CrownCoinsCasino_task or CrownCoinsCasino_task.done():
         await ctx.send("Checking Crown Coins Casino for Bonus...")
-        CrownCoinsCasino_task = asyncio.create_task(crowncoins_casino(driver, bot, ctx))
+        channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
+        CrownCoinsCasino_task = asyncio.create_task(crowncoins_casino(driver, bot, ctx, channel))
     else:
         await ctx.send("CrownCoinsCasino automation is already running.")
 
@@ -381,7 +388,7 @@ async def authenticate_command(ctx, site: str, method: str = None):
             else:
                 screenshot_path = "crowncoins_google_auth_failed.png"
                 driver.save_screenshot(screenshot_path)
-                await ctx.send("Google authentication failed. Unable to proceed.",
+                await ctx.send("",
                                file=discord.File(screenshot_path))
                 os.remove(screenshot_path)
 
@@ -393,7 +400,7 @@ async def authenticate_command(ctx, site: str, method: str = None):
             else:
                 screenshot_path = "crowncoins_env_auth_failed.png"
                 driver.save_screenshot(screenshot_path)
-                await ctx.send("Authentication with .env credentials failed. Unable to proceed.",
+                await ctx.send("",
                                file=discord.File(screenshot_path))
                 os.remove(screenshot_path)
 
