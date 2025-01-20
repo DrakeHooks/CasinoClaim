@@ -94,9 +94,8 @@ async def get_countdown(driver, bot, ctx, channel):
     try:
         # Enable network logging via CDP
         driver.execute_cdp_cmd("Network.enable", {})
-        await asyncio.sleep(5)
-        driver.get("https://crowncoinscasino.com/")
-        await asyncio.sleep(20)  # Wait for page to load
+        await asyncio.sleep(20)  # Allow time for requests to be captured
+
         # Fetch network logs
         logs = driver.get_log("performance")
         request_id = None
@@ -133,11 +132,11 @@ async def get_countdown(driver, bot, ctx, channel):
                 time_until_next_bonus = str(timedelta(milliseconds=time_until_next_bonus_ms)).split(".")[0]
                 await channel.send(f"Next Crown Coins Bonus Available in: {time_until_next_bonus}")
             else:
-                await channel.send("Key 'timeUntilNextBonusMS' not found in response.")
+                print("Key 'timeUntilNextBonusMS' not found in response.")
         except Exception as e:
-            print(f"Failed to retrieve Crown Coins Countdown Timer.")
+            print(f"Failed to retrieve Daily-Bonus response body: {e}")
     except Exception as e:
-        await channel.send(f"An error occurred while retrieving the countdown: {e}")
+        await channel.send(f"Could not retrieve Crown Coins countdown.")
 
 
 # Function to claim the daily bonus
