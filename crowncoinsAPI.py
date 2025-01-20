@@ -94,8 +94,9 @@ async def get_countdown(driver, bot, ctx, channel):
     try:
         # Enable network logging via CDP
         driver.execute_cdp_cmd("Network.enable", {})
-        await asyncio.sleep(20)  # Allow time for requests to be captured
-
+        await asyncio.sleep(5)
+        driver.get("https://crowncoinscasino.com/")
+        await asyncio.sleep(20)  # Wait for page to load
         # Fetch network logs
         logs = driver.get_log("performance")
         request_id = None
