@@ -20,26 +20,18 @@ load_dotenv()
 # Helper function to retrieve the countdown element
 def get_countdown_element(driver):
     try:
+        letters = "abcdefghijklmnopqrstuvwxyz"
+        classes = [f"{char * 7}_e" for char in letters]
+        xpath = "//span[" + " or ".join(f"contains(@class, '{cls}')" for cls in classes) + "]"
+        
         countdown_element = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located(
-                (By.XPATH, "//span[contains(@class, 'rrrr_e') or contains(@class, 'oooo_e') or "
-                           "contains(@class, 'aaaa_e') or contains(@class, 'bbbb_e') or "
-                           "contains(@class, 'cccc_e') or contains(@class, 'dddd_e') or "
-                           "contains(@class, 'eeee_e') or contains(@class, 'ffff_e') or "
-                           "contains(@class, 'gggg_e') or contains(@class, 'hhhh_e') or "
-                           "contains(@class, 'iiii_e') or contains(@class, 'jjjj_e') or "
-                           "contains(@class, 'kkkk_e') or contains(@class, 'llll_e') or "
-                           "contains(@class, 'mmmm_e') or contains(@class, 'nnnn_e') or "
-                           "contains(@class, 'oooo_e') or contains(@class, 'pppp_e') or "
-                           "contains(@class, 'rrrr_e') or contains(@class, 'ssss_e') or "
-                           "contains(@class, 'tttt_e') or contains(@class, 'uuuu_e') or "
-                           "contains(@class, 'vvvv_e') or contains(@class, 'wwww_e') or "
-                           "contains(@class, 'xxxx_e') or contains(@class, 'yyyy_e') or "
-                           "contains(@class, 'zzzz_e')]"))
+            EC.presence_of_element_located((By.XPATH, xpath))
         )
         return countdown_element
     except TimeoutException:
         return None
+
+
 
 # Function to log in to Global Poker, handling the case where the session is already active
 async def login_to_global_poker(driver, channel):
