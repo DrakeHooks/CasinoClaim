@@ -114,7 +114,7 @@ async def get_countdown(driver, bot, ctx, channel):
                     break
 
         if not request_id:
-            await channel.send("Failed to capture the daily-bonus request ID. Retrying...")
+            await channel.send("Failed to capture Crown Coins daily-bonus request ID. Retrying...")
             return
 
         # Wait briefly to ensure the response body is available
