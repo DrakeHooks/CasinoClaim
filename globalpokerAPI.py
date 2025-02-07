@@ -42,14 +42,14 @@ async def login_to_global_poker(driver, channel):
         # Check if login page is present by looking for the username field
         try:
             username_field = WebDriverWait(driver, 5).until(
-                EC.presence_of_element_located((By.XPATH, "/html/body/div/div/div[2]/form/div/div/div/div[2]/div[2]/span/div/div/div/div/div/div/div/div/div[2]/div[3]/div[1]/div/input"))
+                EC.presence_of_element_located((By.XPATH, "/html/body/main/div/div[2]/form/div/div/div/div/div[2]/div[2]/span/div/div/div/div/div/div/div/div/div[2]/div[3]/div[1]/div/input"))
             )
             # If found, proceed with login
             username = os.getenv("GLOBAL_POKER").split(":")[0]
             password = os.getenv("GLOBAL_POKER").split(":")[1]
             
             password_field = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.XPATH, "/html/body/div/div/div[2]/form/div/div/div/div[2]/div[2]/span/div/div/div/div/div/div/div/div/div[2]/div[3]/div[2]/div/div/input"))
+                EC.presence_of_element_located((By.XPATH, "/html/body/main/div/div[2]/form/div/div/div/div/div[2]/div[2]/span/div/div/div/div/div/div/div/div/div[2]/div[3]/div[2]/div/div/input"))
             )
 
             # Input the username and password
