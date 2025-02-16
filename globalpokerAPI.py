@@ -125,7 +125,7 @@ async def click_get_coins_button(driver, channel):
         await asyncio.sleep(3)  # Wait for any UI transitions
 
     except TimeoutException:
-        await channel.send("Get Coins button not found! Check XPATH of the button.")
+        await channel.send("Get Coins button not found! Check TOS or button XPATHS!")
 
 # Main function to check the countdown first, then claim the bonus if not found
 async def global_poker(ctx, driver, channel):
