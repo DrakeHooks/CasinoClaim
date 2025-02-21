@@ -89,7 +89,7 @@ async def claim_chumba_bonus(driver, channel):
         getCoinsBtn.click()
 
         dailyBonusLabel = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.XPATH, "/html/body/div[10]/div/div/div/div[2]/div[1]/div/div[3]/label"))
+            EC.presence_of_element_located((By.XPATH, "/html/body/div[9]/div/div/div/div[2]/div[1]/div/div[3]/label"))
         )
         dailyBonusLabel.click()
 
@@ -114,7 +114,7 @@ async def claim_chumba_bonus(driver, channel):
 async def check_chumba_countdown(driver, channel):
     try:
         countdownElement = WebDriverWait(driver, 100).until(
-            EC.presence_of_element_located((By.XPATH, "/html/body/div[10]/div/div/div/div[2]/div[2]/div/div[3]/p"))
+            EC.presence_of_element_located((By.XPATH, "/html/body/div[9]/div/div/div/div[2]/div[2]/div/div[3]/p"))
         )
         countdownValue = countdownElement.text
         hours, minutes = map(int, re.findall(r'\d+', countdownValue)[:2])
