@@ -77,7 +77,7 @@ async def authenticate_chumba(driver, bot, channel):
             return True
 
     except Exception as e:
-        await channel.send(f"Error during authentication")
+        await channel.send("Error during authentication")
         return False
 
 # Function to claim Chumba Casino bonus
@@ -88,17 +88,30 @@ async def claim_chumba_bonus(driver, channel):
         )
         getCoinsBtn.click()
 
-        dailyBonusLabel = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.XPATH, "/html/body/div[9]/div/div/div/div[2]/div[1]/div/div[3]/label"))
-        )
-        dailyBonusLabel.click()
+        # Try multiple xpaths for dailyBonusLabel (div[7], div[9], div[10])
+        dailyBonus_xpaths = [
+            "/html/body/div[7]/div/div/div/div[2]/div[1]/div/div[3]/label",
+            "/html/body/div[9]/div/div/div/div[2]/div[1]/div/div[3]/label",
+            "/html/body/div[10]/div/div/div/div[2]/div[1]/div/div[3]/label"
+        ]
+        dailyBonusLabel = None
+        for xpath in dailyBonus_xpaths:
+            try:
+                dailyBonusLabel = WebDriverWait(driver, 3).until(EC.presence_of_element_located((By.XPATH, xpath)))
+                dailyBonusLabel.click()
+                break
+            except TimeoutException:
+                continue
+        if not dailyBonusLabel:
+            await channel.send("Daily bonus label not found.")
+            return
 
+        # Claim button xpaths (already includes multiple div indices)
         claim_button_xpaths = [
             "/html/body/div[9]/div/div/div/div[2]/div[2]/div/button",
             "/html/body/div[7]/div/div/div/div[2]/div[2]/div/button",
             "/html/body/div[10]/div/div/div/div[2]/div[2]/div/button"
         ]
-
         for xpath in claim_button_xpaths:
             try:
                 claimBtn = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, xpath)))
@@ -107,21 +120,37 @@ async def claim_chumba_bonus(driver, channel):
                 break
             except TimeoutException:
                 continue
-    except:
+    except Exception as e:
         await channel.send("Error claiming Chumba bonus.")
 
 # Function to check countdown timer for next bonus
 async def check_chumba_countdown(driver, channel):
     try:
-        countdownElement = WebDriverWait(driver, 100).until(
-            EC.presence_of_element_located((By.XPATH, "/html/body/div[9]/div/div/div/div[2]/div[2]/div/div[3]/p"))
-        )
+        # Try multiple xpaths for the countdown element (div[7], div[9], div[10])
+        countdown_xpaths = [
+            "/html/body/div[7]/div/div/div/div[2]/div[2]/div/div[3]/p",
+            "/html/body/div[9]/div/div/div/div[2]/div[2]/div/div[3]/p",
+            "/html/body/div[10]/div/div/div/div[2]/div[2]/div/div[3]/p"
+        ]
+        countdownElement = None
+        for xpath in countdown_xpaths:
+            try:
+                countdownElement = WebDriverWait(driver, 3).until(
+                    EC.presence_of_element_located((By.XPATH, xpath))
+                )
+                break
+            except TimeoutException:
+                continue
+        if not countdownElement:
+            await channel.send("Countdown element not found.")
+            return
+
         countdownValue = countdownElement.text
         hours, minutes = map(int, re.findall(r'\d+', countdownValue)[:2])
         formatted_countdown = f"{hours:02}:{minutes:02}:00"
         await channel.send(f"Next Chumba Bonus Available in: {formatted_countdown}")
     except Exception as e:
-        await channel.send(f"Failed to retrieve Chumba countdown.")
+        await channel.send("Failed to retrieve Chumba countdown.")
 
 # Main function for Chumba Casino bonus claiming
 async def chumba_casino(ctx, driver, bot):
