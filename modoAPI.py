@@ -118,7 +118,7 @@ async def check_modo_countdown(driver, bot, ctx, channel):
 
         # Wait for countdown timer element using its class
         countdown_element = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.XPATH, "//p[contains(@class, 'MuiTypography-root') and contains(@class, 'MuiTypography-body1') and contains(@class, 'css-1ttdl7e')]"))
+            EC.presence_of_element_located((By.XPATH, "//p[contains(@class, 'MuiTypography-root') and contains(@class, 'MuiTypography-body2') and contains(@class, 'css-1i1dyad')]"))
         )
 
         # Extract countdown time text
