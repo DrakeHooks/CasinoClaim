@@ -604,14 +604,15 @@ async def casino_loop():
             print("Error in LuckyBird")
         await asyncio.sleep(10)
         try:
+            await rolling_riches_casino(None, driver, channel)
+        except:
+            print("Error in RollingRiches")
+        try:
             await chumba_casino(None, driver, bot)
         except:
             print("Error in Chumba")
         await asyncio.sleep(10)
-        try:
-            await rolling_riches_casino(None, driver, channel)
-        except:
-            print("Error in RollingRiches")
+
         try:
             await stake_claim(driver, bot, None, channel)
         except:
