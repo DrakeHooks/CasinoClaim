@@ -125,7 +125,7 @@ async def claim_chanced_bonus(ctx, driver, channel):
         print("Navigated to Chanced.com Daily Bonus page.")
         await asyncio.sleep(5)
         # Check for the claim button and click it if available
-        for div_index in [6, 7]:
+        for div_index in [9, 6, 7]:
             try:
                 first_button_xpath = f"/html/body/div[{div_index}]/div/div/div/div/div/div[2]/div[3]/section/div/div/div/form/div[7]/button"
                 first_button = WebDriverWait(driver, 3).until(
@@ -159,7 +159,7 @@ async def claim_chanced_bonus(ctx, driver, channel):
 async def check_chanced_countdown(ctx, driver, channel):
     try:
         # Check both div[6] and div[7] for the countdown elements
-        for div_index in [6, 7]:
+        for div_index in [9, 6, 7]:
             try:
                 hours_xpath = f"/html/body/div[{div_index}]/div/div/div/div/div/div[2]/div[3]/section/div/div/div/form/div[5]/div[1]"
                 minutes_xpath = f"/html/body/div[{div_index}]/div/div/div/div/div/div[2]/div[3]/section/div/div/div/form/div[5]/div[2]"
