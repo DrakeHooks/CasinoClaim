@@ -121,10 +121,11 @@ async def check_modo_countdown(driver, bot, ctx, channel):
             EC.presence_of_element_located((By.XPATH, "//p[contains(@class, 'MuiTypography-root') and contains(@class, 'MuiTypography-body2') and contains(@class, 'css-1i1dyad')]"))
         )
 
-        # Extract countdown time text
-        countdown_time = countdown_element.text
+        # Extract and reformat countdown time
+        countdown_text = countdown_element.text.replace("Next in ", "").strip()
+        countdown_time = countdown_text.replace("h", ":").replace("m", ":").replace("s", "")
 
-        # Send countdown message
+        # Send formatted countdown message
         countdown_message = f"Next Modo Bonus Available in: {countdown_time}"
         await channel.send(countdown_message)
 
@@ -133,6 +134,7 @@ async def check_modo_countdown(driver, bot, ctx, channel):
         return False
 
     return True
+
 
 
 # Main function to handle modo
