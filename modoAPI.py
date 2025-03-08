@@ -10,6 +10,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
+import re
 
 # Load environment variables from the .env file
 load_dotenv()
@@ -121,9 +122,16 @@ async def check_modo_countdown(driver, bot, ctx, channel):
             EC.presence_of_element_located((By.XPATH, "//p[contains(@class, 'MuiTypography-root') and contains(@class, 'MuiTypography-body2') and contains(@class, 'css-1i1dyad')]"))
         )
 
-        # Extract and reformat countdown time
+        # Extract countdown text
         countdown_text = countdown_element.text.replace("Next in ", "").strip()
-        countdown_time = countdown_text.replace("h", ":").replace("m", ":").replace("s", "")
+
+        # Use regex to extract hours, minutes, and seconds
+        match = re.match(r"(\d+)h\s*(\d+)m\s*(\d+)s", countdown_text)
+        if match:
+            hours, minutes, seconds = match.groups()
+            countdown_time = f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}"  # Ensures two-digit formatting
+        else:
+            countdown_time = countdown_text  # Fallback in case of unexpected format
 
         # Send formatted countdown message
         countdown_message = f"Next Modo Bonus Available in: {countdown_time}"
@@ -134,7 +142,6 @@ async def check_modo_countdown(driver, bot, ctx, channel):
         return False
 
     return True
-
 
 
 # Main function to handle modo
