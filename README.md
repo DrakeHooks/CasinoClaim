@@ -48,7 +48,7 @@ cd CasinoClaim
 | Global Poker   | ✓          | ✓               | No                          | $0.00-$4 SC bonus/day | Yes     |
 | Rolling Riches | ✓          | ✓               | No                          | $.20 bonus every 6 hours | Yes     |
 | Chumba         | ✓          | ✓               | No                          | $1 bonus/day     | Yes     |
-| DingDingDing   | ✓          | ✓               | No                          | Varies between $0.50 SC and $1 SC | Yes     |
+| DingDingDing   | ✓          | ✓               | No                          | Varies between $0.50 SC and $1 SC | Exit scammed as of 4/2. Do not put your money into DDD. No 🤢     |
 | Stake          | ✗          | ✓               | Yes                         | $1 bonus/day. Auto Claim in development | Yes     |
 | Zula           | ✓          | ✓               | No                          | $1 bonus/day     | Yes     |
 | Fortune Coins  | ✓          | ✗               | No                          | $0.50-$1.20 SC bonus every 24 hours | Yes     |
