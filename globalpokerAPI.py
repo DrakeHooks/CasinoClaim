@@ -21,7 +21,7 @@ load_dotenv()
 def get_countdown_element(driver):
     try:
         letters = "abcdefghijklmnopqrstuvwxyz"
-        classes = [f"{char * 7}_e" for char in letters]
+        classes = [f"{char * 6}_e" for char in letters]
         xpath = "//span[" + " or ".join(f"contains(@class, '{cls}')" for cls in classes) + "]"
         
         countdown_element = WebDriverWait(driver, 10).until(
