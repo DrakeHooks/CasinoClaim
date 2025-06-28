@@ -13,12 +13,6 @@ Never miss a casino bonus again! A discord app for claiming social casino bonuse
 # About 🧾
 Casino Claim is a discord bot for claiming social casino bonuses. The bot will automatically claim your bonus, provide a countdown for the next, and authenticate if needed.
 
-CASINO CLAIM 2 June 22nd, 2025 (stability, bug fixes, new casinos, installation/usage, + more!)
-
-Apologies for the delay in updates. I have been occupied with other projects and life. Those projects are now in a good state for me to return to this one. I will push some bugfixes this week with the rewrite scheduled for late June. Thank you for your continued patience and support. 
-
--- Drake
-
 # DISCLAIMER ⚖️
 I am not responsible for any financial loss or gain incurred with the use of this tool. I have no relationship with any business or website. This tool is for educational purposes only and is provided as is with no warranty.
 
