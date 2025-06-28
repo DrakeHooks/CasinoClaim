@@ -1,9 +1,9 @@
-selenium==4.10.0
+selenium
 undetected-chromedriver
 webdriver-manager
 requests
 regex
-discord==2.3.2
-discord.py==2.3.2
-python-dotenv==1.0.1
+discord
+discord.py
+python-dotenv
 seleniumbase
