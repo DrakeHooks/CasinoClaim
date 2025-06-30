@@ -577,16 +577,16 @@ async def casino_loop():
                 print("Failed to claim Modo bonus. Checking countdown timer...")
                 await check_modo_countdown(driver, bot, None, channel)
         except:
-            print("Error in DingDingDing")
+            print("Error in Modo")
         await asyncio.sleep(100)
-        try:
-            bonus_claimed = await claim_dingdingding_bonus(driver, bot, None, channel)
-            if not bonus_claimed:
-                print("Failed to claim DingDingDing bonus. Checking countdown timer...")
-                await check_dingdingding_countdown(driver, bot, None, channel)
-        except:
-            print("Error in DingDingDing")
-        await asyncio.sleep(100)
+        # try:
+        #     bonus_claimed = await claim_dingdingding_bonus(driver, bot, None, channel)
+        #     if not bonus_claimed:
+        #         print("Failed to claim DingDingDing bonus. Checking countdown timer...")
+        #         await check_dingdingding_countdown(driver, bot, None, channel)
+        # except:
+        #     print("Error in DingDingDing")
+        # await asyncio.sleep(100)
 
         await asyncio.sleep(10)
         try:
