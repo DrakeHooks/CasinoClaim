@@ -529,15 +529,15 @@ async def chanced_casino_loop():
 
 
 
-@tasks.loop(hours=24)
-async def dingdingding_auth_task():
-    channel = bot.get_channel(DISCORD_CHANNEL)
-    await channel.send("Running scheduled DingDingDing authentication...")
-    auth_status["dingdingding"] = await authenticate_dingdingding(driver, bot, None, channel)
-    if auth_status["dingdingding"]:
-        await channel.send("DingDingDing authentication succeeded during the scheduled task.")
-    else:
-        await channel.send("DingDingDing authentication failed during the scheduled task.")
+# @tasks.loop(hours=24)
+# async def dingdingding_auth_task():
+#     channel = bot.get_channel(DISCORD_CHANNEL)
+#     await channel.send("Running scheduled DingDingDing authentication...")
+#     auth_status["dingdingding"] = await authenticate_dingdingding(driver, bot, None, channel)
+#     if auth_status["dingdingding"]:
+#         await channel.send("DingDingDing authentication succeeded during the scheduled task.")
+#     else:
+#         await channel.send("DingDingDing authentication failed during the scheduled task.")
 
 
 @tasks.loop(hours=2, )
