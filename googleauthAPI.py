@@ -17,20 +17,19 @@ import discord
 # Load environment variables from the .env file
 load_dotenv()
 
-# Retrieve the single login string from environment variables
-google_login = os.getenv("GOOGLE_LOGIN")
-
-# Split the login string into email and password
-email, password = google_login.split(":")
 
 async def google_auth(ctx, driver, channel, credentials):
     try:
-        if credentials:
-            username, password = credentials
+        if credentials and all(credentials):
+            email, password = credentials
         else:
-            username = os.getenv("GOOGLE_USERNAME")
-            password = os.getenv("GOOGLE_PASSWORD")
-        if username and password:
+            google_login = os.getenv("GOOGLE_LOGIN")
+            if google_login:
+                email, password = google_login.split(":")
+            else:
+                await channel.send("Google credentials not found")
+                return
+        if email and password:
             driver.get("https://myaccount.google.com/?utm_source=chrome-profile-chooser&pli=1")
             await asyncio.sleep(5)
             driver.get("https://accounts.google.com/o/oauth2/v2/auth/oauthchooseaccount?redirect_uri=https%3A%2F%2Fdevelopers.google.com%2Foauthplayground&prompt=consent&response_type=code&client_id=407408718192.apps.googleusercontent.com&scope=email&access_type=offline&flowName=GeneralOAuthFlow")
