@@ -37,7 +37,9 @@ cd CasinoClaim
 
 
 
+# Usage 🎰🤖
 
+The bot is designed to run automatically in 2-hour intervals, with commands to check status of bonus. Running `!help` at any time provides the available commands.
 
 
 
@@ -58,12 +60,12 @@ cd CasinoClaim
 | Modo           | ✓          | ✓               | No                          | $0.30-$1.00 bonus/day | Yes     |
 | Goldnluck      | ✗          | ✗               | No                          | $2.00 bonus/day     | No 🤢     |
 | Luckyland      | ✗          | ✗               | No                          | $0.30-$1.00  bonus/day | Yes     |
-| iCasino        | ✗          | ✗               | No                          | $1.70 bonus/day | Yes     |
-| RealPrize      | ✗          | ✗               | No                          | $1.20 bonus/day | Yes     |
-| Spin Pals      | ✗          | ✗               | No                          | $1.00  bonus/day | Yes     |
-| Dara Casino    | ✗          | ✗               | No                          | $1.00  bonus/day | Yes     |
+| iCasino        | IN DEVELOPMENT         | IN DEVELOPMENT               | IN DEVELOPMENT                          | $1.70 bonus/day | Yes     |
+| RealPrize      | IN DEVELOPMENT          | IN DEVELOPMENT               | IN DEVELOPMENT                          | $1.20 bonus/day | Yes     |
+| Spin Pals      | IN DEVELOPMENT          | IN DEVELOPMENT               | IN DEVELOPMENT                          | $1.00  bonus/day | Yes     |
+| Dara Casino    | IN DEVELOPMENT  | IN DEVELOPMENT               | IN DEVELOPMENT                          | $1.00  bonus/day | Yes     |
 | Pulsz          | IN DEVELOPMENT | IN DEVELOPMENT | IN DEVELOPMENT            | Varies between $0.20-$3 bonus/day | Yes      |
-| DingDingDing   | ✓          | ✓               | No                          | Varies between $0.50 and $1 SC | Exit scammed as of 4/2/25 - Do not put your money into DDD. No 💩 |
+| DingDingDing   | ✓          | ✓               | No                          | No SC granted anymore from bonus | Exit scammed as of 4/2/25 - Do not put your money into DDD. No 💩 |
 
 
 # Support 🔮 
