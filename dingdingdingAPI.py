@@ -27,12 +27,16 @@ async def authenticate_dingdingding(driver, bot, ctx, channel):
         email_field = WebDriverWait(driver, 30).until(
             EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div/div/div[1]/div[1]/div/div/div[2]/form/input[1]"))
         )
-        email_field.send_keys(os.getenv("DINGDINGDING").split(":")[0])
+        creds = os.getenv("DINGDINGDING")
+        if not creds:
+            await channel.send("DINGDINGDING credentials not found in environment variables.")
+            return False
+        email_field.send_keys(creds.split(":")[0])
 
         password_field = WebDriverWait(driver, 30).until(
             EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div/div/div[1]/div[1]/div/div/div[2]/form/input[2]"))
         )
-        password_field.send_keys(os.getenv("DINGDINGDING").split(":")[1])
+        password_field.send_keys(creds.split(":")[1])
         
         await asyncio.sleep(3)
 

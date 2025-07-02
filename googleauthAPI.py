@@ -20,12 +20,15 @@ load_dotenv()
 # Retrieve the single login string from environment variables
 google_login = os.getenv("GOOGLE_LOGIN")
 
-# Split the login string into email and password
-email, password = google_login.split(":")
+if google_login:
+    # Split the login string into email and password
+    email, password = google_login.split(":")
+else:
+    email = password = None
 
 async def google_auth(ctx, driver, channel, credentials):
     try:
-        if credentials:
+        if credentials and all(credentials):
             username, password = credentials
         else:
             username = os.getenv("GOOGLE_USERNAME")

@@ -45,8 +45,11 @@ async def login_to_global_poker(driver, channel):
                 EC.presence_of_element_located((By.XPATH, "/html/body/main/div/div[2]/form/div/div/div/div/div[2]/div[2]/span/div/div/div/div/div/div/div/div/div[2]/div[3]/div[1]/div/input"))
             )
             # If found, proceed with login
-            username = os.getenv("GLOBAL_POKER").split(":")[0]
-            password = os.getenv("GLOBAL_POKER").split(":")[1]
+            creds = os.getenv("GLOBAL_POKER")
+            if not creds:
+                await channel.send("GLOBAL_POKER credentials not found in environment variables.")
+                return False
+            username, password = creds.split(":")
             
             password_field = WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.XPATH, "/html/body/main/div/div[2]/form/div/div/div/div/div[2]/div[2]/span/div/div/div/div/div/div/div/div/div[2]/div[3]/div[2]/div/div/input"))

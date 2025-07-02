@@ -16,8 +16,11 @@ import re
 async def authenticate_chumba(driver, bot, channel):
     try:
         # Load environment variables for login
-        username = os.getenv("CHUMBA").split(":")[0]
-        password = os.getenv("CHUMBA").split(":")[1]
+        creds = os.getenv("CHUMBA")
+        if not creds:
+            await channel.send("CHUMBA credentials not found in environment variables.")
+            return False
+        username, password = creds.split(":")
 
         # Enter login details
         WebDriverWait(driver, 90).until(EC.presence_of_element_located((By.ID, "login_email-input")))
