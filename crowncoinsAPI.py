@@ -59,8 +59,11 @@ async def auth_crown_env(driver, bot, ctx, channel):
             login_btn.click()
 
             # If found, proceed with login
-            username = os.getenv("CROWNCOINS").split(":")[0]
-            password = os.getenv("CROWNCOINS").split(":")[1]
+            creds = os.getenv("CROWNCOINS")
+            if not creds:
+                await channel.send("CROWNCOINS credentials not found in environment variables.")
+                return
+            username, password = creds.split(":")
             
             username_field = WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.XPATH, "/html/body/div[2]/div[2]/div[2]/div/div/div[1]/div[2]/form/div[1]/input"))

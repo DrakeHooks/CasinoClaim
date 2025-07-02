@@ -22,11 +22,16 @@ load_dotenv()
 async def authenticate_luckybird(driver, bot, ctx, channel):
     # LuckyBird credentials from the .env file
     try:
-        luckybird_credentials = os.getenv("LUCKYBIRD").split(":")
+        creds = os.getenv("LUCKYBIRD")
+        if not creds:
+            await channel.send("LUCKYBIRD credentials not found in environment variables.")
+            return False
+        luckybird_credentials = creds.split(":")
         username_text = luckybird_credentials[0]
         password_text = luckybird_credentials[1]
-    except:
-        print("LuckyBird credentials not found in environment variables.")
+    except Exception:
+        await channel.send("LUCKYBIRD credentials not found in environment variables.")
+        return False
     try:
         driver.get("https://luckybird.io/")
         # Step 2: Check if login is required

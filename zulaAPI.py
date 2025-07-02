@@ -109,7 +109,11 @@ async def zula_casino(ctx, driver, channel):
         # Time to wait for the page to fully load before entering username and password
         await asyncio.sleep(5)
         # Retrieve credentials from .env
-        credentials = os.getenv("ZULA").split(":")
+        creds = os.getenv("ZULA")
+        if not creds:
+            await channel.send("ZULA credentials not found in environment variables.")
+            return
+        credentials = creds.split(":")
         username_text = credentials[0]
         password_text = credentials[1]
 

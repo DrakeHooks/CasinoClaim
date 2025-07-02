@@ -72,7 +72,7 @@ async def chanced_casino(ctx, driver, channel, credentials):
         # Handle the login logic
         if login_button_present:
             # Use passed credentials or fallback to environment variables if not provided
-            if credentials:
+            if credentials and all(credentials):
                 username, password = credentials
             else:
                 username = os.getenv("CHANCED_USERNAME")

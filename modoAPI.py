@@ -28,12 +28,16 @@ async def authenticate_modo(driver, bot, ctx, channel):
             email_field = WebDriverWait(driver, 30).until(
             EC.presence_of_element_located((By.XPATH, "/html/body/main/div/div[2]/form/div/div/div/div/div[2]/div[2]/span/div/div/div/div/div/div/div/div/div[2]/div[3]/div[1]/div/input"))
             )
-            email_field.send_keys(os.getenv("MODO").split(":")[0])
+            creds = os.getenv("MODO")
+            if not creds:
+                await channel.send("MODO credentials not found in environment variables.")
+                return False
+            email_field.send_keys(creds.split(":")[0])
 
             password_field = WebDriverWait(driver, 30).until(
             EC.presence_of_element_located((By.XPATH, "/html/body/main/div/div[2]/form/div/div/div/div/div[2]/div[2]/span/div/div/div/div/div/div/div/div/div[2]/div[3]/div[2]/div/div/input"))
             )
-            password_field.send_keys(os.getenv("MODO").split(":")[1])
+            password_field.send_keys(creds.split(":")[1])
         
             await asyncio.sleep(120)
 

@@ -113,7 +113,11 @@ async def Sportzino(ctx, driver, channel):
         await asyncio.sleep(5)
         WebDriverWait(driver, 90).until(EC.presence_of_element_located((By.ID, "emailAddress")))
 
-        credentials = os.getenv("SPORTZINO").split(":")
+        creds = os.getenv("SPORTZINO")
+        if not creds:
+            await channel.send("SPORTZINO credentials not found in environment variables.")
+            return
+        credentials = creds.split(":")
         username_text = credentials[0]
         password_text = credentials[1]
 
