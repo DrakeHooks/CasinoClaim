@@ -31,22 +31,30 @@ from selenium.webdriver.common.action_chains import ActionChains
 #import custom API functions
 
 
-try:
-# from fortunecoinsAPI import *
-    from stakeAPI import *
-    from modoAPI import *
-    from googleauthAPI import *
-    from chancedAPI import *
-    from rollingrichesAPI import *
-    from globalpokerAPI import *
-    from dingdingdingAPI import *
-    from chumbaAPI import *
-    from crowncoinsAPI import *
-    from zulaAPI import *
-    from luckybirdAPI import *
-    from sportzinoAPI import *
-except Exception as e:
-    print(f"Error importing API libraries: {str(e)}")
+import importlib
+
+# Dynamically import API modules
+api_modules = [
+    "stakeAPI",
+    "modoAPI",
+    "googleauthAPI",
+    "chancedAPI",
+    "rollingrichesAPI",
+    "globalpokerAPI",
+    "dingdingdingAPI",
+    "chumbaAPI",
+    "crowncoinsAPI",
+    "zulaAPI",
+    "luckybirdAPI",
+    "sportzinoAPI",
+]
+
+for module_name in api_modules:
+    try:
+        module = importlib.import_module(module_name)
+        globals().update(vars(module))
+    except Exception as e:
+        print(f"Warning: Failed to import {module_name}: {e}")
 
 
 load_dotenv()
