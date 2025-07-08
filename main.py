@@ -81,6 +81,7 @@ user_data_dir = "/temp/google-chrome/"  # Change path for Linux environment
 options.add_argument(f"--user-data-dir={user_data_dir}")
 options.add_extension('/temp/CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx')
 options.set_capability("goog:loggingPrefs", caps["goog:loggingPrefs"])
+options.add_argument("--allow-geolocation")
 
 # extension = "/root/.config/google-chrome/Default/Extensions"
 
