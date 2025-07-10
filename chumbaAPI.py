@@ -15,6 +15,7 @@ import re
 # Function to authenticate into Chumba Casino
 async def authenticate_chumba(driver, bot, channel):
     try:
+        driver.maximize_window()
         # Load environment variables for login
         creds = os.getenv("CHUMBA")
         if not creds:
