@@ -77,8 +77,14 @@ options.add_argument('--disable-blink-features=AutomationControlled')
 options.add_argument('--no-sandbox')
 user_agent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36"
 options.add_argument(f"--user-agent={user_agent}")
-user_data_dir = "/temp/google-chrome/"  # Change path for Linux environment
-options.add_argument(f"--user-data-dir={user_data_dir}")
+
+#IMPORTANT. YOU MAY WANT TO IMPORT A CUSTOM USER DATA DIRECTORY FOR CAPTCHA SOLVING EXTENSIONS. UNCOMMENT THIS OUT AND IN THE DOCKERFILE FOR THIS
+
+# user_data_dir = "/temp/google-chrome/" 
+# Change path for Linux environment
+# options.add_argument(f"--user-data-dir={user_data_dir}")
+
+
 options.add_extension('/temp/CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx')
 options.set_capability("goog:loggingPrefs", caps["goog:loggingPrefs"])
 options.add_argument("--allow-geolocation")

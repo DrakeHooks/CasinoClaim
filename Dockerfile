@@ -31,7 +31,7 @@ WORKDIR /app
 COPY ./CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx /temp/CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx
 
 # Copy the google-chrome directory to a temporary directory
-COPY ./google-chrome /temp/google-chrome
+# COPY ./google-chrome /temp/google-chrome
 
 # Copy the entire project to /app in the container
 COPY . /app
