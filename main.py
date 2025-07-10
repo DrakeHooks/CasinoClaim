@@ -68,7 +68,7 @@ intents.message_content = True
 caps = DesiredCapabilities.CHROME
 caps["goog:loggingPrefs"] = {"performance": "ALL"}
 
-# Setup Chrome options
+# Setup our environment and Chrome options
 options = Options()
 options.add_argument('--ignore-certificate-errors')
 options.add_argument('--ignore-ssl-errors')
@@ -82,8 +82,7 @@ options.add_argument(f"--user-data-dir={user_data_dir}")
 options.add_extension('/temp/CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx')
 options.set_capability("goog:loggingPrefs", caps["goog:loggingPrefs"])
 options.add_argument("--allow-geolocation")
-
-# extension = "/root/.config/google-chrome/Default/Extensions"
+options.add_argument("--disable-features=DisableLoadExtensionCommandLineSwitch")
 
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
@@ -139,7 +138,23 @@ async def on_ready():
         await channel.send("Discord bot has started...")
     else:
         print("Invalid DISCORD_CHANNEL")
-
+    # This is to check that our Captcha Solver extension was loaded in properly and activated.
+    try:
+        driver.get("chrome://extensions")
+        time.sleep(5)
+        await channel.send("Captcha Solver Activated!")
+        driver.get("chrome-extension://hlifkpholllijblknnmbfagnkjneagid/popup/popup.html#/")
+        time.sleep(5)
+        screenshot_path = "captcha_screenshot.png"
+        driver.save_screenshot(screenshot_path)
+        await channel.send( 
+                       file=discord.File(screenshot_path))
+        
+        os.remove(screenshot_path)
+    except:
+        await channel.send("Failed to activate captcha solver! Some casinos may not work properly!")
+    
+    # Start main tasks loop.
     await asyncio.sleep(60)
     if not chanced_casino_loop.is_running():
         chanced_casino_loop.start()
@@ -148,9 +163,9 @@ async def on_ready():
     if not casino_loop.is_running():
         casino_loop.start()
     await asyncio.sleep(260)
-    if not dingdingding_auth_task.is_running():
-        dingdingding_auth_task.start()
-    
+
+
+
 
 @bot.command(name="ping")
 async def ping(ctx):
