@@ -85,10 +85,10 @@ options.add_argument(f"--user-agent={user_agent}")
 # options.add_argument(f"--user-data-dir={user_data_dir}")
 
 
-options.add_extension('/temp/CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx')
 options.set_capability("goog:loggingPrefs", caps["goog:loggingPrefs"])
 options.add_argument("--allow-geolocation")
 options.add_argument("--disable-features=DisableLoadExtensionCommandLineSwitch")
+options.add_extension('/temp/CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx')
 
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
