@@ -18,6 +18,7 @@ load_dotenv()
 # Function to authenticate into modo
 async def authenticate_modo(driver, bot, ctx, channel):
     try:
+        driver.maximize_window()
         channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
 
         web = "https://login.modo.us/login"
