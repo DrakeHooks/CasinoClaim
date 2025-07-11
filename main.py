@@ -40,6 +40,7 @@ api_modules = [
     "googleauthAPI",
     "chancedAPI",
     "rollingrichesAPI",
+    "jefebetAPI",
     "globalpokerAPI",
     "dingdingdingAPI",
     "chumbaAPI",
@@ -117,6 +118,7 @@ dingdingding_task = None
 stake_task = None
 zula_task = None
 rollingriches_task = None
+jefebet_task = None
 sportzino_task = None
 
 
@@ -131,6 +133,7 @@ dingdingding_running = False
 stake_running = False
 zula_running = False
 rollingriches_running = False
+jefebet_running = False
 funrize_running = False
 sportzino_running = False
 
@@ -192,6 +195,7 @@ async def help(ctx):
     !sweepslots - Check SweepSlots for bonus
     !zula - Check Zula for bonus
     !rollingriches - Check RollingRiches for bonus
+    !jefebet - Check JefeBet for bonus
     !sportzino - Check Sportzino for bonus
     !fortunecoins - Check Fortunecoins for bonus
 
@@ -305,6 +309,16 @@ async def rollingriches(ctx):
         await rolling_riches_casino(ctx, driver, channel)
     else:
         await ctx.send("RollingRiches automation is already running.")
+
+@bot.command(name="JefeBet")
+async def jefebet(ctx):
+    global jefebet_task
+    if not jefebet_task or jefebet_task.done():
+        await ctx.send("Checking JefeBet for Bonus...")
+        channel = bot.get_channel(DISCORD_CHANNEL)
+        await jefebet_casino(ctx, driver, channel)
+    else:
+        await ctx.send("JefeBet automation is already running.")
 
 @bot.command(name="Stake")
 async def stake(ctx):
@@ -638,11 +652,14 @@ async def casino_loop():
         except:
             print("Error in RollingRiches")
         try:
+            await jefebet_casino(None, driver, channel)
+        except:
+            print("Error in JefeBet")
+        try:
             await chumba_casino(None, driver, bot)
         except:
             print("Error in Chumba")
         await asyncio.sleep(10)
-
         try:
             await stake_claim(driver, bot, None, channel)
         except:
