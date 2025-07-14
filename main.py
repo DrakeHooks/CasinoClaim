@@ -147,21 +147,7 @@ async def on_ready():
         await channel.send("Discord bot has started...")
     else:
         print("Invalid DISCORD_CHANNEL")
-    # This is to check that our Captcha Solver extension was loaded in properly and activated.
-    try:
-        driver.get("chrome://extensions")
-        time.sleep(5)
-        await channel.send("Captcha Solver Activated!")
-        driver.get("chrome-extension://hlifkpholllijblknnmbfagnkjneagid/popup/popup.html#/")
-        time.sleep(5)
-        screenshot_path = "captcha_screenshot.png"
-        driver.save_screenshot(screenshot_path)
-        await channel.send( 
-                       file=discord.File(screenshot_path))
-        
-        os.remove(screenshot_path)
-    except:
-        await channel.send("Failed to activate captcha solver! Some casinos may not work properly!")
+
     
     # Start main tasks loop.
     await asyncio.sleep(60)
@@ -180,6 +166,24 @@ async def on_ready():
 async def ping(ctx):
     print("ponged")
     await ctx.send("Pong")
+
+
+@bot.command(name="captcha")
+async def captcha(ctx):
+    """Open the captcha solver extension page and send a screenshot."""
+    await ctx.send("Opening captcha solver page...")
+    try:
+        driver.get("chrome://extensions")
+        time.sleep(5)
+        driver.get("chrome-extension://hlifkpholllijblknnmbfagnkjneagid/popup/popup.html#/")
+        time.sleep(5)
+        screenshot_path = "captcha_screenshot.png"
+        driver.save_screenshot(screenshot_path)
+        await ctx.send(file=discord.File(screenshot_path))
+        os.remove(screenshot_path)
+    except Exception as e:
+        await ctx.send("Failed to capture captcha solver page.")
+        print(f"Captcha command error: {e}")
 
 
 @bot.command(name="help")
