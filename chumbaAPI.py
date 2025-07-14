@@ -1,11 +1,12 @@
 # Drake Hooks
-# Casino Claim
+# Casino Claim 2
 # Chumba API
 
 
 
 import os
 import asyncio
+import discord
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -179,3 +180,8 @@ async def chumba_casino(ctx, driver, bot):
         await check_chumba_countdown(driver, channel)
     else:
         await channel.send("Failed to reach the Chumba lobby.")
+        screenshot_path = "chumba_login_screenshot.png"
+        driver.save_screenshot(screenshot_path)
+        await channel.send("Chumba Authentication timed out, will try again later.", 
+                       file=discord.File(screenshot_path))
+        os.remove(screenshot_path)
