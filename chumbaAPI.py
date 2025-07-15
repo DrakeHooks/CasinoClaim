@@ -13,6 +13,12 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 import re
 
+# Helper function to type text slowly
+async def slow_type(element, text, delay=0.3):
+    for char in text:
+        element.send_keys(char)
+        await asyncio.sleep(delay)
+
 # Function to authenticate into Chumba Casino
 async def authenticate_chumba(driver, bot, channel):
     try:
@@ -26,9 +32,11 @@ async def authenticate_chumba(driver, bot, channel):
 
         # Enter login details
         WebDriverWait(driver, 90).until(EC.presence_of_element_located((By.ID, "login_email-input")))
-        driver.find_element(By.ID, "login_email-input").send_keys(username)
+        email_field = driver.find_element(By.ID, "login_email-input")
+        await slow_type(email_field, username)
         WebDriverWait(driver, 90).until(EC.presence_of_element_located((By.ID, "login_password-input")))
-        driver.find_element(By.ID, "login_password-input").send_keys(password)
+        password_field = driver.find_element(By.ID, "login_password-input")
+        await slow_type(password_field, password)
 
         # Click the login button
         loginBtn = WebDriverWait(driver, 90).until(
