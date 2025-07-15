@@ -76,7 +76,7 @@ options.add_argument('--ignore-ssl-errors')
 options.add_argument("disable-infobars")
 options.add_argument('--disable-blink-features=AutomationControlled')
 options.add_argument('--no-sandbox')
-user_agent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36"
+user_agent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
 options.add_argument(f"--user-agent={user_agent}")
 
 #IMPORTANT. YOU MAY WANT TO IMPORT A CUSTOM USER DATA DIRECTORY FOR CAPTCHA SOLVING EXTENSIONS. UNCOMMENT THIS OUT HERE AND IN THE DOCKERFILE.
