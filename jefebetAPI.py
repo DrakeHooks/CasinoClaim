@@ -77,7 +77,7 @@ async def claim_jefebet_bonus(ctx, driver, channel):
     try:
         # Navigate to the main page to claim the bonus
         if driver.current_url == "https://www.jefebet.com/lobby":
-            print("Authenticated into JefeBet successfully!")
+            await channel.send("Authenticated into JefeBet successfully!")
         await asyncio.sleep(5)
 
 
