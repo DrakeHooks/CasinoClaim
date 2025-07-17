@@ -61,10 +61,10 @@ async def spinpals_flow(ctx, driver, channel):
     # 2) Try to click any enabled “Claim” button
     for xp in CLAIM_XPATHS:
         try:
-            btn = WebDriverWait(driver, 3).until(
+            claim_btn = WebDriverWait(driver, 3).until(
                 EC.element_to_be_clickable((By.XPATH, xp))
             )
-            btn.click()
+            claim_btn.click()
             await channel.send("SpinPals Daily Bonus Claimed!")
             return
         except TimeoutException:
@@ -72,10 +72,10 @@ async def spinpals_flow(ctx, driver, channel):
 
     # 3) If no claim, try to read the countdown
     try:
-        cd_btn = WebDriverWait(driver, 3).until(
+        countdown_btn = WebDriverWait(driver, 3).until(
             EC.presence_of_element_located((By.XPATH, XPATH_COUNTDOWN))
         )
-        raw       = cd_btn.text.strip()               # e.g. "22 : 27 : 06"
+        raw       = countdown_btn.text.strip()               # e.g. "22 : 27 : 06"
         countdown = re.sub(r"\s+", "", raw)           # => "22:27:06"
         await channel.send(f"Next SpinPals bonus Available in: {countdown}")
         return
@@ -151,10 +151,10 @@ async def claim_spinpals_bonus(ctx, driver, channel):
     # then reuse the same loop we had above
     for xp in CLAIM_XPATHS:
         try:
-            btn = WebDriverWait(driver, 10).until(
+            claim_btn = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.XPATH, xp))
             )
-            btn.click()
+            claim_btn.click()
             await channel.send("SpinPals Daily Bonus Claimed!")
             return
         except TimeoutException:
@@ -171,9 +171,9 @@ async def check_spinpals_countdown(ctx, driver, channel):
     driver.get(STORE_URL)
     await asyncio.sleep(5)
 
-    cd_btn = WebDriverWait(driver, 10).until(
+    countdown_btn = WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.XPATH, XPATH_COUNTDOWN))
     )
-    raw       = cd_btn.text.strip()
+    raw       = countdown_btn.text.strip()
     countdown = re.sub(r"\s+", "", raw)
     await channel.send(f"Next SpinPals bonus Available in: {countdown}")
