@@ -41,6 +41,7 @@ api_modules = [
     "chancedAPI",
     "rollingrichesAPI",
     "jefebetAPI",
+    "spinpalsAPI",
     "globalpokerAPI",
     "dingdingdingAPI",
     "chumbaAPI",
@@ -90,6 +91,7 @@ options.set_capability("goog:loggingPrefs", caps["goog:loggingPrefs"])
 options.add_argument("--allow-geolocation")
 options.add_argument("--disable-features=DisableLoadExtensionCommandLineSwitch")
 options.add_extension('/temp/CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx')
+options.add_argument('--disable-notifications')
 
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
@@ -119,6 +121,7 @@ stake_task = None
 zula_task = None
 rollingriches_task = None
 jefebet_task = None
+spinpals_task = None
 sportzino_task = None
 
 
@@ -134,6 +137,7 @@ stake_running = False
 zula_running = False
 rollingriches_running = False
 jefebet_running = False
+spinpals_running = False
 funrize_running = False
 sportzino_running = False
 
@@ -200,6 +204,7 @@ async def help(ctx):
     !zula - Check Zula for bonus
     !rollingriches - Check RollingRiches for bonus
     !jefebet - Check JefeBet for bonus
+    !spinpals - Check SpinPals for bonus
     !sportzino - Check Sportzino for bonus
     !fortunecoins - Check Fortunecoins for bonus
 
@@ -323,6 +328,16 @@ async def jefebet(ctx):
         await jefebet_casino(ctx, driver, channel)
     else:
         await ctx.send("JefeBet automation is already running.")
+
+@bot.command(name="SpinPals")
+async def spinpals(ctx):
+    global spinpals_task
+    if not spinpals_task or spinpals_task.done():
+        await ctx.send("Checking SpinPals for Bonus...")
+        channel = bot.get_channel(DISCORD_CHANNEL)
+        await spinpals_casino(ctx, driver, channel)
+    else:
+        await ctx.send("SpinPals automation is already running.")
 
 @bot.command(name="Stake")
 async def stake(ctx):
@@ -659,6 +674,10 @@ async def casino_loop():
             await jefebet_casino(None, driver, channel)
         except:
             print("Error in JefeBet")
+        try:
+            await spinpals_casino(None, driver, channel)
+        except:
+            print("Error in SpinPals")
         try:
             await chumba_casino(None, driver, bot)
         except:
