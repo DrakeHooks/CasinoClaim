@@ -176,4 +176,4 @@ async def check_spinpals_countdown(ctx, driver, channel):
     )
     raw       = countdown_btn.text.strip()
     countdown = re.sub(r"\s+", "", raw)
-    await channel.send(f"Next SpinPals bonus Available in: {countdown}")
+    await channel.send(f"Next SpinPals Bonus Available in: {countdown}")
