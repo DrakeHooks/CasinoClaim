@@ -309,6 +309,8 @@ async def chumba(ctx):
     else:
         await ctx.send("Failed to reach the Chumba lobby.")
 
+
+
 @bot.command(name="RollingRiches")
 async def rollingriches(ctx):
     global rollingriches_task
@@ -335,7 +337,7 @@ async def spinpals(ctx):
     if not spinpals_task or spinpals_task.done():
         await ctx.send("Checking SpinPals for Bonus...")
         channel = bot.get_channel(DISCORD_CHANNEL)
-        await spinpals_casino(ctx, driver, channel)
+        await spinpals_flow(ctx, driver, channel)
     else:
         await ctx.send("SpinPals automation is already running.")
 
