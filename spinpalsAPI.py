@@ -77,7 +77,7 @@ async def spinpals_flow(ctx, driver, channel):
         )
         raw       = cd_btn.text.strip()               # e.g. "22 : 27 : 06"
         countdown = re.sub(r"\s+", "", raw)           # => "22:27:06"
-        await channel.send(f"⏳ Next SpinPals bonus in: {countdown}")
+        await channel.send(f"Next SpinPals bonus Available in: {countdown}")
         return
     except TimeoutException:
         pass
@@ -91,7 +91,7 @@ async def spinpals_flow(ctx, driver, channel):
 # ───────────────────────────────────────────────────────────
 async def spinpals_casino(ctx, driver, channel):
     if not SPINPALS_CRED:
-        await channel.send("⚠️ SPINPALS credentials missing!")
+        await channel.send("SpinPals credentials not found in environment variables.")
         return
 
     username, password = SPINPALS_CRED.split(":")
