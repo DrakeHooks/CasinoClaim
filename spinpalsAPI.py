@@ -121,47 +121,36 @@ async def claim_spinpals_bonus(ctx, driver, channel):
         # Check countdown if button was not found
         if not button_found:
             print("No 'Claim' button found. Checking countdown timer...")
-            await check_sinpals_countdown(driver, bot, ctx, channel)
+            await check_spinpals_countdown(ctx, driver, channel)
 
     except Exception as e:
         print(f"Error while claiming SpinPals bonus: {str(e)}")
         return False
 
-        await asyncio.sleep(5)
-        print("Checking for countdown element.")
 
 
-        # List of possible XPaths for the countdown element
-        countdown_xpaths = [
-            "/html/body/div[5]/div[2]/div/mat-dialog-container/div/div/app-get-coin/div/div[2]/div/app-hourly-bonus/div/div/div[3]/div/label",
-            "/html/body/div[5]/div[2]/div/mat-dialog-container/div/div/app-get-coin/div/div[2]/div/app-hourly-bonus/div/div/div[4]/div/label",
-            "/html/body/div[5]/div[2]/div/mat-dialog-container/div/div/app-get-coin/div/div[2]/div/app-hourly-bonus/div/div/div[5]/div/label"
-        ]
-        countdown_element = None
-        for xpath in countdown_xpaths:
-            try:
-                countdown_element = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, xpath)))
-                if countdown_element:
-                    break
-            except:
-                continue
 
+async def check_spinpals_countdown(ctx, driver, channel):
+    try:
+        # wait for at least one disabled button with a “:” in it
+        countdown_btn = WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((
+                By.XPATH,
+                "//button[@disabled and contains(normalize-space(.), ':')]"
+            ))
+        )
 
-        if countdown_element:
-            countdown_value = countdown_element.text.strip()
+        # extract and clean up the text
+        countdown_text = countdown_btn.text.strip()
 
+        # sanity-check: make sure it looks like HH:MM:SS
+        if not re.match(r"^\d{1,2}:\d{1,2}:\d{1,2}$", countdown_text):
+            raise ValueError(f"Unexpected countdown format: {countdown_text!r}")
 
-            # Replace spaces with colons to format it correctly as HH:MM:SS
-            countdown_value = countdown_value.replace(" ", ":")
+        # send it back to Discord
+        await channel.send(f"Next SpinPals Bonus Available in: {countdown_text}")
 
-
-            # In case the value has fewer than 6 characters, prepend zeros to maintain the format
-            time_parts = countdown_value.split(":")
-            while len(time_parts) < 3:  # Ensure we have 3 parts (HH:MM:SS)
-                time_parts.insert(0, "00")
-            formatted_countdown = ":".join(time_parts)
-
-
-            await channel.send(f"Next SpinPals Bonus Available in: {formatted_countdown}")
-        else:
-            print("Unable to retrieve SpinPals countdown value.")
+    except (TimeoutException, ValueError) as e:
+        # either we couldn’t find it in time, or the text was weird
+        print(f"[SpinPals] countdown error: {e}")
+        await channel.send("Error retrieving SpinPals countdown timer.")
