@@ -132,25 +132,25 @@ async def claim_spinpals_bonus(ctx, driver, channel):
 
 async def check_spinpals_countdown(ctx, driver, channel):
     try:
-        # wait for at least one disabled button with a “:” in it
-        countdown_btn = WebDriverWait(driver, 15).until(
+        # 1) Wait for the disabled button with a colon in its text
+        btn = WebDriverWait(driver, 15).until(
             EC.presence_of_element_located((
                 By.XPATH,
                 "//button[@disabled and contains(normalize-space(.), ':')]"
             ))
         )
 
-        # extract and clean up the text
-        countdown_text = countdown_btn.text.strip()
+        # 2) Collapse out any whitespace
+        raw = btn.text.strip()                  # e.g. "22 : 27 : 06"
+        countdown = re.sub(r"\s+", "", raw)     # becomes "22:27:06"
 
-        # sanity-check: make sure it looks like HH:MM:SS
-        if not re.match(r"^\d{1,2}:\d{1,2}:\d{1,2}$", countdown_text):
-            raise ValueError(f"Unexpected countdown format: {countdown_text!r}")
+        # 3) Validate format
+        if not re.match(r"^\d{1,2}:\d{1,2}:\d{1,2}$", countdown):
+            raise ValueError(f"Unexpected format: {raw!r}")
 
-        # send it back to Discord
-        await channel.send(f"Next SpinPals Bonus Available in: {countdown_text}")
+        # 4) Send to Discord
+        await channel.send(f"Next SpinPals Bonus in: {countdown}")
 
     except (TimeoutException, ValueError) as e:
-        # either we couldn’t find it in time, or the text was weird
         print(f"[SpinPals] countdown error: {e}")
         await channel.send("Error retrieving SpinPals countdown timer.")
