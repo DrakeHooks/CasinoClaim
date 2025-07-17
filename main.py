@@ -193,7 +193,7 @@ async def captcha(ctx):
 @bot.command(name="help")
 async def help(ctx):
     await ctx.send("""Commands are not recommended. 
-    🎰Casino Commands: 
+    🎰 Casino Commands: 
     !chanced - Check Chanced.com for bonus
     !luckybird - Check LuckyBird.io for bonus
     !globalpoker - Check GlobalPoker for bonus
