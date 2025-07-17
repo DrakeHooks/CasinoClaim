@@ -677,7 +677,7 @@ async def casino_loop():
         except:
             print("Error in JefeBet")
         try:
-            await spinpals_casino(None, driver, channel)
+            await spinpals_flow(None, driver, channel)
         except:
             print("Error in SpinPals")
         try:
