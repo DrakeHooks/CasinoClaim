@@ -115,6 +115,7 @@ async def claim_jefebet_bonus(ctx, driver, channel):
 
         # List of possible XPaths for the countdown element
         countdown_xpaths = [
+            "/html/body/div[1]/div[2]/div/mat-dialog-container/div/div/app-get-coin/div/div[2]/div/app-hourly-bonus/div/div/div[3]/div/label",
             "/html/body/div[5]/div[2]/div/mat-dialog-container/div/div/app-get-coin/div/div[2]/div/app-hourly-bonus/div/div/div[3]/div/label",
             "/html/body/div[5]/div[2]/div/mat-dialog-container/div/div/app-get-coin/div/div[2]/div/app-hourly-bonus/div/div/div[4]/div/label",
             "/html/body/div[5]/div[2]/div/mat-dialog-container/div/div/app-get-coin/div/div[2]/div/app-hourly-bonus/div/div/div[5]/div/label"
