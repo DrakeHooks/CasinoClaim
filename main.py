@@ -192,13 +192,13 @@ async def captcha(ctx):
 
 @bot.command(name="help")
 async def help(ctx):
-    await ctx.send("""Commands are not recommended. Available commands: 
+    await ctx.send("""Commands are not recommended. 
+    🎰Casino Commands: 
     !chanced - Check Chanced.com for bonus
     !luckybird - Check LuckyBird.io for bonus
     !globalpoker - Check GlobalPoker for bonus
     !crowncoins - Check CrownCoinsCasino for bonus
     !chumba - Check Chumba for bonus
-    !dingdingding - Check DingDingDing for bonus
     !modo - Check Modo for bonus
     !sweepslots - Check SweepSlots for bonus
     !zula - Check Zula for bonus
@@ -208,13 +208,16 @@ async def help(ctx):
     !sportzino - Check Sportzino for bonus
     !fortunecoins - Check Fortunecoins for bonus
 
+    ---------------------------------------
+    ⚙️ General Commands:                             
     !ping - Check if the bot is online
     !restart - Restart the bot     
     !help - Display the available commands
+    !captcha - Open the captcha solver extension page            
     !stop - Stop the bot               
 
     ---------------------------------------
-    Auth Commands:
+    ✅ Auth Commands:
     !googleauth - Authenticate Google Account
     !auth <site> - Authenticate into a specific site           
     (e.g. Modo, DingDingDing, Stake, LuckyBird)
