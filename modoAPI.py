@@ -1,10 +1,11 @@
 # Drake Hooks
-# Casino Claim
+# Casino Claim 2
 # Modo API
 
 
 import os
 import asyncio
+import discord
 from dotenv import load_dotenv
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -39,7 +40,13 @@ async def authenticate_modo(driver, bot, ctx, channel):
             EC.presence_of_element_located((By.XPATH, "/html/body/main/div/div[2]/form/div/div/div/div/div[2]/div[2]/span/div/div/div/div/div/div/div/div/div[2]/div[3]/div[2]/div/div/input"))
             )
             password_field.send_keys(creds.split(":")[1])
+            screenshot_path = "modo_login_screenshot.png"
+            driver.save_screenshot(screenshot_path)
+            await channel.send("Modo user/pass entered. Solving captcha...", 
+            file=discord.File(screenshot_path))
         
+            #Optionally, remove the screenshot file after sending
+            os.remove(screenshot_path)
             await asyncio.sleep(120)
 
         except:
