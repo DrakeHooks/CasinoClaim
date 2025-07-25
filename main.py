@@ -42,6 +42,7 @@ api_modules = [
     "rollingrichesAPI",
     "jefebetAPI",
     "spinpalsAPI",
+    "nolimitcoinsAPI",
     "globalpokerAPI",
     "dingdingdingAPI",
     "chumbaAPI",
@@ -122,6 +123,7 @@ zula_task = None
 rollingriches_task = None
 jefebet_task = None
 spinpals_task = None
+nolimitcoins_task = None
 sportzino_task = None
 
 
@@ -138,6 +140,7 @@ zula_running = False
 rollingriches_running = False
 jefebet_running = False
 spinpals_running = False
+nolimitcoins_running = False
 funrize_running = False
 sportzino_running = False
 
@@ -205,6 +208,7 @@ async def help(ctx):
     !rollingriches - Check RollingRiches for bonus
     !jefebet - Check JefeBet for bonus
     !spinpals - Check SpinPals for bonus
+    !nolimitcoins - Check NoLimitCoins for bonus
     !sportzino - Check Sportzino for bonus
     !fortunecoins - Check Fortunecoins for bonus
 
@@ -343,6 +347,16 @@ async def spinpals(ctx):
         await spinpals_flow(ctx, driver, channel)
     else:
         await ctx.send("SpinPals automation is already running.")
+
+@bot.command(name="NoLimitCoins")
+async def nolimitcoins(ctx):
+    global nolimitcoins_task
+    if not nolimitcoins_task or nolimitcoins_task.done():
+        await ctx.send("Checking NoLimitCoins for Bonus...")
+        channel = bot.get_channel(DISCORD_CHANNEL)
+        await nolimitcoins_flow(ctx, driver, channel)
+    else:
+        await ctx.send("NoLimitCoins automation is already running.")
 
 @bot.command(name="Stake")
 async def stake(ctx):
@@ -675,14 +689,22 @@ async def casino_loop():
             await rolling_riches_casino(None, driver, channel)
         except:
             print("Error in RollingRiches")
+        await asyncio.sleep(10)
         try:
             await jefebet_casino(None, driver, channel)
         except:
             print("Error in JefeBet")
+        await asyncio.sleep(10)
         try:
             await spinpals_flow(None, driver, channel)
         except:
             print("Error in SpinPals")
+        await asyncio.sleep(10)
+        try:
+            await nolimitcoins_flow(None, driver, channel)
+        except:
+            print("Error in NoLimitCoins")
+        await asyncio.sleep(10)
         try:
             await chumba_casino(None, driver, bot)
         except:
