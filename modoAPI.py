@@ -12,6 +12,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 import re
+from helperAPI import open_captcha_solver_page
 
 # Load environment variables from the .env file
 load_dotenv()
@@ -19,8 +20,9 @@ load_dotenv()
 # Function to authenticate into modo
 async def authenticate_modo(driver, bot, ctx, channel):
     try:
-        driver.maximize_window()
         channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
+        await open_captcha_solver_page(driver)
+        driver.maximize_window()
 
         web = "https://login.modo.us/login"
         driver.get(web)
@@ -65,12 +67,16 @@ async def authenticate_modo(driver, bot, ctx, channel):
             return False
         await asyncio.sleep(10)
         driver.refresh()
-        # Check if login was successful
-        if driver.current_url == "https://modo.us/lobby":
+        # Check for the presence of the "Log Out" button to confirm authentication
+        logout_xpath = "/html/body/div[1]/div[1]/div/div/div[2]/div[2]/li/div/div[2]/p"
+        try:
+            WebDriverWait(driver, 30).until(
+                EC.presence_of_element_located((By.XPATH, logout_xpath))
+            )
             await channel.send("Authenticated into modo successfully!")
             return True
-        else:
-            await channel.send("Authentication failed. Did not reach the lobby.")
+        except TimeoutException:
+            await channel.send("Authentication failed. Log Out button not found.")
             return False
     except TimeoutException:
         await channel.send("Authentication timeout. Please check your credentials or XPaths.")
