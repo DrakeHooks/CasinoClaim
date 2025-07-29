@@ -683,10 +683,13 @@ async def casino_loop():
             await spinpals_flow(None, driver, channel)
         except:
             print("Error in SpinPals")
-        try:
-            await chumba_casino(None, driver, bot)
-        except:
-            print("Error in Chumba")
+
+        # Chumba under maintenance
+        
+        # try:
+        #     await chumba_casino(None, driver, bot)
+        # except:
+        #     print("Error in Chumba")
         await asyncio.sleep(10)
         try:
             await stake_claim(driver, bot, None, channel)
