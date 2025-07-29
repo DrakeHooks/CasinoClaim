@@ -12,11 +12,14 @@ RUN apt-get update && apt-get install -y \
     software-properties-common \
     apt-utils \
     ca-certificates \
+    curl \
     python3 \
     python3-venv \
-    python3-pip \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
+
+# Install uv for managing Python dependencies
+RUN curl -Ls https://astral.sh/uv/install.sh | bash
 
 # Install Chrome
 RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - && \
@@ -36,9 +39,9 @@ COPY ./CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx /temp/
 # Copy the entire project to /app in the container
 COPY . /app
 
-# Create virtual environment and install Python dependencies
+# Create virtual environment and install Python dependencies using uv
 RUN python3 -m venv /venv && \
-    /venv/bin/pip install --no-cache-dir -r /app/requirements.txt
+    /venv/bin/uv pip install --no-cache-dir -r /app/requirements.txt
 
 # Install common utilities
 RUN apt-get update && apt-get install -y xdg-utils ca-certificates
