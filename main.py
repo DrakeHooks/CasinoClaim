@@ -588,12 +588,14 @@ async def chanced_casino_loop():
         print(f"Error: Invalid channel ID '{DISCORD_CHANNEL}' or bot is not connected.")
         return  # Exit the task loop early if the channel is invalid
 
-    try:
-        # Run the chanced casino task
-        await chanced_casino(None, driver, channel, None)
-    except Exception as e:
-        print(f"Error in loop: {str(e)}")
-        await channel.send(f"Error in Chanced Casino loop: {str(e)}")
+
+    # Chanced under maintenance
+    # try:
+    #     # Run the chanced casino task
+    #     await chanced_casino(None, driver, channel, None)
+    # except Exception as e:
+    #     print(f"Error in loop: {str(e)}")
+    #     await channel.send(f"Error in Chanced Casino loop: {str(e)}")
 
 
 
