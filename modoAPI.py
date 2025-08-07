@@ -17,7 +17,9 @@ from helperAPI import open_captcha_solver_page
 # Load environment variables from the .env file
 load_dotenv()
 
-# Function to authenticate into modo
+# ───────────────────────────────────────────────────────────
+# Authentication for Modo
+# ───────────────────────────────────────────────────────────
 async def authenticate_modo(driver, bot, ctx, channel):
     try:
         channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
@@ -82,8 +84,9 @@ async def authenticate_modo(driver, bot, ctx, channel):
         await channel.send("Authentication timeout. Please check your credentials or XPaths.")
         return False
 
-
-# Function to claim modo daily bonus
+# ───────────────────────────────────────────────────────────
+# Bonus Claim Function
+# ───────────────────────────────────────────────────────────
 async def claim_modo_bonus(driver, bot, ctx, channel):
     try:
         channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
@@ -128,8 +131,9 @@ async def claim_modo_bonus(driver, bot, ctx, channel):
     return True
 
 
-
-# Function to check the countdown for the next bonus
+# ───────────────────────────────────────────────────────────
+# Countdown reader function
+# ───────────────────────────────────────────────────────────
 async def check_modo_countdown(driver, bot, ctx, channel):
     try:
         channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
@@ -163,8 +167,9 @@ async def check_modo_countdown(driver, bot, ctx, channel):
     return True
 
 
-
-# Main function to handle modo
+# ───────────────────────────────────────────────────────────
+# Main function
+# ───────────────────────────────────────────────────────────
 async def modo_casino(driver, bot, ctx, channel):
     channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
 
