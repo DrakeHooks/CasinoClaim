@@ -11,12 +11,19 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
+from helperAPI import open_captcha_solver_page
 
 # Load environment variables from the .env file
 load_dotenv()
 
-# Function to log in and claim Rolling Riches bonus
+# ───────────────────────────────────────────────────────────
+# Main function + auth
+# ───────────────────────────────────────────────────────────
 async def rolling_riches_casino(ctx, driver, channel):
+
+    # For hidden recaptcha 
+    await open_captcha_solver_page(driver)
+
     try:
         # Get the ROLLING_RICHES credentials from the .env file
         rolling_riches_credentials = os.getenv("ROLLING_RICHES")
@@ -60,7 +67,9 @@ async def rolling_riches_casino(ctx, driver, channel):
         print(f"Error in rolling_riches_casino")
 
 
-# Function to claim the 6-hour bonus
+# ───────────────────────────────────────────────────────────
+# Claim function
+# ───────────────────────────────────────────────────────────
 async def claim_rolling_riches_bonus(ctx, driver, channel):
     try:
         # Navigate to the main page to claim the bonus
