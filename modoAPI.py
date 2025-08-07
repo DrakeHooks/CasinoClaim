@@ -67,16 +67,16 @@ async def authenticate_modo(driver, bot, ctx, channel):
             return False
         await asyncio.sleep(10)
         driver.refresh()
-        # Check for the presence of the "Log Out" button to confirm authentication
-        lobby_xpath = "/html/body/div[1]/div[1]/div/div[3]/div/div[1]/li[1]/div/div[2]/p"
+        # Check for the presence of the "Get Coins" button to confirm authentication
+        getCoins_xpath = "/html/body/div[1]/div[2]/div[2]/main/main/header/div/div/div[2]/button"
         try:
             WebDriverWait(driver, 30).until(
-                EC.presence_of_element_located((By.XPATH, lobby_xpath))
+                EC.presence_of_element_located((By.XPATH, getCoins_xpath))
             )
             await channel.send("Authenticated into modo successfully!")
             return True
         except TimeoutException:
-            await channel.send("Authentication failed. Lobby element not found.")
+            await channel.send("Authentication failed. Get Coins element not found.")
             return False
     except TimeoutException:
         await channel.send("Authentication timeout. Please check your credentials or XPaths.")
