@@ -68,15 +68,15 @@ async def authenticate_modo(driver, bot, ctx, channel):
         await asyncio.sleep(10)
         driver.refresh()
         # Check for the presence of the "Log Out" button to confirm authentication
-        logout_xpath = "/html/body/div[1]/div[1]/div/div/div[2]/div[2]/li/div/div[2]/p"
+        lobby_xpath = "/html/body/div[1]/div[1]/div/div[3]/div/div[1]/li[1]/div/div[2]/p"
         try:
             WebDriverWait(driver, 30).until(
-                EC.presence_of_element_located((By.XPATH, logout_xpath))
+                EC.presence_of_element_located((By.XPATH, lobby_xpath))
             )
             await channel.send("Authenticated into modo successfully!")
             return True
         except TimeoutException:
-            await channel.send("Authentication failed. Log Out button not found.")
+            await channel.send("Authentication failed. Lobby element not found.")
             return False
     except TimeoutException:
         await channel.send("Authentication timeout. Please check your credentials or XPaths.")
@@ -94,11 +94,12 @@ async def claim_modo_bonus(driver, bot, ctx, channel):
         # Try multiple possible XPaths for the claim button
         xpaths = [
             "/html/body/div[6]/div[3]/div/div[2]/button",
+            "/html/body/div[6]/div[3]/div/div[3]/div/button",
             "/html/body/div[4]/div[3]/div/div[3]/button",
             "/html/body/div[5]/div[3]/div[3]/button",
-            "/html/body/div[5]/div[3]/div/div[3]/button",
-            "/html/body/div[6]/div[3]/div/div[3]/button",
-            "/html/body/div[7]/div[3]/div/div[3]/button"
+            "/html/body/div[5]/div[3]/div/div[3]/div/button",
+            "/html/body/div[6]/div[3]/div/div[3]/div/button",
+            "/html/body/div[7]/div[3]/div/div[3]/div/button"
         ]
 
         button_found = False
@@ -135,21 +136,20 @@ async def check_modo_countdown(driver, bot, ctx, channel):
         driver.get("https://modo.us/lobby/")
         await asyncio.sleep(10)
 
-        # Wait for countdown timer element using its class
+        # Wait for countdown timer element using updated class
         countdown_element = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.XPATH, "//p[contains(@class, 'MuiTypography-root') and contains(@class, 'MuiTypography-body2') and contains(@class, 'css-1i1dyad')]"))
+            EC.presence_of_element_located((By.XPATH, "//span[contains(@class, 'MuiTypography-root') and contains(@class, 'MuiTypography-caption') and contains(@class, 'css-1xbaeqr')]"))
         )
 
         # Extract countdown text
-        countdown_text = countdown_element.text.replace("Next in ", "").strip()
+        countdown_text = countdown_element.text.strip()
 
-        # Use regex to extract hours, minutes, and seconds
-        match = re.match(r"(\d+)h\s*(\d+)m\s*(\d+)s", countdown_text)
+        # Use regex to extract time format (HH:MM:SS)
+        match = re.match(r"(\d{2}):(\d{2}):(\d{2})", countdown_text)
         if match:
-            hours, minutes, seconds = match.groups()
-            countdown_time = f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}"  # Ensures two-digit formatting
+            countdown_time = countdown_text
         else:
-            countdown_time = countdown_text  # Fallback in case of unexpected format
+            countdown_time = "Unknown format"
 
         # Send formatted countdown message
         countdown_message = f"Next Modo Bonus Available in: {countdown_time}"
@@ -160,6 +160,7 @@ async def check_modo_countdown(driver, bot, ctx, channel):
         return False
 
     return True
+
 
 
 # Main function to handle modo
