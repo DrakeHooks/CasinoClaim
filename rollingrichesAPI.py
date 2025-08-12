@@ -76,15 +76,9 @@ async def claim_rolling_riches_bonus(ctx, driver, channel):
         driver.get("https://www.rollingriches.com/get-coins")
         await asyncio.sleep(5)
         
-        # Click the daily bonus label
-        daily_bonus_label = WebDriverWait(driver, 5).until(
-            EC.element_to_be_clickable((By.XPATH, "/html/body/app-root/app-get-coin/div/div[1]/div/label[2]"))
-        )
-        daily_bonus_label.click()
-
         # Click the claim button
         claim_btn = WebDriverWait(driver, 5).until(
-            EC.element_to_be_clickable((By.XPATH, "/html/body/app-root/app-get-coin/div/div[2]/div/app-hourly-bonus/div/div/div[4]/button"))
+            EC.element_to_be_clickable((By.XPATH, "/html/body/app-root/app-get-coin/div/div/div/div/div/div/app-hourly-bonus/div[2]/div/div/div[3]/button"))
         )
         claim_btn.click()
         await channel.send("Rolling Riches 6-Hour Bonus Claimed!")
@@ -97,7 +91,7 @@ async def claim_rolling_riches_bonus(ctx, driver, channel):
         
         # List of possible XPaths for the countdown element
         countdown_xpaths = [
-            "/html/body/app-root/app-get-coin/div/div[2]/div/app-hourly-bonus/div/div/div[4]/div/label",
+            "/html/body/app-root/app-get-coin/div/div/div/div/div/div/app-hourly-bonus/div[2]/div/div/div[3]/div/label",
             "/html/body/app-root/app-get-coin/div/div[2]/div/app-hourly-bonus/div/div/div[5]/div/label"
         ]
         countdown_element = None
