@@ -18,7 +18,7 @@ from helperAPI import open_captcha_solver_page
 load_dotenv()
 
 # ───────────────────────────────────────────────────────────
-# Authentication for Modo
+# Authentication for Modo. 5 Attempts to login
 # ───────────────────────────────────────────────────────────
 async def authenticate_modo(driver, bot, ctx, channel):
     channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
