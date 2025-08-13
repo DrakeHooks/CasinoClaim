@@ -161,6 +161,8 @@ async def on_ready():
         new_chanced_session.start()
     if not casino_loop.is_running():
         casino_loop.start()
+    if not modo_auth_task.is_running():
+        modo_auth_task.start()
     await asyncio.sleep(260)
 
 
@@ -608,6 +610,17 @@ async def chanced_casino_loop():
 #         await channel.send("DingDingDing authentication succeeded during the scheduled task.")
 #     else:
 #         await channel.send("DingDingDing authentication failed during the scheduled task.")
+
+
+@tasks.loop(hours=24)
+async def modo_auth_task():
+    channel = bot.get_channel(DISCORD_CHANNEL)
+    await channel.send("Running scheduled Modo authentication...")
+    auth_status["modo"] = await authenticate_modo(driver, bot, None, channel)
+    if auth_status["modo"]:
+        await channel.send("Modo authentication succeeded during the scheduled task.")
+    else:
+        await channel.send("Modo authentication failed during the scheduled task.")
 
 
 @tasks.loop(hours=2, )

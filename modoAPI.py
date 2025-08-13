@@ -21,68 +21,73 @@ load_dotenv()
 # Authentication for Modo
 # ───────────────────────────────────────────────────────────
 async def authenticate_modo(driver, bot, ctx, channel):
-    try:
-        channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
-        await open_captcha_solver_page(driver)
-        driver.maximize_window()
+    channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
 
-        web = "https://login.modo.us/login"
-        driver.get(web)
-        await asyncio.sleep(10)
-        try:
-        # Wait for email and password fields, enter credentials from environment variables
-            email_field = WebDriverWait(driver, 30).until(
-            EC.presence_of_element_located((By.XPATH, "/html/body/main/div/div[2]/form/div/div/div/div/div[2]/div[2]/span/div/div/div/div/div/div/div/div/div[2]/div[3]/div[1]/div/input"))
-            )
-            creds = os.getenv("MODO")
-            if not creds:
-                await channel.send("MODO credentials not found in environment variables.")
-                return False
-            email_field.send_keys(creds.split(":")[0])
-
-            password_field = WebDriverWait(driver, 30).until(
-            EC.presence_of_element_located((By.XPATH, "/html/body/main/div/div[2]/form/div/div/div/div/div[2]/div[2]/span/div/div/div/div/div/div/div/div/div[2]/div[3]/div[2]/div/div/input"))
-            )
-            password_field.send_keys(creds.split(":")[1])
-            screenshot_path = "modo_login_screenshot.png"
-            driver.save_screenshot(screenshot_path)
-            await channel.send("Modo user/pass entered. Solving captcha...", 
-            file=discord.File(screenshot_path))
-        
-            #Optionally, remove the screenshot file after sending
-            os.remove(screenshot_path)
-            await asyncio.sleep(120)
-
-        except:
-            await channel.send("Unable to auth Modo!")
-            return False
-
-        try:
-        # Click login button
-            login_btn = WebDriverWait(driver, 20).until(
-            EC.element_to_be_clickable((By.XPATH, "/html/body/main/div/div[2]/form/div/div/div/button"))
-            )
-            login_btn.click()
-            await asyncio.sleep(10)
-        except:
-            await channel.send("Unable to solve Modo captcha!")
-            return False
-        await asyncio.sleep(10)
-        driver.refresh()
-        # Check for the presence of the "Get Coins" button to confirm authentication
-        getCoins_xpath = "/html/body/div[1]/div[2]/div[2]/main/main/header/div/div/div[2]/button"
-        try:
-            WebDriverWait(driver, 30).until(
-                EC.presence_of_element_located((By.XPATH, getCoins_xpath))
-            )
-            await channel.send("Authenticated into modo successfully!")
-            return True
-        except TimeoutException:
-            await channel.send("Authentication failed. Get Coins element not found.")
-            return False
-    except TimeoutException:
-        await channel.send("Authentication timeout. Please check your credentials or XPaths.")
+    creds = os.getenv("MODO")
+    if not creds:
+        await channel.send("MODO credentials not found in environment variables.")
         return False
+
+    email, password = creds.split(":")
+
+    for attempt in range(5):
+        try:
+            await open_captcha_solver_page(driver)
+            driver.maximize_window()
+
+            web = "https://login.modo.us/login"
+            driver.get(web)
+            await asyncio.sleep(10)
+
+            try:
+                email_field = WebDriverWait(driver, 30).until(
+                    EC.presence_of_element_located((By.XPATH, "/html/body/main/div/div[2]/form/div/div/div/div/div[2]/div[2]/span/div/div/div/div/div/div/div[2]/div[3]/div[1]/div/input"))
+                )
+                email_field.send_keys(email)
+
+                password_field = WebDriverWait(driver, 30).until(
+                    EC.presence_of_element_located((By.XPATH, "/html/body/main/div/div[2]/form/div/div/div/div/div[2]/div[2]/span/div/div/div/div/div/div/div[2]/div[3]/div[2]/div/div/input"))
+                )
+                password_field.send_keys(password)
+                screenshot_path = "modo_login_screenshot.png"
+                driver.save_screenshot(screenshot_path)
+                await channel.send("Modo user/pass entered. Solving captcha...", file=discord.File(screenshot_path))
+                os.remove(screenshot_path)
+                await asyncio.sleep(120)
+            except Exception:
+                await channel.send("Unable to auth Modo! Retrying...")
+                await asyncio.sleep(5)
+                continue
+
+            try:
+                login_btn = WebDriverWait(driver, 20).until(
+                    EC.element_to_be_clickable((By.XPATH, "/html/body/main/div/div[2]/form/div/div/div/button"))
+                )
+                login_btn.click()
+                await asyncio.sleep(10)
+            except Exception:
+                await channel.send("Unable to solve Modo captcha! Retrying...")
+                await asyncio.sleep(5)
+                continue
+
+            await asyncio.sleep(10)
+            driver.refresh()
+            getCoins_xpath = "/html/body/div[1]/div[2]/div[2]/main/main/header/div/div/div[2]/button"
+            try:
+                WebDriverWait(driver, 30).until(
+                    EC.presence_of_element_located((By.XPATH, getCoins_xpath))
+                )
+                await channel.send("Authenticated into modo successfully!")
+                return True
+            except TimeoutException:
+                await channel.send(f"Authentication failed. Get Coins element not found. Attempt {attempt + 1} of 5.")
+        except TimeoutException:
+            await channel.send(f"Authentication timeout on attempt {attempt + 1}. Retrying...")
+
+        await asyncio.sleep(5)
+
+    await channel.send("Authentication failed after 5 attempts.")
+    return False
 
 # ───────────────────────────────────────────────────────────
 # Bonus Claim Function
