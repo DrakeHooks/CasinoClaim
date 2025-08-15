@@ -161,8 +161,6 @@ async def on_ready():
         new_chanced_session.start()
     if not casino_loop.is_running():
         casino_loop.start()
-    if not modo_auth_task.is_running():
-        modo_auth_task.start()
     await asyncio.sleep(260)
 
 
@@ -555,40 +553,40 @@ async def sportzino(ctx):
         await ctx.send("Sportzino automation is already running.")
 
 
-@tasks.loop(hours=12)
-async def new_chanced_session():
-    print("Starting new_chanced_session...")
-    channel = bot.get_channel(DISCORD_CHANNEL)
-    # Load credentials from environment variables
-    chanced_credentials = os.getenv("CHANCED")
+# @tasks.loop(hours=12)
+# async def new_chanced_session():
+#     print("Starting new_chanced_session...")
+#     channel = bot.get_channel(DISCORD_CHANNEL)
+#     # Load credentials from environment variables
+#     chanced_credentials = os.getenv("CHANCED")
     
-    if chanced_credentials:
-        chanced_username, chanced_password = chanced_credentials.split(':')
-        credentials = (chanced_username, chanced_password)
-    else:
-        credentials = (None, None)
+#     if chanced_credentials:
+#         chanced_username, chanced_password = chanced_credentials.split(':')
+#         credentials = (chanced_username, chanced_password)
+#     else:
+#         credentials = (None, None)
     
-    if credentials[0] and credentials[1]:
-        await channel.send(f"Creating a new Chanced session with credentials.")
-    else:
-        await channel.send(f"Unable to create new chanced.com session. Are the credentials set?")
+#     if credentials[0] and credentials[1]:
+#         await channel.send(f"Creating a new Chanced session with credentials.")
+#     else:
+#         await channel.send(f"Unable to create new chanced.com session. Are the credentials set?")
     
-    try:
-        await logout_and_login(None, driver, channel, credentials)
-    except Exception as e:
-        await channel.send(f"Error during session refresh: {str(e)}")
+#     try:
+#         await logout_and_login(None, driver, channel, credentials)
+#     except Exception as e:
+#         await channel.send(f"Error during session refresh: {str(e)}")
 
-@tasks.loop(minutes=62)
-async def chanced_casino_loop():
-    print("Starting chanced_casino_loop...")
+# @tasks.loop(minutes=62)
+# async def chanced_casino_loop():
+#     print("Starting chanced_casino_loop...")
 
-    # Get the channel object
-    channel = bot.get_channel(DISCORD_CHANNEL)
+#     # Get the channel object
+#     channel = bot.get_channel(DISCORD_CHANNEL)
 
     # Check if the channel is valid
-    if channel is None:
-        print(f"Error: Invalid channel ID '{DISCORD_CHANNEL}' or bot is not connected.")
-        return  # Exit the task loop early if the channel is invalid
+    # if channel is None:
+    #     print(f"Error: Invalid channel ID '{DISCORD_CHANNEL}' or bot is not connected.")
+    #     return  # Exit the task loop early if the channel is invalid
 
 
     # Chanced under maintenance
@@ -610,17 +608,6 @@ async def chanced_casino_loop():
 #         await channel.send("DingDingDing authentication succeeded during the scheduled task.")
 #     else:
 #         await channel.send("DingDingDing authentication failed during the scheduled task.")
-
-
-@tasks.loop(hours=24)
-async def modo_auth_task():
-    channel = bot.get_channel(DISCORD_CHANNEL)
-    await channel.send("Running scheduled Modo authentication...")
-    auth_status["modo"] = await authenticate_modo(driver, bot, None, channel)
-    if auth_status["modo"]:
-        await channel.send("Modo authentication succeeded during the scheduled task.")
-    else:
-        await channel.send("Modo authentication failed during the scheduled task.")
 
 
 @tasks.loop(hours=2, )
