@@ -610,7 +610,7 @@ async def chanced_casino_loop():
 #         await channel.send("DingDingDing authentication failed during the scheduled task.")
 
 
-@tasks.loop(hours=2, )
+@tasks.loop(hours=2)
 async def casino_loop():
     print("Starting casino_loop...")
 
