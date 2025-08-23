@@ -2,7 +2,7 @@
 # Casino Claim 2
 # Helper API
 
-"""Utility helpers used across Casino Claim."""
+"""Utility helpers used across the bot."""
 
 import asyncio
 
