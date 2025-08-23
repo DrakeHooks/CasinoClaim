@@ -681,10 +681,13 @@ async def casino_loop():
             await jefebet_casino(None, driver, channel)
         except:
             print("Error in JefeBet")
-        try:
-            await spinpals_flow(None, driver, channel)
-        except:
-            print("Error in SpinPals")
+
+        # Spin Pals under maintenance, requires CF solver
+
+        # try:
+        #     await spinpals_flow(None, driver, channel)
+        # except:
+        #     print("Error in SpinPals")
 
         # Chumba under maintenance
         
