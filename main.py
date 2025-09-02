@@ -42,6 +42,7 @@ api_modules = [
     "rollingrichesAPI",
     "jefebetAPI",
     "spinpalsAPI",
+    "spinquestAPI",
     "globalpokerAPI",
     "dingdingdingAPI",
     "chumbaAPI",
@@ -122,6 +123,7 @@ zula_task = None
 rollingriches_task = None
 jefebet_task = None
 spinpals_task = None
+spinquest_task = None
 sportzino_task = None
 
 
@@ -138,6 +140,7 @@ zula_running = False
 rollingriches_running = False
 jefebet_running = False
 spinpals_running = False
+spinquest_running = False
 funrize_running = False
 sportzino_running = False
 
@@ -152,8 +155,10 @@ async def on_ready():
     else:
         print("Invalid DISCORD_CHANNEL")
 
-    
-    # Start main tasks loop.
+# ───────────────────────────────────────────────────────────
+# Start Main Tasks Loop
+# ───────────────────────────────────────────────────────────
+
     await asyncio.sleep(60)
     if not chanced_casino_loop.is_running():
         chanced_casino_loop.start()
@@ -161,6 +166,8 @@ async def on_ready():
         new_chanced_session.start()
     if not casino_loop.is_running():
         casino_loop.start()
+    if not eighthour_loop.is_running():
+        eighthour_loop.start()
     await asyncio.sleep(260)
 
 
@@ -205,6 +212,7 @@ async def help(ctx):
     !rollingriches - Check RollingRiches for bonus
     !jefebet - Check JefeBet for bonus
     !spinpals - Check SpinPals for bonus
+    !spinquest - Check SpinQuest for bonus
     !sportzino - Check Sportzino for bonus
     !fortunecoins - Check Fortunecoins for bonus
 
@@ -343,6 +351,16 @@ async def spinpals(ctx):
         await spinpals_flow(ctx, driver, channel)
     else:
         await ctx.send("SpinPals automation is already running.")
+
+@bot.command(name="SpinQuest")
+async def spinquest(ctx):
+    global spinquest_task
+    if not spinquest_task or spinquest_task.done():
+        await ctx.send("Checking SpinQuest for Bonus...")
+        channel = bot.get_channel(DISCORD_CHANNEL)
+        await spinquest_flow(ctx, driver, channel)
+    else:
+        await ctx.send("SpinQuest automation is already running.")
 
 @bot.command(name="Stake")
 async def stake(ctx):
@@ -705,5 +723,27 @@ async def casino_loop():
     except Exception as e:
         print(f"Error in loop: {str(e)}")
 
+# ───────────────────────────────────────────────────────────
+# 8 Hour Task Loop
+# ───────────────────────────────────────────────────────────
+
+@tasks.loop(hours=8)
+async def eighthour_loop():
+    print("Starting Eight Hour Loop")
+
+    channel = bot.get_channel(DISCORD_CHANNEL)
+    if channel is None:
+        print(f"Error: Invalid channel ID '{DISCORD_CHANNEL}' or bot is not connected.")
+        return # Exit the task loop early if the channel is invalid
+
+    try:
+        # Run the casino taks sequentially with 4-hour gaps
+        try:
+            await spinquest_flow(None, driver, channel)
+        except:
+            print("Error in SpinQuest")
+
+    except Exception as e:
+        print(f"Error in loop: {str(e)}")
 
 bot.run(DISCORD_TOKEN)
