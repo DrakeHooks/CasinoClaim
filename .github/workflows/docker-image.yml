@@ -4,16 +4,53 @@ on:
   push:
     branches: [ main, testing ]
 
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: docker-${{ github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
-  build-and-push:
-    uses: NelsonDane/Custom-GitHub-Actions/.github/workflows/docker-registry-build-push.yml@e64ecc758bc758d58955cab25e3ee3f09ab380dd
-    with:
-      image_name: casinoclaim
-      image_tag: ${{ github.ref_name == 'main' && 'latest' || 'testing' }}
-      should_push: ${{ github.ref_name == 'main' || github.ref_name == 'testing' }}
-      platforms: linux/amd64
-      # OPTIONAL: if the reusable workflow supports it, use the FULL SHA (no substr())
-      extra_tags: ${{ github.sha }}
-    secrets:
-      DOCKER_REGISTRY_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKER_REGISTRY_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set tags
+        id: vars
+        run: |
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            echo "TAG=latest" >> $GITHUB_OUTPUT
+          else
+            echo "TAG=testing" >> $GITHUB_OUTPUT
+          fi
+          echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          # If you don't need ARM yet, set to linux/amd64
+          platforms: linux/amd64
+          tags: |
+            drakehooks/casinoclaim:${{ steps.vars.outputs.TAG }}
+            drakehooks/casinoclaim:${{ steps.vars.outputs.SHORT_SHA }}
+          # Optional: cache to speed up builds
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
