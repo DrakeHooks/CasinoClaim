@@ -1,5 +1,5 @@
 # Drake Hooks
-# Casino Claim
+# Casino Claim 2
 # Never Miss a Casino Bonus Again! A discord app for claiming social casino bonuses.
 
 import os
