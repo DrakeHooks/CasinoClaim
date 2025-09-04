@@ -9,13 +9,11 @@ jobs:
     uses: NelsonDane/Custom-GitHub-Actions/.github/workflows/docker-registry-build-push.yml@e64ecc758bc758d58955cab25e3ee3f09ab380dd
     with:
       image_name: casinoclaim
-      # main -> latest, testing -> testing
       image_tag: ${{ github.ref_name == 'main' && 'latest' || 'testing' }}
-      # optionally also push a second, immutable tag for rollbacks
-      extra_tags: ${{ github.sha.substr(0,7) }}
-      # only push for main or testing (keeps forks/other branches from pushing)
       should_push: ${{ github.ref_name == 'main' || github.ref_name == 'testing' }}
       platforms: linux/amd64
+      # OPTIONAL: if the reusable workflow supports it, use the FULL SHA (no substr())
+      extra_tags: ${{ github.sha }}
     secrets:
       DOCKER_REGISTRY_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKER_REGISTRY_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
