@@ -2,16 +2,19 @@ name: Docker Build and Push
 
 on:
   push:
-    branches:
-      - 'main'
+    branches: [ main, testing ]
 
 jobs:
-  call-workflow-dockerhub-build-push:
-    uses: NelsonDane/Custom-GitHub-Actions/.github/workflows/docker-registry-build-push.yml@e64ec758b6758d58955cab25a0e330f9bab380dd
+  build-and-push:
+    uses: NelsonDane/Custom-GitHub-Actions/.github/workflows/docker-registry-build-push.yml@e64ecc758bc758d58955cab25e3ee3f09ab380dd
     with:
       image_name: casinoclaim
-      image_tag: latest
-      should_push: ${{ github.ref_name == 'main' || startsWith(github.ref_name, 'main') }}
+      # main -> latest, testing -> testing
+      image_tag: ${{ github.ref_name == 'main' && 'latest' || 'testing' }}
+      # optionally also push a second, immutable tag for rollbacks
+      extra_tags: ${{ github.sha.substr(0,7) }}
+      # only push for main or testing (keeps forks/other branches from pushing)
+      should_push: ${{ github.ref_name == 'main' || github.ref_name == 'testing' }}
       platforms: linux/amd64
     secrets:
       DOCKER_REGISTRY_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
