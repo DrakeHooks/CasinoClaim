@@ -228,7 +228,6 @@ async def claim_nolimitcoins_bonus(ctx, driver, channel):
         file=discord.File(screenshot))
         os.remove(screenshot)
         
-
         return
 
     # Fall back to generic countdown once more
