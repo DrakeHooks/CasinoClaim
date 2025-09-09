@@ -62,6 +62,10 @@ async def rolling_riches_casino(ctx, driver, channel):
             await channel.send(
             file=discord.File(screenshot))
             os.remove(screenshot)
+
+
+
+            
         # Now proceed with claiming the bonus
         await claim_rolling_riches_bonus(ctx, driver, channel)
 
