@@ -154,6 +154,11 @@ async def nolimitcoins_flow(ctx, driver, channel):
     # Prefer the “Claim Reward” button by class, then try our XPath set
     if try_click_any(driver, CLAIM_REWARD_SELECTORS, timeout_each=3) or \
        try_click_any_xpath(driver, CLAIM_XPATHS, timeout_each=3):
+        screenshot = "claim.png"
+            driver.save_screenshot(screenshot)
+            await channel.send(
+            file=discord.File(screenshot))
+            os.remove(screenshot)
         await channel.send("NoLimitCoins Daily Bonus Claimed!")
         return
 
