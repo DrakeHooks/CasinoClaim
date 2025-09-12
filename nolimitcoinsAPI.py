@@ -159,7 +159,7 @@ async def nolimitcoins_flow(ctx, driver, channel):
             await channel.send(
             file=discord.File(screenshot))
             os.remove(screenshot)
-        await channel.send("NoLimitCoins Daily Bonus Claimed!")
+        await channel.send("NoLimitCoins Daily Bonus Claimed")
         return
 
     # Generic disabled countdown fallback anywhere on the page
@@ -225,7 +225,7 @@ async def claim_nolimitcoins_bonus(ctx, driver, channel):
 
     if try_click_any(driver, CLAIM_REWARD_SELECTORS, timeout_each=5) or \
        try_click_any_xpath(driver, CLAIM_XPATHS, timeout_each=5):
-        await channel.send("NoLimitCoins Daily Bonus Claimed!")
+        await channel.send("NoLimitCoins Daily Bonus Claimed")
 
         screenshot = "nlc_bonus_claim.png"
         driver.save_screenshot(screenshot)
