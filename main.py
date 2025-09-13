@@ -160,10 +160,6 @@ async def on_ready():
 # ───────────────────────────────────────────────────────────
 
     await asyncio.sleep(60)
-    if not chanced_casino_loop.is_running():
-        chanced_casino_loop.start()
-    if not new_chanced_session.is_running():
-        new_chanced_session.start()
     if not casino_loop.is_running():
         casino_loop.start()
     if not eighthour_loop.is_running():
