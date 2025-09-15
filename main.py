@@ -43,6 +43,7 @@ api_modules = [
     "jefebetAPI",
     "spinpalsAPI",
     "spinquestAPI",
+    "funrizeAPI",
     "globalpokerAPI",
     "dingdingdingAPI",
     "chumbaAPI",
@@ -124,6 +125,7 @@ rollingriches_task = None
 jefebet_task = None
 spinpals_task = None
 spinquest_task = None
+funrize_task = None
 sportzino_task = None
 
 
@@ -141,6 +143,7 @@ rollingriches_running = False
 jefebet_running = False
 spinpals_running = False
 spinquest_running = False
+funrize_running = False
 funrize_running = False
 sportzino_running = False
 
@@ -162,9 +165,9 @@ async def on_ready():
     await asyncio.sleep(60)
     if not casino_loop.is_running():
         casino_loop.start()
+    await asyncio.sleep(1800)
     if not eighthour_loop.is_running():
         eighthour_loop.start()
-    await asyncio.sleep(260)
 
 
 
@@ -209,6 +212,7 @@ async def help(ctx):
     !jefebet - Check JefeBet for bonus
     !spinpals - Check SpinPals for bonus
     !spinquest - Check SpinQuest for bonus
+    !funrize - Check Funrize for bonus
     !sportzino - Check Sportzino for bonus
     !fortunecoins - Check Fortunecoins for bonus
 
@@ -357,6 +361,16 @@ async def spinquest(ctx):
         await spinquest_flow(ctx, driver, channel)
     else:
         await ctx.send("SpinQuest automation is already running.")
+
+@bot.command(name="Funrize")
+async def funrize(ctx):
+    global funrize_task
+    if not funrize_task or funrize_task.done():
+        await ctx.send("Checking Funrize for Bonus...")
+        channel = bot.get_channel(DISCORD_CHANNEL)
+        await funrize_flow(ctx, driver, channel)
+    else:
+        await ctx.send("Funrize automation is already running.")
 
 @bot.command(name="Stake")
 async def stake(ctx):
@@ -703,6 +717,11 @@ async def eighthour_loop():
             await spinquest_flow(None, driver, channel)
         except:
             print("Error in SpinQuest")
+        await asyncio.sleep(10)
+        try:
+            await funrize_flow(None, driver, channel)
+        except:
+            print("Error in Funrize")
 
     except Exception as e:
         print(f"Error in loop: {str(e)}")
