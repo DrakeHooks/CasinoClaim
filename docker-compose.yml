@@ -1,26 +1,26 @@
 services:
   casino-bot:
     container_name: casino-bot
-    image: drakehooks/casinoclaim:latest  # Pull the image from Docker Hub
+    image: drakehooks/casinoclaim:testing
     ports:
-      - 5900:5900
+      - "5900:5900"
     volumes:
-      - ./google-chrome:/temp/google-chrome  # Mount the google-chrome folder
-      - ./CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx:/temp/CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx  # Mounts the .crx file
+      - /srv/casinoclaim/google-chrome:/temp/google-chrome
+      - ./CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx:/temp/CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx
     env_file:
-      - .env  # Load user environment variables
-    shm_size: '2g'  # Shared memory size to avoid Chrome crashing
+      - .env
+    shm_size: "2g"
     restart: unless-stopped
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
 
   watchtower:
     container_name: watchtower
     image: containrrr/watchtower:latest
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock  # Required for Watchtower to monitor other containers
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      - WATCHTOWER_CLEANUP=true  # Clean up old images
-      - WATCHTOWER_INCLUDE_STOPPED=true  # Monitor stopped containers
-      - WATCHTOWER_POLL_INTERVAL=3600  # Check for updates every hour
-    command:
-      - casino-bot  # Monitor the casino-bot container
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_LABEL_ENABLE=true         # only update labeled containers
+      - WATCHTOWER_POLL_INTERVAL=3600
     restart: unless-stopped
