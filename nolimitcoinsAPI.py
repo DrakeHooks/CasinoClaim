@@ -152,9 +152,42 @@ async def nolimitcoins_flow(ctx, driver, channel):
         await channel.send("NoLimitCoins: Couldn't find 'Collect' after clicking claim.")
         await send_screenshot(channel, driver)
 
+<<<<<<< HEAD
 async def claim_nolimitcoins_bonus(ctx, driver, channel):
     """Same as nolimitcoins_flow but used post-login."""
     await nolimitcoins_flow(ctx, driver, channel)
+=======
+    # Optional screenshot for debugging
+    # await send_screenshot(channel, driver)
+
+    # Try clicking the Daily card (site shuffles index sometimes)
+    try_click_any_xpath(driver, CLAIM_CARD_XPATHS, timeout_each=5)
+    await asyncio.sleep(1)
+
+    # Prefer the “Claim Reward” button by class, then try our XPath set
+    if try_click_any(driver, CLAIM_REWARD_SELECTORS, timeout_each=3) or \
+       try_click_any_xpath(driver, CLAIM_XPATHS, timeout_each=3):
+        screenshot = "claim.png"
+            driver.save_screenshot(screenshot)
+            await channel.send(
+            file=discord.File(screenshot))
+            os.remove(screenshot)
+        await channel.send("NoLimitCoins Daily Bonus Claimed")
+        return
+
+    # Generic disabled countdown fallback anywhere on the page
+    try:
+        countdown_btn = wait_present(driver, By.XPATH, XPATH_COUNTDOWN_GENERIC, timeout=4)
+        await channel.send(
+            f"Next No Limit Coins Bonus Available in: {_normalize_hms(countdown_btn.text)}"
+        )
+        return
+    except TimeoutException:
+        pass
+
+    # Not logged in or page odd → login and try again
+    await nolimitcoins_casino(ctx, driver, channel)
+>>>>>>> 7e71e9120197587801f5f6aea974712eb0e345a6
 
 # ───────────────────────────────────────────────────────────
 # Login with .env, then claim
@@ -200,9 +233,48 @@ async def check_nolimitcoins_countdown(ctx, driver, channel):
     cd = read_countdown_from_div(driver)
     if cd:
         await channel.send(f"Next No Limit Coins Bonus Available in: {cd}")
+<<<<<<< HEAD
     else:
         await channel.send("NoLimitCoins: No countdown found.")
         await send_screenshot(channel, driver)
+=======
+        return
+
+    try_click_any_xpath(driver, CLAIM_CARD_XPATHS, timeout_each=6)
+    await asyncio.sleep(1)
+
+    if try_click_any(driver, CLAIM_REWARD_SELECTORS, timeout_each=5) or \
+       try_click_any_xpath(driver, CLAIM_XPATHS, timeout_each=5):
+        await channel.send("NoLimitCoins Daily Bonus Claimed")
+
+        screenshot = "nlc_bonus_claim.png"
+        driver.save_screenshot(screenshot)
+        await channel.send(
+        file=discord.File(screenshot))
+        os.remove(screenshot)
+        return
+
+    # Fall back to generic countdown once more
+    try:
+        countdown_btn = wait_present(driver, By.XPATH, XPATH_COUNTDOWN_GENERIC, timeout=6)
+        await channel.send(
+            f"Next No Limit Coins Bonus Available in: {_normalize_hms(countdown_btn.text)}"
+        )
+    except TimeoutException:
+        # As a last resort, re-run the unified flow (for robustness)
+        await nolimitcoins_flow(ctx, driver, channel)
+
+async def check_nolimitcoins_countdown(ctx, driver, channel):
+    """Standalone timer fetch."""
+    driver.get(STORE_URL)
+    await asyncio.sleep(2)
+    cd = read_claim_card_countdown(driver, CLAIM_CARD_COUNTDOWN_XPATH)
+    if not cd:
+        # fallback to generic disabled button if card lookup fails
+        btn = wait_present(driver, By.XPATH, XPATH_COUNTDOWN_GENERIC, timeout=10)
+        cd = _normalize_hms(btn.text)
+    await channel.send(f"Next No Limit Coins Bonus Available in: {cd}")
+>>>>>>> 7e71e9120197587801f5f6aea974712eb0e345a6
 
 # ───────────────────────────────────────────────────────────
 # Auth helpers
