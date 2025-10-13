@@ -32,7 +32,7 @@ CLAIM_REWARD_SELECTORS = [
 # …then click one of these "Collect" buttons in the modal.
 CLAIM_XPATHS = [
     "/html/body/div[3]/div/div/div/button",
-    "/html/body/div[4]/div/div/div/button",
+    "/html/body/div[4]/div/div/div/button"
 ]
 
 # Read countdown from this DIV (your provided path)
