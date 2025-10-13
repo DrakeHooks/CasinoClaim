@@ -84,7 +84,7 @@ options.add_argument('--ignore-ssl-errors')
 options.add_argument("disable-infobars")
 options.add_argument('--disable-blink-features=AutomationControlled')
 options.add_argument('--no-sandbox')
-user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
+user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit(537.36) (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
 options.add_argument(f"--user-agent={user_agent}")
 
 # IMPORTANT. If you need custom user data dir for extensions, uncomment here and in Dockerfile.
@@ -226,7 +226,7 @@ async def help_cmd(ctx):
 
     ---------------------------------------
     ✅ Auth Commands:
-    !googleauth - Authenticate Google Account
+    !auth google - Authenticate Google Account (global)
     !auth <site> - Authenticate into a specific site (e.g., Modo, DingDingDing, Stake, LuckyBird)
     !auth <site> <method> - Authenticate using a specific method
        (e.g. !auth crowncoins google, !auth crowncoins env, !auth nolimitcoins env)
@@ -247,9 +247,10 @@ async def restart(ctx):
     await bot.close()
     os._exit(0)
 
+# (Deprecated wrapper) Keep old command working but point users to !auth google
 @bot.command(name="googleauth")
 async def googleauth(ctx):
-    await ctx.send("Authenticating Google Account...")
+    await ctx.send("`!googleauth` is deprecated. Use `!auth google`.")
     google_credentials = os.getenv("GOOGLE_LOGIN")
     if google_credentials:
         google_username, google_password = google_credentials.split(':', 1)
@@ -408,6 +409,19 @@ async def nolimitcoins(ctx):
 @bot.command(name="auth")
 async def authenticate_command(ctx, site: str, method: str = None):
     channel = bot.get_channel(DISCORD_CHANNEL)
+
+    # New: global google auth via !auth google
+    if site.lower() == "google":
+        await ctx.send("Authenticating Google Account...")
+        google_credentials = os.getenv("GOOGLE_LOGIN")
+        if google_credentials:
+            google_username, google_password = google_credentials.split(':', 1)
+            credentials = (google_username, google_password)
+        else:
+            await ctx.send("Google credentials not found in .env file.")
+            credentials = (None, None)
+        await google_auth(ctx, driver, channel, credentials)
+        return
 
     if site.lower() == "crowncoins":
         if method is None:
