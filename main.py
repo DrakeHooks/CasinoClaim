@@ -594,6 +594,14 @@ async def casino_loop():
             print("Error in NoLimitCoins")
         await asyncio.sleep(30)
 
+
+        try:
+            await funrize_flow(None, driver, channel)
+        except Exception:
+            print("Error in Funrize")
+
+        await asyncio.sleep(30)
+
         try:
             await crowncoins_casino(driver, bot, None, channel)
         except Exception:
@@ -655,12 +663,6 @@ async def eighthour_loop():
             await spinquest_flow(None, driver, channel)
         except Exception:
             print("Error in SpinQuest")
-
-        await asyncio.sleep(10)
-        try:
-            await funrize_flow(None, driver, channel)
-        except:
-            print("Error in Funrize")
 
     except Exception as e:
         print(f"Error in loop: {str(e)}")

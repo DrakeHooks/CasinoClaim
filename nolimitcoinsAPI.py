@@ -332,7 +332,7 @@ async def auth_nolimit_env(driver, channel, ctx):
         await send_screenshot(channel, driver)
         await channel.send("Authenticated into NoLimitCoins!")
     except Exception:
-        await channel.send("NoLimitCoins login with env creds failed. Perhaps you need to run !googleauth.")
+        await channel.send("NoLimitCoins login with env creds failed. Perhaps you need to run !auth google.")
 
 async def auth_nolimit_google(driver, channel, ctx):
     """
@@ -364,4 +364,4 @@ async def auth_nolimit_google(driver, channel, ctx):
 
         await channel.send("Authenticated into NoLimitCoins!")
     except Exception:
-        await channel.send("NoLimitCoins login with Google failed. Perhaps you need to run !googleauth.")
+        await channel.send("NoLimitCoins login with Google failed. Perhaps you need to run !auth google.")
