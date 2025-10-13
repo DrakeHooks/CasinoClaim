@@ -410,12 +410,15 @@ async def nolimitcoins(ctx):
 async def authenticate_command(ctx, site: str, method: str = None):
     channel = bot.get_channel(DISCORD_CHANNEL)
 
-    # New: global google auth via !auth google
-    if site.lower() == "google":
+    # Normalize site name (e.g., "no limit coins" -> "nolimitcoins")
+    norm_site = re.sub(r"\s+", "", site.lower())
+
+    # 1) Global Google auth: !auth google
+    if norm_site == "google":
         await ctx.send("Authenticating Google Account...")
         google_credentials = os.getenv("GOOGLE_LOGIN")
         if google_credentials:
-            google_username, google_password = google_credentials.split(':', 1)
+            google_username, google_password = google_credentials.split(":", 1)
             credentials = (google_username, google_password)
         else:
             await ctx.send("Google credentials not found in .env file.")
@@ -423,7 +426,8 @@ async def authenticate_command(ctx, site: str, method: str = None):
         await google_auth(ctx, driver, channel, credentials)
         return
 
-    if site.lower() == "crowncoins":
+    # 2) CrownCoins
+    elif norm_site == "crowncoins":
         if method is None:
             await ctx.send("Please specify the authentication method: `google` or `env`.")
             return
@@ -446,7 +450,8 @@ async def authenticate_command(ctx, site: str, method: str = None):
         else:
             await ctx.send("Invalid authentication method. Use `google` or `env`.")
 
-    elif site.lower() == "dingdingding":
+    # 3) DingDingDing
+    elif norm_site == "dingdingding":
         await ctx.send("Authenticating DingDingDing...")
         ok = await authenticate_dingdingding(driver, bot, ctx, channel)
         if not ok:
@@ -455,7 +460,8 @@ async def authenticate_command(ctx, site: str, method: str = None):
             await ctx.send("Authentication failed. Unable to proceed.", file=discord.File(screenshot_path))
             os.remove(screenshot_path)
 
-    elif site.lower() == "modo":
+    # 4) Modo
+    elif norm_site == "modo":
         await ctx.send("Authenticating Modo...")
         ok = await authenticate_modo(driver, bot, ctx, channel)
         if not ok:
@@ -464,7 +470,8 @@ async def authenticate_command(ctx, site: str, method: str = None):
             await ctx.send("Modo authentication failed. Unable to proceed.", file=discord.File(screenshot_path))
             os.remove(screenshot_path)
 
-    elif site.lower() == "stake":
+    # 5) Stake
+    elif norm_site == "stake":
         await ctx.send("Authenticating Stake...")
         ok = await stake_auth(driver, bot, ctx, channel)
         if not ok:
@@ -473,7 +480,8 @@ async def authenticate_command(ctx, site: str, method: str = None):
             await ctx.send("Stake authentication failed. Unable to proceed.", file=discord.File(screenshot_path))
             os.remove(screenshot_path)
 
-    elif site.lower() == "luckybird":
+    # 6) LuckyBird
+    elif norm_site == "luckybird":
         await ctx.send("Authenticating LuckyBird...")
         ok = await authenticate_luckybird(driver, bot, ctx, channel)
         if not ok:
@@ -482,21 +490,45 @@ async def authenticate_command(ctx, site: str, method: str = None):
             await ctx.send("LuckyBird authentication failed. Unable to proceed.", file=discord.File(screenshot_path))
             os.remove(screenshot_path)
 
-    elif site.lower() in ("nolimitcoins", "nlc"):
+    # 7) NoLimitCoins (supports multiple aliases)
+    elif norm_site in {"nolimit", "nolimitcoins", "nlc", "no limit coins"}:
         if method is None:
             await ctx.send("Please specify the authentication method: `google` or `env`.")
             return
+
         if method.lower() == "google":
             await ctx.send("Authenticating NoLimitCoins using Google...")
-            await auth_nolimit_google(driver, channel, ctx)
+            ok = await auth_nolimit_google(driver, channel, ctx)
+            if ok:
+                print("NoLimitCoins authentication via Google succeeded.")
+            else:
+                screenshot_path = "nolimit_google_auth_failed.png"
+                driver.save_screenshot(screenshot_path)
+                await ctx.send("", file=discord.File(screenshot_path))
+                os.remove(screenshot_path)
+
         elif method.lower() == "env":
             await ctx.send("Authenticating NoLimitCoins using .env credentials...")
-            await auth_nolimit_env(driver, channel, ctx)
+            ok = await auth_nolimit_env(driver, channel, ctx)
+            if ok:
+                print("NoLimitCoins authentication via .env credentials succeeded.")
+            else:
+                screenshot_path = "nolimit_env_auth_failed.png"
+                driver.save_screenshot(screenshot_path)
+                await ctx.send("", file=discord.File(screenshot_path))
+                os.remove(screenshot_path)
         else:
             await ctx.send("Invalid authentication method. Use `google` or `env`.")
 
+    # 8) Unknown
     else:
         await ctx.send(f"Authentication for '{site}' is not implemented.")
+
+
+
+
+
+
 
 # ───────────────────────────────────────────────────────────
 # Loops
