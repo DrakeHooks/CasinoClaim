@@ -195,6 +195,33 @@ async def captcha(ctx):
         await ctx.send("Failed to capture captcha solver page.")
         print(f"Captcha command error: {e}")
 
+@bot.command(name="about")
+async def about(ctx):
+    """Show the exact Chrome build that SeleniumBase UC is running."""
+    await ctx.send("🔍 Retrieving Chrome version …")
+
+    # 1) open the internal diagnostics page
+    driver.get("chrome://version/")
+    await asyncio.sleep(2)          # small wait so the DOM is ready
+
+    # 2) pull the <span id="version"> text
+    try:
+        version_raw = driver.find_element(By.ID, "version").text
+        # chrome://version/ puts lots of info; grab first word ⇒ "138.0.7204.157"
+        version_num = version_raw.split()[0]
+    except Exception:
+        version_num = "unknown 🤷"
+
+    # 3) screenshot for extra context / troubleshooting
+    snap = "chrome_version.png"
+    driver.save_screenshot(snap)
+
+    await ctx.send(f"🧩 **Chrome build running inside the bot:** `{version_num}`",
+                   file=discord.File(snap))
+
+    os.remove(snap)
+
+
 @bot.command(name="help")
 async def help_cmd(ctx):
     await ctx.send("""Commands are not recommended. 
