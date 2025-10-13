@@ -5,6 +5,7 @@
 import re
 import os
 import asyncio
+import discord
 from dotenv import load_dotenv
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -56,7 +57,15 @@ async def rolling_riches_casino(ctx, driver, channel):
         else:
             # If no login button is found, assume already logged in
             await channel.send("Rolling Riches unable to login. Will try again later.")
+            screenshot = "rr_login_error.png"
+            driver.save_screenshot(screenshot)
+            await channel.send(
+            file=discord.File(screenshot))
+            os.remove(screenshot)
 
+
+
+            
         # Now proceed with claiming the bonus
         await claim_rolling_riches_bonus(ctx, driver, channel)
 

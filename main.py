@@ -1,5 +1,5 @@
 # Drake Hooks
-# Casino Claim
+# Casino Claim 2
 # Never Miss a Casino Bonus Again! A discord app for claiming social casino bonuses.
 
 import os
@@ -9,6 +9,7 @@ import re
 import sqlite3
 import discord
 import asyncio
+
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.service import Service
@@ -19,21 +20,20 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
+
 import datetime
 from dotenv import load_dotenv
 import undetected_chromedriver as uc
 from discord import Intents, Client, Message
 from discord.ext import commands, tasks
-import asyncio
 from seleniumbase import Driver
 from selenium.webdriver.common.action_chains import ActionChains
 
-#import custom API functions
-
-
 import importlib
 
-# Dynamically import API modules
+# ───────────────────────────────────────────────────────────
+# Dynamic API imports
+# ───────────────────────────────────────────────────────────
 api_modules = [
     "stakeAPI",
     "modoAPI",
@@ -43,6 +43,7 @@ api_modules = [
     "jefebetAPI",
     "spinpalsAPI",
     "spinquestAPI",
+    "funrizeAPI",
     "globalpokerAPI",
     "dingdingdingAPI",
     "chumbaAPI",
@@ -50,6 +51,7 @@ api_modules = [
     "zulaAPI",
     "luckybirdAPI",
     "sportzinoAPI",
+    "nolimitcoinsAPI",   # ← NoLimitCoins
 ]
 
 for module_name in api_modules:
@@ -59,7 +61,9 @@ for module_name in api_modules:
     except Exception as e:
         print(f"Warning: Failed to import {module_name}: {e}")
 
-
+# ───────────────────────────────────────────────────────────
+# Env & Discord setup
+# ───────────────────────────────────────────────────────────
 load_dotenv()
 
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
@@ -68,26 +72,26 @@ DISCORD_CHANNEL = int(os.getenv("DISCORD_CHANNEL"))
 intents = Intents.default()
 intents.message_content = True
 
+# ───────────────────────────────────────────────────────────
+# Selenium driver
+# ───────────────────────────────────────────────────────────
 caps = DesiredCapabilities.CHROME
 caps["goog:loggingPrefs"] = {"performance": "ALL"}
 
-# Setup our environment and Chrome options
 options = Options()
 options.add_argument('--ignore-certificate-errors')
 options.add_argument('--ignore-ssl-errors')
 options.add_argument("disable-infobars")
 options.add_argument('--disable-blink-features=AutomationControlled')
 options.add_argument('--no-sandbox')
-user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
+user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit(537.36) (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
 options.add_argument(f"--user-agent={user_agent}")
 
-#IMPORTANT. YOU MAY WANT TO IMPORT A CUSTOM USER DATA DIRECTORY FOR CAPTCHA SOLVING EXTENSIONS. UNCOMMENT THIS OUT HERE AND IN THE DOCKERFILE.
-
-# user_data_dir = "/temp/google-chrome/" 
-# Change path for Linux environment
+# IMPORTANT. If you need custom user data dir for extensions, uncomment here and in Dockerfile.
+# user_data_dir = "/temp/google-chrome/"
 # options.add_argument(f"--user-data-dir={user_data_dir}")
-
-
+options.add_argument("--window-size=1920,1080")
+options.add_argument("--no-first-run")
 options.set_capability("goog:loggingPrefs", caps["goog:loggingPrefs"])
 options.add_argument("--allow-geolocation")
 options.add_argument("--disable-features=DisableLoadExtensionCommandLineSwitch")
@@ -96,13 +100,16 @@ options.add_argument('--disable-notifications')
 
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
+# ───────────────────────────────────────────────────────────
+# Discord bot
+# ───────────────────────────────────────────────────────────
 bot = commands.Bot(command_prefix='!', intents=intents, case_insensitive=True)
 bot.remove_command("help")
 
-bot.luckybird_2fa_code = None  
-bot.chumba_2fa_code = None    
+bot.luckybird_2fa_code = None
+bot.chumba_2fa_code = None
 
-# Dictionary to manage authentication status for different casinos
+# Authentication flags
 auth_status = {
     "dingdingding": False,
     "modo": False,
@@ -110,8 +117,7 @@ auth_status = {
     "luckybird": False,
 }
 
-
-# Tasks
+# Task handles
 chanced_casino_task = None
 luckybird_task = None
 globalpoker_task = None
@@ -124,11 +130,10 @@ rollingriches_task = None
 jefebet_task = None
 spinpals_task = None
 spinquest_task = None
+funrize_task = None
 sportzino_task = None
 
-
-
-# Flags to check if corresponding background tasks are running
+# Running flags
 chanced_casino_running = False
 luckybird_running = False
 globalpoker_running = False
@@ -142,9 +147,12 @@ jefebet_running = False
 spinpals_running = False
 spinquest_running = False
 funrize_running = False
+funrize_running = False
 sportzino_running = False
 
-
+# ───────────────────────────────────────────────────────────
+# Bot events
+# ───────────────────────────────────────────────────────────
 @bot.event
 async def on_ready():
     print(f"Bot has connected as {bot.user}")
@@ -155,25 +163,20 @@ async def on_ready():
     else:
         print("Invalid DISCORD_CHANNEL")
 
-# ───────────────────────────────────────────────────────────
-# Start Main Tasks Loop
-# ───────────────────────────────────────────────────────────
-
+    # Start loops
     await asyncio.sleep(60)
     if not casino_loop.is_running():
         casino_loop.start()
+    await asyncio.sleep(1800)
     if not eighthour_loop.is_running():
         eighthour_loop.start()
-    await asyncio.sleep(260)
 
-
-
-
+# ───────────────────────────────────────────────────────────
+# Commands
+# ───────────────────────────────────────────────────────────
 @bot.command(name="ping")
 async def ping(ctx):
-    print("ponged")
     await ctx.send("Pong")
-
 
 @bot.command(name="captcha")
 async def captcha(ctx):
@@ -192,9 +195,8 @@ async def captcha(ctx):
         await ctx.send("Failed to capture captcha solver page.")
         print(f"Captcha command error: {e}")
 
-
 @bot.command(name="help")
-async def help(ctx):
+async def help_cmd(ctx):
     await ctx.send("""Commands are not recommended. 
     🎰 Casino Commands: 
     !chanced - Check Chanced.com for bonus
@@ -209,8 +211,10 @@ async def help(ctx):
     !jefebet - Check JefeBet for bonus
     !spinpals - Check SpinPals for bonus
     !spinquest - Check SpinQuest for bonus
+    !funrize - Check Funrize for bonus
     !sportzino - Check Sportzino for bonus
     !fortunecoins - Check Fortunecoins for bonus
+    !nolimitcoins - Check NoLimitCoins for bonus
 
     ---------------------------------------
     ⚙️ General Commands:                             
@@ -222,54 +226,40 @@ async def help(ctx):
 
     ---------------------------------------
     ✅ Auth Commands:
-    !googleauth - Authenticate Google Account
-    !auth <site> - Authenticate into a specific site           
-    (e.g. Modo, DingDingDing, Stake, LuckyBird)
-
+    !auth google - Authenticate Google Account (global)
+    !auth <site> - Authenticate into a specific site (e.g., Modo, DingDingDing, Stake, LuckyBird)
     !auth <site> <method> - Authenticate using a specific method
-    (e.g. !auth crowncoins google, !auth crowncoins env)                   
-                                    
+       (e.g. !auth crowncoins google, !auth crowncoins env, !auth nolimitcoins env)
     """)
 
-
 async def action_notification(ctx, message):
-    # Send a notification message to the Discord channel
     await ctx.send(f"Notification: {message}")
 
-# Invalid command error handling
 @bot.event
 async def on_command_error(ctx, error):
     print(f"Command Error: {error}")
     await ctx.send(f"Command Error: {error}")
-    # Print help command
-    print("Type '!help' for a list of commands")
     await ctx.send("Type '!help' for a list of commands")
 
-# Restart command
 @bot.command(name="restart")
 async def restart(ctx):
-    print("Restarting...")
     await ctx.send("Restarting...")
     await bot.close()
-    os._exit(0)  # Special exit code to restart docker container
+    os._exit(0)
 
-
+# (Deprecated wrapper) Keep old command working but point users to !auth google
 @bot.command(name="googleauth")
 async def googleauth(ctx):
-    await ctx.send("Authenticating Google Account...")
-    # Load credentials from environment variables
+    await ctx.send("`!googleauth` is deprecated. Use `!auth google`.")
     google_credentials = os.getenv("GOOGLE_LOGIN")
-
     if google_credentials:
-        google_username, google_password = google_credentials.split(':')
+        google_username, google_password = google_credentials.split(':', 1)
         credentials = (google_username, google_password)
     else:
         await ctx.send("Google credentials not found in .env file.")
-        credentials = (None, None)  
-
+        credentials = (None, None)
     channel = bot.get_channel(DISCORD_CHANNEL)
     await google_auth(ctx, driver, channel, credentials)
-
 
 @bot.event
 async def on_message(message):
@@ -277,318 +267,272 @@ async def on_message(message):
     if message.channel.id == DISCORD_CHANNEL:
         content = message.content.strip()
         if len(content) == 6 and content.isdigit():
-            if "luckybird" in message.content.lower():  # Check if it's for LuckyBird
+            if "luckybird" in message.content.lower():
                 bot.luckybird_2fa_code = content
                 print(f"LuckyBird 2FA code {bot.luckybird_2fa_code} received.")
-            elif "chumba" in message.content.lower():  # Check if it's for Chumba
+            elif "chumba" in message.content.lower():
                 bot.chumba_2fa_code = content
                 print(f"Chumba 2FA code {bot.chumba_2fa_code} received.")
-
     await bot.process_commands(message)
 
-
+# ── Site Commands ──────────────────────────────────────────
 @bot.command(name="chumba")
 async def chumba(ctx):
-    """Starts the Chumba automation process."""
     await ctx.send("Checking Chumba for Bonus...")
-
-    # Step 1: Go to the Chumba lobby
     driver.get("https://lobby.chumbacasino.com/")
     await asyncio.sleep(5)
-
-    # Step 2: If we are on the login page, authenticate
     if driver.current_url.startswith("https://login.chumbacasino.com/"):
-
-        # Reset 2FA code before authentication
         bot.chumba_2fa_code = None
-
-        # Call authentication process and pass the bot object to share the two_fa_code
         authenticated = await authenticate_chumba(driver, bot, ctx)
-
         if not authenticated:
             await ctx.send("Chumba authentication failed.")
             return
-
-    # Step 3: Proceed with claiming the bonus if authenticated
     if driver.current_url.startswith("https://lobby.chumbacasino.com/"):
         await claim_chumba_bonus(driver, ctx)
         await check_chumba_countdown(driver, ctx)
     else:
         await ctx.send("Failed to reach the Chumba lobby.")
 
-
-
 @bot.command(name="RollingRiches")
 async def rollingriches(ctx):
-    global rollingriches_task
-    if not rollingriches_task or rollingriches_task.done():
-        await ctx.send("Checking Rolling Riches for Bonus...")
-        channel = bot.get_channel(DISCORD_CHANNEL)
-        await rolling_riches_casino(ctx, driver, channel)
-    else:
-        await ctx.send("RollingRiches automation is already running.")
+    await ctx.send("Checking Rolling Riches for Bonus...")
+    channel = bot.get_channel(DISCORD_CHANNEL)
+    await rolling_riches_casino(ctx, driver, channel)
 
 @bot.command(name="JefeBet")
 async def jefebet(ctx):
-    global jefebet_task
-    if not jefebet_task or jefebet_task.done():
-        await ctx.send("Checking JefeBet for Bonus...")
-        channel = bot.get_channel(DISCORD_CHANNEL)
-        await jefebet_casino(ctx, driver, channel)
-    else:
-        await ctx.send("JefeBet automation is already running.")
+    await ctx.send("Checking JefeBet for Bonus...")
+    channel = bot.get_channel(DISCORD_CHANNEL)
+    await jefebet_casino(ctx, driver, channel)
 
 @bot.command(name="SpinPals")
 async def spinpals(ctx):
-    global spinpals_task
-    if not spinpals_task or spinpals_task.done():
-        await ctx.send("Checking SpinPals for Bonus...")
-        channel = bot.get_channel(DISCORD_CHANNEL)
-        await spinpals_flow(ctx, driver, channel)
-    else:
-        await ctx.send("SpinPals automation is already running.")
+    await ctx.send("Checking SpinPals for Bonus...")
+    channel = bot.get_channel(DISCORD_CHANNEL)
+    await spinpals_flow(ctx, driver, channel)
 
 @bot.command(name="SpinQuest")
 async def spinquest(ctx):
-    global spinquest_task
-    if not spinquest_task or spinquest_task.done():
-        await ctx.send("Checking SpinQuest for Bonus...")
+    await ctx.send("Checking SpinQuest for Bonus...")
+    channel = bot.get_channel(DISCORD_CHANNEL)
+    await spinquest_flow(ctx, driver, channel)
+
+@bot.command(name="Funrize")
+async def funrize(ctx):
+    global funrize_task
+    if not funrize_task or funrize_task.done():
+        await ctx.send("Checking Funrize for Bonus...")
         channel = bot.get_channel(DISCORD_CHANNEL)
-        await spinquest_flow(ctx, driver, channel)
+        await funrize_flow(ctx, driver, channel)
     else:
-        await ctx.send("SpinQuest automation is already running.")
+        await ctx.send("Funrize automation is already running.")
 
 @bot.command(name="Stake")
 async def stake(ctx):
-    global stake_task
-    if not stake_task or stake_task.done():
-        await ctx.send("Checking Stake for Bonus...")
-        channel = bot.get_channel(DISCORD_CHANNEL)
-        await stake_claim(driver, bot, ctx, channel)
-    else:
-        await ctx.send("Stake automation is already running.")
-
+    await ctx.send("Checking Stake for Bonus...")
+    channel = bot.get_channel(DISCORD_CHANNEL)
+    await stake_claim(driver, bot, ctx, channel)
 
 @bot.command(name="chanced")
 async def chanced(ctx):
     await ctx.send("Checking Chanced.com for Bonus...")
-    # Load credentials from environment variables
     chanced_credentials = os.getenv("CHANCED")
-
     if chanced_credentials:
-        # Split the credentials into username and password using the ':' delimiter
-        chanced_username, chanced_password = chanced_credentials.split(':')
+        chanced_username, chanced_password = chanced_credentials.split(':', 1)
         credentials = (chanced_username, chanced_password)
     else:
-        credentials = (None, None)  # No credentials, will proceed with user data dir
-
+        credentials = (None, None)
     channel = bot.get_channel(DISCORD_CHANNEL)
     await chanced_casino(ctx, driver, channel, credentials)
-
 
 @bot.command(name="luckybird")
 async def luckybird(ctx):
     await ctx.send("Checking Luckybird for bonus...")
-    channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
+    channel = bot.get_channel(DISCORD_CHANNEL)
     bonus_claimed = await luckyBird_claim(driver, bot, ctx, channel)
-
-    # If claiming the bonus failed, always check the countdown
     if not bonus_claimed:
-        print("Failed to claim LuckyBird bonus. Checking countdown timer...")
         await extract_countdown_info(driver, bot, ctx, channel)
 
-# Command to run the Global Poker bonus checker
 @bot.command(name="globalpoker")
 async def global_poker_command(ctx):
     global globalpoker_running
     if not globalpoker_running:
         await ctx.send("Checking GlobalPoker for Bonus...")
         globalpoker_running = True
-
-        # Get the channel and driver from the context
         channel = bot.get_channel(DISCORD_CHANNEL)
-        # driver = ctx.driver  # Assuming driver is passed in the context
-
-        # Call the main GlobalPoker function
         await global_poker(ctx, driver, channel)
-
         globalpoker_running = False
     else:
         await ctx.send("GlobalPoker automation is already running.")
 
 @bot.command(name="CrownCoins")
 async def crowncoinscasino(ctx):
-    global CrownCoinsCasino_task
-    if not CrownCoinsCasino_task or CrownCoinsCasino_task.done():
-        await ctx.send("Checking Crown Coins Casino for Bonus...")
-        channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
-        CrownCoinsCasino_task = asyncio.create_task(crowncoins_casino(driver, bot, ctx, channel))
-    else:
-        await ctx.send("CrownCoinsCasino automation is already running.")
+    await ctx.send("Checking Crown Coins Casino for Bonus...")
+    channel = bot.get_channel(DISCORD_CHANNEL)
+    await crowncoins_casino(driver, bot, ctx, channel)
 
 @bot.command(name="dingdingding")
 async def DingDingDing(ctx):
     await ctx.send("Checking DingDingDing for bonus...")
-    channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
+    channel = bot.get_channel(DISCORD_CHANNEL)
     bonus_claimed = await claim_dingdingding_bonus(driver, bot, ctx, channel)
-
-    # If claiming the bonus failed, always check the countdown
     if not bonus_claimed:
-        print("Failed to claim DingDingDing bonus. Checking countdown timer...")
         await check_dingdingding_countdown(driver, bot, ctx, channel)
 
 @bot.command(name="modo")
 async def modo(ctx):
     await ctx.send("Checking Modo for bonus...")
-    channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
-
-    # Attempt to claim the bonus
+    channel = bot.get_channel(DISCORD_CHANNEL)
     bonus_claimed = await claim_modo_bonus(driver, bot, ctx, channel)
-
-    # Check countdown if claiming fails
     if not bonus_claimed:
-        print("Failed to claim Modo bonus. Checking countdown timer...")
         await check_modo_countdown(driver, bot, ctx, channel)
 
-     
+@bot.command(name="Zula")
+async def zula(ctx):
+    await ctx.send("Checking Zula Casino for Bonus...")
+    await zula_casino(driver, bot, ctx)
 
+@bot.command(name="Sportzino")
+async def sportzino(ctx):
+    await ctx.send("Checking Sportzino for Bonus...")
+    channel = bot.get_channel(DISCORD_CHANNEL)
+    await Sportzino(ctx, driver, channel)
+
+@bot.command(name="nolimitcoins", aliases=["nlc"])
+async def nolimitcoins(ctx):
+    """Check NoLimitCoins for a claim or report the countdown."""
+    await ctx.send("Checking NoLimitCoins for bonus...")
+    channel = bot.get_channel(DISCORD_CHANNEL)
+    await nolimitcoins_flow(ctx, driver, channel)
+
+# ── Auth router ────────────────────────────────────────────
 @bot.command(name="auth")
 async def authenticate_command(ctx, site: str, method: str = None):
     channel = bot.get_channel(DISCORD_CHANNEL)
 
-    # CrownCoins Authentication
-    if site.lower() == "crowncoins":
+    # Normalize site name (e.g., "no limit coins" -> "nolimitcoins")
+    norm_site = re.sub(r"\s+", "", site.lower())
+
+    # 1) Global Google auth: !auth google
+    if norm_site == "google":
+        await ctx.send("Authenticating Google Account...")
+        google_credentials = os.getenv("GOOGLE_LOGIN")
+        if google_credentials:
+            google_username, google_password = google_credentials.split(":", 1)
+            credentials = (google_username, google_password)
+        else:
+            await ctx.send("Google credentials not found in .env file.")
+            credentials = (None, None)
+        await google_auth(ctx, driver, channel, credentials)
+        return
+
+    # 2) CrownCoins
+    elif norm_site == "crowncoins":
+        if method is None:
+            await ctx.send("Please specify the authentication method: `google` or `env`.")
+            return
+        if method.lower() == "google":
+            await ctx.send("Authenticating CrownCoins using Google...")
+            ok = await auth_crown_google(driver, bot, ctx, channel)
+            if not ok:
+                screenshot_path = "crowncoins_google_auth_failed.png"
+                driver.save_screenshot(screenshot_path)
+                await ctx.send("", file=discord.File(screenshot_path))
+                os.remove(screenshot_path)
+        elif method.lower() == "env":
+            await ctx.send("Authenticating CrownCoins using .env credentials...")
+            ok = await auth_crown_env(driver, bot, ctx, channel)
+            if not ok:
+                screenshot_path = "crowncoins_env_auth_failed.png"
+                driver.save_screenshot(screenshot_path)
+                await ctx.send("", file=discord.File(screenshot_path))
+                os.remove(screenshot_path)
+        else:
+            await ctx.send("Invalid authentication method. Use `google` or `env`.")
+
+    # 3) DingDingDing
+    elif norm_site == "dingdingding":
+        await ctx.send("Authenticating DingDingDing...")
+        ok = await authenticate_dingdingding(driver, bot, ctx, channel)
+        if not ok:
+            screenshot_path = "dingdingding_auth_failed.png"
+            driver.save_screenshot(screenshot_path)
+            await ctx.send("Authentication failed. Unable to proceed.", file=discord.File(screenshot_path))
+            os.remove(screenshot_path)
+
+    # 4) Modo
+    elif norm_site == "modo":
+        await ctx.send("Authenticating Modo...")
+        ok = await authenticate_modo(driver, bot, ctx, channel)
+        if not ok:
+            screenshot_path = "modo_auth_failed.png"
+            driver.save_screenshot(screenshot_path)
+            await ctx.send("Modo authentication failed. Unable to proceed.", file=discord.File(screenshot_path))
+            os.remove(screenshot_path)
+
+    # 5) Stake
+    elif norm_site == "stake":
+        await ctx.send("Authenticating Stake...")
+        ok = await stake_auth(driver, bot, ctx, channel)
+        if not ok:
+            screenshot_path = "stake_auth_failed.png"
+            driver.save_screenshot(screenshot_path)
+            await ctx.send("Stake authentication failed. Unable to proceed.", file=discord.File(screenshot_path))
+            os.remove(screenshot_path)
+
+    # 6) LuckyBird
+    elif norm_site == "luckybird":
+        await ctx.send("Authenticating LuckyBird...")
+        ok = await authenticate_luckybird(driver, bot, ctx, channel)
+        if not ok:
+            screenshot_path = "luckybird_auth_failed.png"
+            driver.save_screenshot(screenshot_path)
+            await ctx.send("LuckyBird authentication failed. Unable to proceed.", file=discord.File(screenshot_path))
+            os.remove(screenshot_path)
+
+    # 7) NoLimitCoins (supports multiple aliases)
+    elif norm_site in {"nolimit", "nolimitcoins", "nlc", "no limit coins"}:
         if method is None:
             await ctx.send("Please specify the authentication method: `google` or `env`.")
             return
 
         if method.lower() == "google":
-            await ctx.send("Authenticating CrownCoins using Google...")
-            auth_status["crowncoins_google"] = await auth_crown_google(driver, bot, ctx, channel)
-            if auth_status["crowncoins_google"]:
-                print("CrownCoins authentication via Google succeeded.")
+            await ctx.send("Authenticating NoLimitCoins using Google...")
+            ok = await auth_nolimit_google(driver, channel, ctx)
+            if ok:
+                print("NoLimitCoins authentication via Google succeeded.")
             else:
-                screenshot_path = "crowncoins_google_auth_failed.png"
+                screenshot_path = "nolimit_google_auth_failed.png"
                 driver.save_screenshot(screenshot_path)
-                await ctx.send("",
-                               file=discord.File(screenshot_path))
+                await ctx.send("", file=discord.File(screenshot_path))
                 os.remove(screenshot_path)
 
         elif method.lower() == "env":
-            await ctx.send("Authenticating CrownCoins using .env credentials...")
-            auth_status["crowncoins_env"] = await auth_crown_env(driver, bot, ctx, channel)
-            if auth_status["crowncoins_env"]:
-                print("CrownCoins authentication via .env credentials succeeded.")
+            await ctx.send("Authenticating NoLimitCoins using .env credentials...")
+            ok = await auth_nolimit_env(driver, channel, ctx)
+            if ok:
+                print("NoLimitCoins authentication via .env credentials succeeded.")
             else:
-                screenshot_path = "crowncoins_env_auth_failed.png"
+                screenshot_path = "nolimit_env_auth_failed.png"
                 driver.save_screenshot(screenshot_path)
-                await ctx.send("",
-                               file=discord.File(screenshot_path))
+                await ctx.send("", file=discord.File(screenshot_path))
                 os.remove(screenshot_path)
-
         else:
             await ctx.send("Invalid authentication method. Use `google` or `env`.")
-    
-    # Other Sites
-    elif site.lower() == "dingdingding":
-        await ctx.send("Authenticating DingDingDing...")
-        auth_status["dingdingding"] = await authenticate_dingdingding(driver, bot, ctx, channel)
-        if auth_status["dingdingding"]:
-            print("DingDingDing authentication succeeded.")
-        else:
-            screenshot_path = "dingdingding_auth_failed.png"
-            driver.save_screenshot(screenshot_path)
-            await ctx.send("Authentication failed. Unable to proceed.",
-                           file=discord.File(screenshot_path))
-            os.remove(screenshot_path)
 
-    elif site.lower() == "modo":
-        await ctx.send("Authenticating Modo...")
-        auth_status["modo"] = await authenticate_modo(driver, bot, ctx, channel)
-        if auth_status["modo"]:
-            print("Modo authentication succeeded.")
-        else:
-            screenshot_path = "modo_auth_failed.png"
-            driver.save_screenshot(screenshot_path)
-            await ctx.send("Modo authentication failed. Unable to proceed.",
-                           file=discord.File(screenshot_path))
-            os.remove(screenshot_path)
-
-    elif site.lower() == "stake":
-        await ctx.send("Authenticating Stake...")
-        auth_status["stake"] = await stake_auth(driver, bot, ctx, channel)
-        if auth_status["stake"]:
-            print("Stake authentication succeeded.")
-        else:
-            screenshot_path = "stake_auth_failed.png"
-            driver.save_screenshot(screenshot_path)
-            await ctx.send("Stake authentication failed. Unable to proceed.",
-                           file=discord.File(screenshot_path))
-            os.remove(screenshot_path)
-
-    elif site.lower() == "luckybird":
-        await ctx.send("Authenticating LuckyBird...")
-        auth_status["luckybird"] = await authenticate_luckybird(driver, bot, ctx, channel)
-        if auth_status["luckybird"]:
-            print("LuckyBird authentication succeeded.")
-        else:
-            screenshot_path = "luckybird_auth_failed.png"
-            driver.save_screenshot(screenshot_path)
-            await ctx.send("LuckyBird authentication failed. Unable to proceed.",
-                           file=discord.File(screenshot_path))
-            os.remove(screenshot_path)
-
+    # 8) Unknown
     else:
         await ctx.send(f"Authentication for '{site}' is not implemented.")
 
 
 
-     
-
-
-@bot.command(name="Zula")
-async def zula(ctx):
-    global zula_task
-    if not zula_task or zula_task.done():
-        await ctx.send("Checking Zula Casino for Bonus...")
-        zula_task = asyncio.create_task(zula_casino(driver, bot, ctx))
-    else:
-        await ctx.send("ZulaCasino automation is already running.")
-
-
-@bot.command(name="Sportzino")
-async def sportzino(ctx):
-    global sportzino_task
-    if not sportzino_task or sportzino_task.done():
-        channel = bot.get_channel(DISCORD_CHANNEL)
-        await ctx.send("Checking Sportzino for Bonus...")
-        sportzino_task = asyncio.create_task(Sportzino(ctx, driver, channel))
-    else:
-        await ctx.send("Sportzino automation is already running.")
 
 
 
-    # Chanced under maintenance
-    # try:
-    #     # Run the chanced casino task
-    #     await chanced_casino(None, driver, channel, None)
-    # except Exception as e:
-    #     print(f"Error in loop: {str(e)}")
-    #     await channel.send(f"Error in Chanced Casino loop: {str(e)}")
 
-
-
-# @tasks.loop(hours=24)
-# async def dingdingding_auth_task():
-#     channel = bot.get_channel(DISCORD_CHANNEL)
-#     await channel.send("Running scheduled DingDingDing authentication...")
-#     auth_status["dingdingding"] = await authenticate_dingdingding(driver, bot, None, channel)
-#     if auth_status["dingdingding"]:
-#         await channel.send("DingDingDing authentication succeeded during the scheduled task.")
-#     else:
-#         await channel.send("DingDingDing authentication failed during the scheduled task.")
-
-
+# ───────────────────────────────────────────────────────────
+# Loops
+# ───────────────────────────────────────────────────────────
 @tasks.loop(hours=2)
 async def casino_loop():
     print("Starting casino_loop...")
@@ -596,115 +540,105 @@ async def casino_loop():
     channel = bot.get_channel(DISCORD_CHANNEL)
     if channel is None:
         print(f"Error: Invalid channel ID '{DISCORD_CHANNEL}' or bot is not connected.")
-        return  # Exit the task loop early if the channel is invalid
-
+        return
 
     try:
-        # Run the casino tasks sequentially with 2-hour gaps
+        # Run the casino tasks sequentially with sleeps between
         try:
             await asyncio.sleep(40)
             await zula_casino(None, driver, channel)
-        except:
+        except Exception:
             print("Error in Zula")
             await asyncio.sleep(50)
         await asyncio.sleep(80)
+
         try:
             await Sportzino(None, driver, channel)
             await asyncio.sleep(50)
-        except:
+        except Exception:
             print("Error in Sportzino")
             await asyncio.sleep(50)
         await asyncio.sleep(80)
+
+        # NoLimitCoins run
+        try:
+            await nolimitcoins_flow(None, driver, channel)
+        except Exception:
+            print("Error in NoLimitCoins")
+        await asyncio.sleep(30)
+
         try:
             await crowncoins_casino(driver, bot, None, channel)
-        except:
+        except Exception:
             print("Error in CrownCoinsCasino")
         await asyncio.sleep(30)
+
         try:
             bonus_claimed = await claim_modo_bonus(driver, bot, None, channel)
             if not bonus_claimed:
-                print("Failed to claim Modo bonus. Checking countdown timer...")
                 await check_modo_countdown(driver, bot, None, channel)
-        except:
+        except Exception:
             print("Error in Modo")
         await asyncio.sleep(100)
-        # try:
-        #     bonus_claimed = await claim_dingdingding_bonus(driver, bot, None, channel)
-        #     if not bonus_claimed:
-        #         print("Failed to claim DingDingDing bonus. Checking countdown timer...")
-        #         await check_dingdingding_countdown(driver, bot, None, channel)
-        # except:
-        #     print("Error in DingDingDing")
-        # await asyncio.sleep(100)
 
         await asyncio.sleep(10)
         try:
             await global_poker(None, driver, channel)
             await asyncio.sleep(10)
-        except:
+        except Exception:
             print("Error in GlobalPoker")
         await asyncio.sleep(10)
+
         try:
             bonus_claimed = await luckyBird_claim(driver, bot, None, channel)
             if not bonus_claimed:
-                print("Failed to claim LuckyBird bonus. Checking countdown timer...")
                 await extract_countdown_info(driver, bot, None, channel)
-        except:
+        except Exception:
             print("Error in LuckyBird")
         await asyncio.sleep(10)
+
         try:
             await rolling_riches_casino(None, driver, channel)
-        except:
+        except Exception:
             print("Error in RollingRiches")
+
         try:
             await jefebet_casino(None, driver, channel)
-        except:
+        except Exception:
             print("Error in JefeBet")
 
-        # Spin Pals under maintenance, requires CF solver
-
-        # try:
-        #     await spinpals_flow(None, driver, channel)
-        # except:
-        #     print("Error in SpinPals")
-
-        # Chumba under maintenance
-        
-        # try:
-        #     await chumba_casino(None, driver, bot)
-        # except:
-        #     print("Error in Chumba")
         await asyncio.sleep(10)
         try:
             await stake_claim(driver, bot, None, channel)
-        except:
+        except Exception:
             print("Error in Stake")
-
 
     except Exception as e:
         print(f"Error in loop: {str(e)}")
-
-# ───────────────────────────────────────────────────────────
-# 8 Hour Task Loop
-# ───────────────────────────────────────────────────────────
 
 @tasks.loop(hours=8)
 async def eighthour_loop():
     print("Starting Eight Hour Loop")
-
     channel = bot.get_channel(DISCORD_CHANNEL)
     if channel is None:
         print(f"Error: Invalid channel ID '{DISCORD_CHANNEL}' or bot is not connected.")
-        return # Exit the task loop early if the channel is invalid
-
+        return
     try:
-        # Run the casino taks sequentially with 4-hour gaps
         try:
             await spinquest_flow(None, driver, channel)
-        except:
+        except Exception:
             print("Error in SpinQuest")
+
+        await asyncio.sleep(10)
+        try:
+            await funrize_flow(None, driver, channel)
+        except:
+            print("Error in Funrize")
 
     except Exception as e:
         print(f"Error in loop: {str(e)}")
 
+# ───────────────────────────────────────────────────────────
+# Run bot
+# ───────────────────────────────────────────────────────────
 bot.run(DISCORD_TOKEN)
