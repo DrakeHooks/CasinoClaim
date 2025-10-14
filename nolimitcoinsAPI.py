@@ -25,9 +25,8 @@ STORE_URL  = "https://nolimitcoins.com/promotions"
 SIGNIN_URL = "https://nolimitcoins.com/signin/"
 
 # After opening the store: first click a "Claim / Claim Reward" styled button…
-CLAIM_REWARD_SELECTORS = [
-    (By.CSS_SELECTOR, "button.a-button.primary.size-md.btn:not(.disabled)"),
-    (By.CSS_SELECTOR, "button[data-v-895f4e2b]:not(.disabled)"),
+CLAIM_REWARD_XPATHS = [
+    (By.XPATH, "/html/body/div[1]/div/main/div/div[3]/div[5]/div[2]/div/button"),
 ]
 
 # …then click one of these "Collect" buttons in the modal.
@@ -228,7 +227,7 @@ async def nolimitcoins_flow(ctx, driver, channel):
     dismiss_overlay(driver)
 
     # Step 1: Claim/Claim Reward
-    if not try_click_any(driver, CLAIM_REWARD_SELECTORS, timeout_each=5):
+    if not try_click_any(driver, CLAIM_REWARD_XPATHS, timeout_each=5):
         cd = read_countdown_from_div(driver)
         if cd:
             await channel.send(f"Next No Limit Coins Bonus Available in: {cd}")
