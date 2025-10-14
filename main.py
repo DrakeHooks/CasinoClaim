@@ -44,6 +44,7 @@ api_modules = [
     "spinpalsAPI",
     "spinquestAPI",
     "funrizeAPI",
+    "fortunewheelzAPI",
     "globalpokerAPI",
     "dingdingdingAPI",
     "chumbaAPI",
@@ -131,6 +132,7 @@ jefebet_task = None
 spinpals_task = None
 spinquest_task = None
 funrize_task = None
+fortunewheelz_task = None
 sportzino_task = None
 
 # Running flags
@@ -147,7 +149,7 @@ jefebet_running = False
 spinpals_running = False
 spinquest_running = False
 funrize_running = False
-funrize_running = False
+fortunewheelz_running = False
 sportzino_running = False
 
 # ───────────────────────────────────────────────────────────
@@ -212,6 +214,7 @@ async def help_cmd(ctx):
     !spinpals - Check SpinPals for bonus
     !spinquest - Check SpinQuest for bonus
     !funrize - Check Funrize for bonus
+    !fortunewheelz - Check Fortune Wheelz for bonus
     !sportzino - Check Sportzino for bonus
     !fortunecoins - Check Fortunecoins for bonus
     !nolimitcoins - Check NoLimitCoins for bonus
@@ -326,6 +329,16 @@ async def funrize(ctx):
         await funrize_flow(ctx, driver, channel)
     else:
         await ctx.send("Funrize automation is already running.")
+
+@bot.command(name="FortuneWheelz")
+async def fortunewheelz(ctx):
+    global fortunewheelz_task
+    if not fortunewheelz_task or fortunewheelz_task.done():
+        await ctx.send("Checking Fortune Wheelz for Bonus...")
+        channel = bot.get_channel(DISCORD_CHANNEL)
+        await fortunewheelz_flow(ctx, driver, channel)
+    else:
+        await ctx.send("Fortune Wheelz automation is already running.")
 
 @bot.command(name="Stake")
 async def stake(ctx):
@@ -634,6 +647,11 @@ async def eighthour_loop():
             await funrize_flow(None, driver, channel)
         except:
             print("Error in Funrize")
+        await asyncio.sleep(10)
+        try:
+            await fortunewheelz_flow(None, driver, channel)
+        except:
+            print("Error in Fortune Wheelz")
 
     except Exception as e:
         print(f"Error in loop: {str(e)}")
