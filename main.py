@@ -665,7 +665,7 @@ async def casino_loop():
             await nolimitcoins_flow(None, driver, channel)
         except Exception:
             print("Error in NoLimitCoins")
-        await asyncio.sleep(30)
+        await asyncio.sleep(10)
         try:
             await funrize_flow(None, driver, channel)
         except Exception:

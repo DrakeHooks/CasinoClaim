@@ -261,37 +261,31 @@ async def claim_nolimitcoins_bonus(ctx, driver, channel):
 # ───────────────────────────────────────────────────────────
 # Login with .env, then claim
 # ───────────────────────────────────────────────────────────
-async def nolimitcoins_casino(ctx, driver, channel):
-    if not NOLIMITCOINS_CRED:
-        await channel.send("NoLimitCoins credentials not found in environment variables.")
-        return
-    username, password = NOLIMITCOINS_CRED.split(":", 1)
-
-    driver.get(SIGNIN_URL)
-    await asyncio.sleep(2)
-
+async def auth_nolimit_env(driver, channel, ctx):
     try:
-        # If form hidden under header button, open it
-        try:
-            btn = wait_clickable(driver, By.XPATH, "/html/body/div[1]/div/div[1]/header/div[2]/button[1]", 6)
-            safe_click(driver, btn)
-            await asyncio.sleep(1)
-        except TimeoutException:
-            pass
-
-        email = wait_present(driver, By.NAME, "email", 10)
-        email.send_keys(username)
-        await asyncio.sleep(0.3)
-
-        pw = wait_present(driver, By.NAME, "password", 10)
-        pw.send_keys(password)
-        pw.send_keys(Keys.ENTER)
+        driver.get(SIGNIN_URL)
         await asyncio.sleep(2)
 
-        await claim_nolimitcoins_bonus(ctx, driver, channel)
-    except TimeoutException:
-        await send_screenshot(channel, driver, "nolimitcoins_login_error.png")
-        await channel.send("NoLimitCoins login timed out, will retry later.")
+        creds = os.getenv("NOLIMITCOINS")
+        if not creds:
+            await channel.send("NoLimitCoins credentials not found in environment variables.")
+            return
+        username, password = creds.split(":", 1)
+
+        email_input = wait_present(driver, By.XPATH, "/html/body/div[1]/div/div[1]/div/form/label[1]/div/div[2]/input", 20)
+        email_input.send_keys(username)
+        await asyncio.sleep(0.2)
+
+        password_input = wait_present(driver, By.XPATH, "/html/body/div[1]/div/div[1]/div/form/label[2]/div/input", 20)
+        password_input.send_keys(password)
+        password_input.send_keys(Keys.ENTER)
+
+        await asyncio.sleep(2)
+        await send_screenshot(channel, driver)
+        await channel.send("Authenticated into NoLimitCoins!")
+    except Exception:
+        await channel.send("NoLimitCoins login with env creds failed. Perhaps you need to run !googleauth.")
+        await send_screenshot(channel, driver)
 
 # ───────────────────────────────────────────────────────────
 # Countdown only (reads from the provided DIV)
