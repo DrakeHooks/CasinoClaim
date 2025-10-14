@@ -420,38 +420,14 @@ async def chanced(ctx):
     await chanced_casino(ctx, driver, channel, credentials)
 
 @bot.command(name="luckybird")
-async def luckybird(ctx):
-    """Single entry point:
-       1) Authenticate (handles 2FA via on_message capture)
-       2) Claim if available, else report countdown."""
-    global luckybird_task
-    channel = bot.get_channel(DISCORD_CHANNEL)
-
-    # prevent double-runs
-    if luckybird_task and not luckybird_task.done():
-        await ctx.send("LuckyBird automation is already running.")
-        return
-
-    async def _run():
-        try:
-            await ctx.send("🔐 Authenticating LuckyBird…")
-            ok = await authenticate_luckybird(driver, bot, ctx, channel)
-            if not ok:
-                await ctx.send("LuckyBird authentication failed.")
-                return
-            await ctx.send("🎁 Authenticated! Checking daily bonus…")
-            await luckybird_flow(ctx, driver, channel)
-        except Exception as e:
-            # Always send a screenshot if something goes wrong
-            snap = "luckybird_unexpected.png"
-            try:
-                driver.save_screenshot(snap)
-                await ctx.send(f"Unexpected LuckyBird error: {e}", file=discord.File(snap))
-                os.remove(snap)
-            except Exception:
-                await ctx.send(f"Unexpected LuckyBird error: {e}")
-
-    luckybird_task = asyncio.create_task(_run())
+async def luckybird_command(ctx):
+    """Run LuckyBird: auth if needed, then claim or report countdown."""
+    channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
+    await ctx.send("Checking LuckyBird or Bonus...")
+    try:
+        await luckybird_entry(ctx, driver, bot, channel)
+    except Exception as e:
+        await channel.send(f"Error running LuckyBird command: {e}")
 
 @bot.command(name="globalpoker")
 async def global_poker_command(ctx):
@@ -683,7 +659,7 @@ async def casino_loop():
             print("Error in JefeBet")
         await asyncio.sleep(10)
         try:
-            await luckybird_flow(None, driver, channel)
+            await luckybird_entry(None, driver, channel)
         except Exception:
             print("Error in LuckyBird")
         await asyncio.sleep(10)

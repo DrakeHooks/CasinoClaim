@@ -1,6 +1,6 @@
 # Drake Hooks
 # Casino Claim 2
-# LuckyBird API — Claim-if-available, else report countdown (with 2FA-capable auth kept intact)
+# LuckyBird API — Try claim/countdown; auth only if needed, then retry once.
 
 import os
 import asyncio
@@ -16,22 +16,19 @@ from selenium.common.exceptions import TimeoutException
 
 load_dotenv()
 
-# ───────────────────────────────────────────────────────────
-# Config & XPaths
-# ───────────────────────────────────────────────────────────
 LB_URL = "https://luckybird.io/"
 
-# Nav → “Buy” tab → Daily bonus card
+# Navigation → Buy tab → Daily bonus card
 X_BUY_TAB        = (By.XPATH, "/html/body/div[1]/div/div[1]/div/section/section/header/div/div/ul[1]/li[2]/p")
 X_DAILY_BONUS    = (By.XPATH, "/html/body/section/div[2]/div[2]/div[2]/div[1]/div/div/div/div[5]")
 
 # Claim button inside daily bonus view
 X_CLAIM_BUTTON   = (By.XPATH, "/html/body/section/div[2]/div[2]/div[2]/div[2]/div/div[2]/button[1]")
 
-# Countdown (text looks like: “Next claim available at 2025/10/13 01:23 PM”)
+# Countdown text (e.g. “Next claim available at 2025/10/14 12:00 AM”)
 X_COUNTDOWN_TEXT = (By.XPATH, "/html/body/section/div[2]/div[2]/div[2]/div[2]/div/div[3]/p[1]")
 
-# Login/2FA bits (kept from your working auth)
+# Login / 2FA
 X_LOGIN_TAB = (By.ID, "tab-login")
 X_EMAIL     = (By.XPATH, "/html/body/div[1]/div/div[1]/div/div/div[1]/div/div[1]/div/div[2]/div[2]/div/div[1]/form[2]/div[1]/div/div/input")
 X_PASS      = (By.XPATH, "/html/body/div[1]/div/div[1]/div/div/div[1]/div/div[1]/div/div[2]/div[2]/div/div[1]/form[2]/div[2]/div/div/input")
@@ -43,25 +40,20 @@ X_2FA_INPUT = (By.XPATH, "/html/body/section/div[1]/div/div/input")
 # ───────────────────────────────────────────────────────────
 def _fmt_remaining(target_str: str) -> str:
     """
-    target_str is like '2025/10/13 01:23 PM' (from the page’s text)
-    Returns a human string: 'HH:MM:SS' or 'X days, HH:MM:SS'
+    Input like 'Next claim available at 2025/10/14 12:00 AM' → 'Next LuckyBird Bonus Available in: HH:MM:SS'
     """
-    # Normalize the label
-    target_str = target_str.replace("Next claim available at", "").strip()
-    # Parse: '%Y/%m/%d %I:%M %p'
+    raw = target_str.replace("Next claim available at", "").strip()
     try:
-        target_dt = datetime.datetime.strptime(target_str, "%Y/%m/%d %I:%M %p")
+        target_dt = datetime.datetime.strptime(raw, "%Y/%m/%d %I:%M %p")
     except Exception:
-        # If parse fails, just echo what we got
-        return f"Next LuckyBird Bonus Available at: {target_str}"
+        return f"Next LuckyBird Bonus Available at: {raw}"
 
     now = datetime.datetime.now()
     diff = target_dt - now
-    if diff.total_seconds() < 0:
-        return "Next LuckyBird Bonus Available in: 00:00:00"
+    total = max(int(diff.total_seconds()), 0)
 
-    days = diff.days
-    hours, rem = divmod(diff.seconds, 3600)
+    days, rem = divmod(total, 86400)
+    hours, rem = divmod(rem, 3600)
     minutes, seconds = divmod(rem, 60)
 
     if days == 0:
@@ -69,6 +61,7 @@ def _fmt_remaining(target_str: str) -> str:
     return f"Next LuckyBird Bonus Available in: {days} days, {hours:02}:{minutes:02}:{seconds:02}"
 
 async def _shot(channel, driver, name, caption):
+    """Only used for the 2FA prompt screenshot."""
     try:
         driver.save_screenshot(name)
         await channel.send(caption, file=discord.File(name))
@@ -77,54 +70,57 @@ async def _shot(channel, driver, name, caption):
         pass
 
 # ───────────────────────────────────────────────────────────
-# Claim flow: try to claim; if not, report countdown
+# Core flow (returns True if it posted a result; False if it couldn't reach UI)
 # ───────────────────────────────────────────────────────────
-async def luckybird_flow(ctx, driver, channel):
-    """Open LB → navigate to daily bonus card → claim if possible → else report countdown."""
+async def luckybird_flow(ctx, driver, channel) -> bool:
+    """
+    Navigate to daily bonus UI. If claimable → claim; else post countdown.
+    Returns:
+      True  = flow reached UI and posted a message (claimed OR countdown OR 'no timer').
+      False = couldn't open Buy tab or Daily Bonus card (likely needs auth).
+    """
     driver.get(LB_URL)
     await asyncio.sleep(3)
 
-    # Go to Buy tab
+    # Buy tab
     try:
-        buy = WebDriverWait(driver, 10).until(EC.element_to_be_clickable(X_BUY_TAB))
+        buy = WebDriverWait(driver, 8).until(EC.element_to_be_clickable(X_BUY_TAB))
         buy.click()
         await asyncio.sleep(0.8)
     except TimeoutException:
-        await channel.send("LuckyBird: couldn't open the Buy tab.")
-        await _shot(channel, driver, "lb_buy_tab_fail.png", "📸 Buy tab not reachable")
-        return
+        # Not even the Buy tab—treat as "needs auth"
+        return False
 
-    # Open Daily Bonus card
+    # Daily Bonus card
     try:
-        daily = WebDriverWait(driver, 10).until(EC.element_to_be_clickable(X_DAILY_BONUS))
+        daily = WebDriverWait(driver, 8).until(EC.element_to_be_clickable(X_DAILY_BONUS))
         daily.click()
         await asyncio.sleep(1)
     except TimeoutException:
-        await channel.send("LuckyBird: couldn't open the Daily Bonus card.")
-        await _shot(channel, driver, "lb_daily_card_fail.png", "📸 Daily bonus card not reachable")
-        return
+        # Couldn’t open the card → likely needs auth
+        return False
 
-    # Try to click "Claim" if available
+    # Try to claim
     try:
-        claim = WebDriverWait(driver, 6).until(EC.element_to_be_clickable(X_CLAIM_BUTTON))
+        claim = WebDriverWait(driver, 4).until(EC.element_to_be_clickable(X_CLAIM_BUTTON))
         claim.click()
-        await asyncio.sleep(1.5)
+        await asyncio.sleep(1.2)
         await channel.send("LuckyBird Daily Bonus Claimed!")
-        return
+        return True
     except TimeoutException:
-        # Not claimable → read the countdown
+        # Not claimable → read countdown
         pass
 
-    # Read countdown text and format
     try:
         cd_node = WebDriverWait(driver, 6).until(EC.presence_of_element_located(X_COUNTDOWN_TEXT))
-        msg = _fmt_remaining(cd_node.text)
-        await channel.send(msg)
+        await channel.send(_fmt_remaining(cd_node.text))
+        return True
     except TimeoutException:
         await channel.send("LuckyBird: neither Claim button nor countdown was found.")
+        return True
 
 # ───────────────────────────────────────────────────────────
-# Authentication (your working version, retained)
+# Authentication (single 2FA screenshot)
 # ───────────────────────────────────────────────────────────
 async def authenticate_luckybird(driver, bot, ctx, channel) -> bool:
     creds = os.getenv("LUCKYBIRD", "")
@@ -135,46 +131,42 @@ async def authenticate_luckybird(driver, bot, ctx, channel) -> bool:
 
     try:
         driver.get(LB_URL)
-        await asyncio.sleep(3)
+        await asyncio.sleep(2)
 
-        login_tab = WebDriverWait(driver, 12).until(EC.element_to_be_clickable(X_LOGIN_TAB))
+        login_tab = WebDriverWait(driver, 10).until(EC.element_to_be_clickable(X_LOGIN_TAB))
         login_tab.click()
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.6)
 
-        email_input = WebDriverWait(driver, 12).until(EC.presence_of_element_located(X_EMAIL))
-        email_input.clear()
-        email_input.send_keys(username_text)
-        await asyncio.sleep(0.3)
+        email_input = WebDriverWait(driver, 10).until(EC.presence_of_element_located(X_EMAIL))
+        email_input.clear(); email_input.send_keys(username_text)
+        await asyncio.sleep(0.2)
 
-        password_input = WebDriverWait(driver, 12).until(EC.presence_of_element_located(X_PASS))
-        password_input.clear()
-        password_input.send_keys(password_text)
-        await asyncio.sleep(0.3)
-
+        password_input = WebDriverWait(driver, 10).until(EC.presence_of_element_located(X_PASS))
+        password_input.clear(); password_input.send_keys(password_text)
+        await asyncio.sleep(0.2)
         password_input.send_keys(Keys.ENTER)
-        await asyncio.sleep(3)
+        await asyncio.sleep(2)
 
         # 2FA detection
-        twofa = False
+        needs_2fa = False
         try:
-            WebDriverWait(driver, 4).until(EC.presence_of_element_located(X_2FA_BTN))
-            twofa = True
+            WebDriverWait(driver, 3).until(EC.presence_of_element_located(X_2FA_BTN))
+            needs_2fa = True
         except TimeoutException:
             try:
                 WebDriverWait(driver, 2).until(EC.presence_of_element_located(X_2FA_INPUT))
-                twofa = True
+                needs_2fa = True
             except TimeoutException:
-                twofa = False
+                needs_2fa = False
 
-        if twofa:
+        if needs_2fa:
             await channel.send("2FA required. Please reply in this channel with your 6–8 digit code.")
-            await _shot(channel, driver, "lb_5_twofa.png", "📸 2FA prompt visible")
+            await _shot(channel, driver, "luckybird_2fa_prompt.png", "2FA prompt visible.")
 
-            # Event-based wait (provided in main.py’s on_message)
+            # Event-based wait (needs on_message in main.py)
             if not hasattr(bot, "_pending_2fa_event"):
                 bot._pending_2fa_event = asyncio.Event()
 
-            # Arm listener
             bot.awaiting_2fa_for = "luckybird"
             bot.pending_2fa_code = None
             try:
@@ -187,36 +179,50 @@ async def authenticate_luckybird(driver, bot, ctx, channel) -> bool:
                 code = bot.pending_2fa_code
             except asyncio.TimeoutError:
                 code = None
-
-            # cleanup
             bot.awaiting_2fa_for = None
 
             if not code:
                 await channel.send("Timed out waiting for LuckyBird 2FA code.")
-                await _shot(channel, driver, "lb_6_twofa_timeout.png", "📸 Still waiting at 2FA")
                 return False
 
             try:
                 twofa_input = WebDriverWait(driver, 10).until(EC.presence_of_element_located(X_2FA_INPUT))
-                twofa_input.clear()
-                twofa_input.send_keys(code)
-                await asyncio.sleep(0.6)
+                twofa_input.clear(); twofa_input.send_keys(code)
+                await asyncio.sleep(0.4)
                 twofa_input.send_keys(Keys.ENTER)
-                await asyncio.sleep(3)
-                await _shot(channel, driver, "lb_7_twofa_entered.png", "📸 2FA code submitted")
+                await asyncio.sleep(2)
             except TimeoutException:
-                await channel.send("Could not find the 2FA input field to type the code.")
-                await _shot(channel, driver, "lb_6_twofa_no_input.png", "📸 2FA input not found")
+                await channel.send("Could not find the 2FA input to type the code.")
                 return False
 
-        await _shot(channel, driver, "lb_8_post_login.png", "📸 Post-login state")
         return True
 
-    except TimeoutException as e:
+    except TimeoutException:
         await channel.send("LuckyBird login step timed out.")
-        await _shot(channel, driver, "lb_error_timeout.png", f"Timeout: {e}")
         return False
     except Exception as e:
         await channel.send(f"LuckyBird login failed. Error: {e}")
-        await _shot(channel, driver, "lb_error_generic.png", "Error state")
         return False
+
+# ───────────────────────────────────────────────────────────
+# Public entry point for the Discord command
+# ───────────────────────────────────────────────────────────
+async def luckybird_entry(ctx, driver, bot, channel):
+    """
+    Run the flow. If navigation fails (likely not logged in),
+    authenticate and retry the flow once.
+    """
+    # First attempt: try to post a result without forcing auth
+    ok = await luckybird_flow(ctx, driver, channel)
+    if ok:
+        return
+
+    # Flow couldn't reach UI → authenticate, then retry once
+    await channel.send("Authenticating LuckyBird...")
+    authed = await authenticate_luckybird(driver, bot, ctx, channel)
+    if not authed:
+        await channel.send("LuckyBird authentication failed.")
+        return
+
+    await channel.send("Authenticated. Checking daily bonus...")
+    _ = await luckybird_flow(ctx, driver, channel)  # Post whatever result it finds
