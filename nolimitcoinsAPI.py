@@ -360,7 +360,7 @@ async def auth_nolimit_google(driver, channel, ctx):
         # Back to main; wait for return to nolimitcoins
         driver.switch_to.window(main_handle)
         WebDriverWait(driver, 25).until(lambda d: "nolimitcoins.com" in (d.current_url or "").lower())
-        await asyncio.sleep(2)
+        await asyncio.sleep(5)
 
         await channel.send("Authenticated into NoLimitCoins!")
     except Exception:

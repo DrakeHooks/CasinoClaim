@@ -104,10 +104,13 @@ driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), opti
 # Discord bot
 # ───────────────────────────────────────────────────────────
 bot = commands.Bot(command_prefix='!', intents=intents, case_insensitive=True)
-bot.remove_command("help")
+# after bot = commands.Bot(...)
+bot.awaiting_2fa_for = None        # site name we're waiting for, e.g. "luckybird"
+bot.pending_2fa_code = None        # the captured code (string) when available
+bot._pending_2fa_event = asyncio.Event()  # event used to wake up waiting coroutine
 
-bot.luckybird_2fa_code = None
-bot.chumba_2fa_code = None
+bot.remove_command("help")
+# bot.two_fa_code = None  # Variable to store the 2FA code
 
 # Authentication flags
 auth_status = {
@@ -290,17 +293,61 @@ async def googleauth(ctx):
 
 @bot.event
 async def on_message(message):
-    """Capture 2FA codes for LuckyBird and Chumba."""
+    """Capture 2FA codes posted in the bot channel."""
     if message.channel.id == DISCORD_CHANNEL:
-        content = message.content.strip()
-        if len(content) == 6 and content.isdigit():
-            if "luckybird" in message.content.lower():
-                bot.luckybird_2fa_code = content
-                print(f"LuckyBird 2FA code {bot.luckybird_2fa_code} received.")
-            elif "chumba" in message.content.lower():
-                bot.chumba_2fa_code = content
-                print(f"Chumba 2FA code {bot.chumba_2fa_code} received.")
+        text = message.content.strip()
+
+        # Accept 5–8 digit numeric codes (covers most sites)
+        if text.isdigit() and 5 <= len(text) <= 8:
+            # Event-driven path (preferred)
+            if getattr(bot, "awaiting_2fa_for", None):
+                bot.pending_2fa_code = text
+                try:
+                    bot._pending_2fa_event.set()
+                except Exception:
+                    # first-run safety
+                    bot._pending_2fa_event = asyncio.Event()
+                    bot._pending_2fa_event.set()
+            else:
+                # Legacy fallback if nobody is actively waiting
+                bot.two_fa_code = text
+                print(f"[2FA] Stored code (legacy): {bot.two_fa_code}")
+
     await bot.process_commands(message)
+
+
+
+async def wait_for_2fa(site_name: str, timeout: int = 90) -> Optional[str]:
+    """
+    Wait for a 2FA code for `site_name` up to `timeout` seconds.
+    Returns the captured code (string) or None if timed out.
+    Ensures only one waiter runs at a time.
+    """
+    # guard: don't let concurrent waits run
+    if bot.awaiting_2fa_for:
+        # someone else is already waiting
+        return None
+
+    bot.awaiting_2fa_for = site_name
+    bot.pending_2fa_code = None
+    # recreate/reset the event
+    bot._pending_2fa_event = asyncio.Event()
+
+    try:
+        # Wait until event is set or timeout
+        await asyncio.wait_for(bot._pending_2fa_event.wait(), timeout=timeout)
+    except asyncio.TimeoutError:
+        # timed out
+        code = None
+    else:
+        code = bot.pending_2fa_code
+
+    # cleanup
+    bot.awaiting_2fa_for = None
+    bot.pending_2fa_code = None
+    # ensure event is cleared for next use
+    bot._pending_2fa_event = asyncio.Event()
+    return code
 
 # ── Site Commands ──────────────────────────────────────────
 @bot.command(name="chumba")
@@ -374,11 +421,37 @@ async def chanced(ctx):
 
 @bot.command(name="luckybird")
 async def luckybird(ctx):
-    await ctx.send("Checking Luckybird for bonus...")
+    """Single entry point:
+       1) Authenticate (handles 2FA via on_message capture)
+       2) Claim if available, else report countdown."""
+    global luckybird_task
     channel = bot.get_channel(DISCORD_CHANNEL)
-    bonus_claimed = await luckyBird_claim(driver, bot, ctx, channel)
-    if not bonus_claimed:
-        await extract_countdown_info(driver, bot, ctx, channel)
+
+    # prevent double-runs
+    if luckybird_task and not luckybird_task.done():
+        await ctx.send("LuckyBird automation is already running.")
+        return
+
+    async def _run():
+        try:
+            await ctx.send("🔐 Authenticating LuckyBird…")
+            ok = await authenticate_luckybird(driver, bot, ctx, channel)
+            if not ok:
+                await ctx.send("LuckyBird authentication failed.")
+                return
+            await ctx.send("🎁 Authenticated! Checking daily bonus…")
+            await luckybird_flow(ctx, driver, channel)
+        except Exception as e:
+            # Always send a screenshot if something goes wrong
+            snap = "luckybird_unexpected.png"
+            try:
+                driver.save_screenshot(snap)
+                await ctx.send(f"Unexpected LuckyBird error: {e}", file=discord.File(snap))
+                os.remove(snap)
+            except Exception:
+                await ctx.send(f"Unexpected LuckyBird error: {e}")
+
+    luckybird_task = asyncio.create_task(_run())
 
 @bot.command(name="globalpoker")
 async def global_poker_command(ctx):
@@ -593,21 +666,32 @@ async def casino_loop():
         except Exception:
             print("Error in NoLimitCoins")
         await asyncio.sleep(30)
-
-
         try:
             await funrize_flow(None, driver, channel)
         except Exception:
             print("Error in Funrize")
-
-        await asyncio.sleep(30)
-
+        await asyncio.sleep(10)
+        try:
+            await global_poker(None, driver, channel)
+            await asyncio.sleep(10)
+        except Exception:
+            print("Error in GlobalPoker")
+        await asyncio.sleep(10)
+        try:
+            await jefebet_casino(None, driver, channel)
+        except Exception:
+            print("Error in JefeBet")
+        await asyncio.sleep(10)
+        try:
+            await luckybird_flow(None, driver, channel)
+        except Exception:
+            print("Error in LuckyBird")
+        await asyncio.sleep(10)
         try:
             await crowncoins_casino(driver, bot, None, channel)
         except Exception:
             print("Error in CrownCoinsCasino")
         await asyncio.sleep(30)
-
         try:
             bonus_claimed = await claim_modo_bonus(driver, bot, None, channel)
             if not bonus_claimed:
@@ -618,31 +702,9 @@ async def casino_loop():
 
         await asyncio.sleep(10)
         try:
-            await global_poker(None, driver, channel)
-            await asyncio.sleep(10)
-        except Exception:
-            print("Error in GlobalPoker")
-        await asyncio.sleep(10)
-
-        try:
-            bonus_claimed = await luckyBird_claim(driver, bot, None, channel)
-            if not bonus_claimed:
-                await extract_countdown_info(driver, bot, None, channel)
-        except Exception:
-            print("Error in LuckyBird")
-        await asyncio.sleep(10)
-
-        try:
             await rolling_riches_casino(None, driver, channel)
         except Exception:
             print("Error in RollingRiches")
-
-        try:
-            await jefebet_casino(None, driver, channel)
-        except Exception:
-            print("Error in JefeBet")
-
-        await asyncio.sleep(10)
         try:
             await stake_claim(driver, bot, None, channel)
         except Exception:
@@ -651,6 +713,12 @@ async def casino_loop():
     except Exception as e:
         print(f"Error in loop: {str(e)}")
 
+
+
+
+# ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+# Loop ran on 8 hour intervals. Helpful for casinos without countdowns or missing logic for countdown.
+# ───────────────────────────────────────────────────────────────────────────────────────────────────────────
 @tasks.loop(hours=8)
 async def eighthour_loop():
     print("Starting Eight Hour Loop")
@@ -667,7 +735,7 @@ async def eighthour_loop():
     except Exception as e:
         print(f"Error in loop: {str(e)}")
 
-# ───────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────────────────────────────────────────────────────────────────
 # Run bot
-# ───────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────────────────────────────────────────────────────────────────
 bot.run(DISCORD_TOKEN)
