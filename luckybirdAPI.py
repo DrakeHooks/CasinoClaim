@@ -145,7 +145,8 @@ async def authenticate_luckybird(driver, bot, ctx, channel) -> bool:
         password_input.clear(); password_input.send_keys(password_text)
         await asyncio.sleep(0.2)
         password_input.send_keys(Keys.ENTER)
-        await asyncio.sleep(2)
+        await asyncio.sleep(5)
+        await _shot(channel, driver, "luckybird_login.png", "Luckybird credentials entered.")
 
         # 2FA detection
         needs_2fa = False
