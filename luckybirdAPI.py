@@ -136,7 +136,7 @@ async def authenticate_luckybird(driver, bot, ctx, channel) -> bool:
         login_tab = WebDriverWait(driver, 10).until(EC.element_to_be_clickable(X_LOGIN_TAB))
         login_tab.click()
         await asyncio.sleep(2)
-        await _shot(channel, driver, "luckybird_login1.png", "Luckybird credentials entered.")
+        await _shot(channel, driver, "luckybird_login.png", "Luckybird credentials entered.")
 
         email_input = WebDriverWait(driver, 10).until(EC.presence_of_element_located(X_EMAIL))
         email_input.clear(); email_input.send_keys(username_text)
