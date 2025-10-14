@@ -35,6 +35,7 @@ import importlib
 # Dynamic API imports
 # ───────────────────────────────────────────────────────────
 api_modules = [
+    "fortunewheelzAPI",
     "stakeAPI",
     "modoAPI",
     "googleauthAPI",
@@ -136,6 +137,7 @@ spinpals_task = None
 spinquest_task = None
 funrize_task = None
 sportzino_task = None
+fortunewheelz_task = None
 
 # Running flags
 chanced_casino_running = False
@@ -153,7 +155,7 @@ spinquest_running = False
 funrize_running = False
 funrize_running = False
 sportzino_running = False
-
+fortunewheelz_running = False
 # ───────────────────────────────────────────────────────────
 # Bot events
 # ───────────────────────────────────────────────────────────
@@ -246,7 +248,7 @@ async def help_cmd(ctx):
     !sportzino - Check Sportzino for bonus
     !fortunecoins - Check Fortunecoins for bonus
     !nolimitcoins - Check NoLimitCoins for bonus
-
+    !fortunewheelz - Check Fortune Wheelz for bonus
     ---------------------------------------
     ⚙️ General Commands:                             
     !ping - Check if the bot is online
@@ -401,6 +403,17 @@ async def funrize(ctx):
         await funrize_flow(ctx, driver, channel)
     else:
         await ctx.send("Funrize automation is already running.")
+
+@bot.command(name="FortuneWheelz")
+async def fortunewheelz(ctx):
+    global fortunewheelz_task
+    if not fortunewheelz_task or fortunewheelz_task.done():
+        await ctx.send("Checking Fortune Wheelz for Bonus...")
+        channel = bot.get_channel(DISCORD_CHANNEL)
+        await fortunewheelz_flow(ctx, driver, channel)
+    else:
+        await ctx.send("Fortune Wheelz automation is already running.")
+
 
 @bot.command(name="Stake")
 async def stake(ctx):
@@ -658,7 +671,7 @@ async def casino_loop():
             await jefebet_casino(None, driver, channel)
         except Exception:
             print("Error in JefeBet")
-        await asyncio.sleep(10)
+        await asyncio.sleep(30)
         try:
             await luckybird_entry(None, driver, channel)
         except Exception:
@@ -705,10 +718,13 @@ async def eighthour_loop():
         return
     try:
         try:
+            await fortunewheelz_flow(None, driver, channel)
+        except Exception:
+            print("Error in FortuneWheelz")            
+        try:
             await spinquest_flow(None, driver, channel)
         except Exception:
             print("Error in SpinQuest")
-
     except Exception as e:
         print(f"Error in loop: {str(e)}")
 
