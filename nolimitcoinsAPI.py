@@ -182,7 +182,7 @@ def switch_to_accounts_google_popup(driver, timeout=20):
 
         if chooser:
             break
-        time.sleep(0.25)
+        time.sleep(5)
 
     if not chooser:
         # One last pass over all existing handles before giving up
@@ -237,7 +237,7 @@ async def nolimitcoins_flow(ctx, driver, channel):
             await send_screenshot(channel, driver)
         return
 
-    await asyncio.sleep(1)
+    await asyncio.sleep(5)
     dismiss_overlay(driver)
 
     # Step 2: Collect (modal)
@@ -274,7 +274,7 @@ async def auth_nolimit_env(driver, channel, ctx):
 
         email_input = wait_present(driver, By.XPATH, "/html/body/div[1]/div/div[1]/div/form/label[1]/div/div[2]/input", 20)
         email_input.send_keys(username)
-        await asyncio.sleep(0.2)
+        await asyncio.sleep(2)
 
         password_input = wait_present(driver, By.XPATH, "/html/body/div[1]/div/div[1]/div/form/label[2]/div/input", 20)
         password_input.send_keys(password)
@@ -292,7 +292,7 @@ async def auth_nolimit_env(driver, channel, ctx):
 # ───────────────────────────────────────────────────────────
 async def check_nolimitcoins_countdown(ctx, driver, channel):
     driver.get(STORE_URL)
-    await asyncio.sleep(2)
+    await asyncio.sleep(5)
     cd = read_countdown_from_div(driver)
     if cd:
         await channel.send(f"Next No Limit Coins Bonus Available in: {cd}")
@@ -316,7 +316,7 @@ async def auth_nolimit_env(driver, channel, ctx):
 
         email_input = wait_present(driver, By.NAME, "email", 8)
         email_input.send_keys(username)
-        await asyncio.sleep(0.2)
+        await asyncio.sleep(2)
 
         password_input = wait_present(driver, By.NAME, "password", 8)
         password_input.send_keys(password)
@@ -337,7 +337,7 @@ async def auth_nolimit_google(driver, channel, ctx):
     """
     try:
         driver.get(SIGNIN_URL)
-        await asyncio.sleep(2)
+        await asyncio.sleep(5)
 
         google_btn = WebDriverWait(driver, 15).until(
             EC.element_to_be_clickable((By.XPATH, "/html/body/div[1]/div/div[1]/div/form/div[1]/button[2]"))
