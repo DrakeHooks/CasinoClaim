@@ -311,7 +311,7 @@ async def check_nolimitcoins_countdown(ctx, driver, channel):
 async def auth_nolimit_env(driver, channel, ctx):
     try:
         driver.get(SIGNIN_URL)
-        await asyncio.sleep(2)
+        await asyncio.sleep(3)
 
         creds = os.getenv("NOLIMITCOINS")
         if not creds:
@@ -321,13 +321,13 @@ async def auth_nolimit_env(driver, channel, ctx):
 
         email_input = wait_present(driver, By.NAME, "email", 8)
         email_input.send_keys(username)
-        await asyncio.sleep(2)
+        await asyncio.sleep(3)
 
         password_input = wait_present(driver, By.NAME, "password", 8)
         password_input.send_keys(password)
         password_input.send_keys(Keys.ENTER)
 
-        await asyncio.sleep(2)
+        await asyncio.sleep(3)
         await send_screenshot(channel, driver)
         await channel.send("Authenticated into NoLimitCoins!")
     except Exception:
