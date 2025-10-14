@@ -348,7 +348,7 @@ async def auth_nolimit_google(driver, channel, ctx):
         main_handle, chooser_handle = switch_to_accounts_google_popup(driver, timeout=22)
         driver.switch_to.window(chooser_handle)
 
-        if not click_first_google_account(driver, timeout=12):
+        if not click_first_google_account(driver, timeout=30):
             raise TimeoutException("Could not click first Google account")
 
         # Back to main; wait for return to nolimitcoins
