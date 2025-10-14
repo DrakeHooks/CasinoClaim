@@ -135,18 +135,19 @@ async def authenticate_luckybird(driver, bot, ctx, channel) -> bool:
 
         login_tab = WebDriverWait(driver, 10).until(EC.element_to_be_clickable(X_LOGIN_TAB))
         login_tab.click()
-        await asyncio.sleep(0.6)
+        await asyncio.sleep(2)
+        await _shot(channel, driver, "luckybird_login1.png", "Luckybird credentials entered.")
 
         email_input = WebDriverWait(driver, 10).until(EC.presence_of_element_located(X_EMAIL))
         email_input.clear(); email_input.send_keys(username_text)
-        await asyncio.sleep(0.2)
+        await asyncio.sleep(2)
 
         password_input = WebDriverWait(driver, 10).until(EC.presence_of_element_located(X_PASS))
         password_input.clear(); password_input.send_keys(password_text)
-        await asyncio.sleep(0.2)
+        await asyncio.sleep(2)
         password_input.send_keys(Keys.ENTER)
         await asyncio.sleep(5)
-        await _shot(channel, driver, "luckybird_login.png", "Luckybird credentials entered.")
+        await _shot(channel, driver, "luckybird_login2.png", "Luckybird credentials entered.")
 
         # 2FA detection
         needs_2fa = False
