@@ -633,6 +633,10 @@ async def casino_loop():
         return
 
     try:
+        try:
+            await luckybird_entry(None, driver, channel)
+        except Exception:
+            print("Error in LuckyBird")
         # Run the casino tasks sequentially with sleeps between
         try:
             await asyncio.sleep(40)
@@ -672,10 +676,7 @@ async def casino_loop():
         except Exception:
             print("Error in JefeBet")
         await asyncio.sleep(30)
-        try:
-            await luckybird_entry(None, driver, channel)
-        except Exception:
-            print("Error in LuckyBird")
+
         await asyncio.sleep(10)
         try:
             await crowncoins_casino(driver, bot, None, channel)
