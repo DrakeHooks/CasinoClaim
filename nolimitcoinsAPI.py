@@ -342,15 +342,15 @@ async def auth_nolimit_google(driver, channel, ctx):
     """
     try:
         driver.get(SIGNIN_URL)
-        await asyncio.sleep(5)
+        await asyncio.sleep(10)
 
-        google_btn = WebDriverWait(driver, 15).until(
+        google_btn = WebDriverWait(driver, 30).until(
             EC.element_to_be_clickable((By.XPATH, "/html/body/div[1]/div/div[1]/div/form/div[1]/button[2]"))
         )
         safe_click(driver, google_btn)
 
         # Switch to the true chooser (wait even if promo shows first)
-        main_handle, chooser_handle = switch_to_accounts_google_popup(driver, timeout=22)
+        main_handle, chooser_handle = switch_to_accounts_google_popup(driver, timeout=30)
         driver.switch_to.window(chooser_handle)
 
         if not click_first_google_account(driver, timeout=30):
@@ -358,7 +358,7 @@ async def auth_nolimit_google(driver, channel, ctx):
 
         # Back to main; wait for return to nolimitcoins
         driver.switch_to.window(main_handle)
-        WebDriverWait(driver, 25).until(lambda d: "nolimitcoins.com" in (d.current_url or "").lower())
+        WebDriverWait(driver, 30).until(lambda d: "nolimitcoins.com" in (d.current_url or "").lower())
         await asyncio.sleep(5)
 
         await channel.send("Authenticated into NoLimitCoins!")
