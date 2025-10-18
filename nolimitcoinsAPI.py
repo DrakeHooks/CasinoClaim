@@ -25,20 +25,15 @@ STORE_URL  = "https://nolimitcoins.com/promotions"
 SIGNIN_URL = "https://nolimitcoins.com/signin/"
 
 # After opening the store: first click a "Claim / Claim Reward" styled button…
-CLAIM_REWARD_XPATHS = [
-    (By.XPATH, "/html/body/div[1]/div/main/div/div[3]/div[5]/div[2]/div/button"),
+CLAIM_REWARD_SELECTORS = [
+    (By.CSS_SELECTOR, "button.a-button.primary.size-md.btn:not(.disabled)"),
+    (By.CSS_SELECTOR, "button[data-v-895f4e2b]:not(.disabled)"),
 ]
 
 # …then click one of these "Collect" buttons in the modal.
 CLAIM_XPATHS = [
-    "/html/body/div[1]/div/div/div/button",
-    "/html/body/div[2]/div/div/div/button",
-    "/html/body/div[3]/div/div/div/button",
     "/html/body/div[3]/div/div/div/button",
     "/html/body/div[4]/div/div/div/button",
-    "/html/body/div[5]/div/div/div/button",
-    "/html/body/div[6]/div/div/div/button",
-    "/html/body/div[7]/div/div/div/button"
 ]
 
 # Read countdown from this DIV (provided path)
@@ -233,7 +228,7 @@ async def nolimitcoins_flow(ctx, driver, channel):
     dismiss_overlay(driver)
 
     # Step 1: Claim/Claim Reward
-    if not try_click_any(driver, CLAIM_REWARD_XPATHS, timeout_each=5):
+    if not try_click_any(driver, CLAIM_REWARD_SELECTORS, timeout_each=5):
         cd = read_countdown_from_div(driver)
         if cd:
             await channel.send(f"Next No Limit Coins Bonus Available in: {cd}")
@@ -311,7 +306,7 @@ async def check_nolimitcoins_countdown(ctx, driver, channel):
 async def auth_nolimit_env(driver, channel, ctx):
     try:
         driver.get(SIGNIN_URL)
-        await asyncio.sleep(3)
+        await asyncio.sleep(2)
 
         creds = os.getenv("NOLIMITCOINS")
         if not creds:
@@ -321,13 +316,13 @@ async def auth_nolimit_env(driver, channel, ctx):
 
         email_input = wait_present(driver, By.NAME, "email", 8)
         email_input.send_keys(username)
-        await asyncio.sleep(3)
+        await asyncio.sleep(2)
 
         password_input = wait_present(driver, By.NAME, "password", 8)
         password_input.send_keys(password)
         password_input.send_keys(Keys.ENTER)
 
-        await asyncio.sleep(3)
+        await asyncio.sleep(2)
         await send_screenshot(channel, driver)
         await channel.send("Authenticated into NoLimitCoins!")
     except Exception:
