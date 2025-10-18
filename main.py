@@ -52,8 +52,8 @@ api_modules = [
     "zulaAPI",
     "luckybirdAPI",
     "sportzinoAPI",
-    "nolimitcoinsAPI",   # ← NoLimitCoins
-    "smilescasinoAPI",   # ← Smiles Casino
+    "nolimitcoinsAPI",          # ← NoLimitCoins
+    "smilescasinoAPI",          # ← Smiles Casino
 ]
 
 for module_name in api_modules:
