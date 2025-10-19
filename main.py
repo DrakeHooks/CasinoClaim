@@ -499,7 +499,7 @@ async def sportzino(ctx):
     channel = bot.get_channel(DISCORD_CHANNEL)
     await Sportzino(ctx, driver, channel)
 
-@bot.command(name="nolimitcoins", aliases=["nlc"])
+@bot.command(name="nolimitcoins", aliases=["nlc","nolimit", "no limit coins"])
 async def nolimitcoins(ctx):
     """Check NoLimitCoins for a claim or report the countdown."""
     await ctx.send("Checking NoLimitCoins for bonus...")
