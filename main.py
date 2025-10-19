@@ -3,12 +3,15 @@
 # Never Miss a Casino Bonus Again! A discord app for claiming social casino bonuses.
 
 import os
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 import time
 import re
 import sqlite3
 import discord
 import asyncio
+import traceback
+from functools import wraps
 
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
@@ -25,9 +28,10 @@ import datetime
 from dotenv import load_dotenv
 import undetected_chromedriver as uc
 from discord import Intents, Client, Message
-from discord.ext import commands, tasks
+from discord.ext import commands
 from seleniumbase import Driver
 from selenium.webdriver.common.action_chains import ActionChains
+from typing import Awaitable, Callable, List, Optional
 
 import importlib
 
@@ -167,6 +171,239 @@ funrize_running = False
 funrize_running = False
 sportzino_running = False
 fortunewheelz_running = False
+
+# ───────────────────────────────────────────────────────────
+# Casino loop configuration
+# ───────────────────────────────────────────────────────────
+
+
+@dataclass
+class CasinoLoopEntry:
+    key: str
+    display_name: str
+    runner: Callable[[discord.abc.Messageable], Awaitable[None]]
+    interval_minutes: float
+    next_run: datetime = field(default_factory=lambda: datetime.utcnow())
+
+    def interval_seconds(self) -> float:
+        return self.interval_minutes * 60
+
+    def schedule_next(self) -> None:
+        self.next_run = datetime.utcnow() + timedelta(seconds=self.interval_seconds())
+
+
+async def _run_luckybird(channel: discord.abc.Messageable) -> None:
+    await luckybird_entry(None, driver, bot, channel)
+
+
+async def _run_zula(channel: discord.abc.Messageable) -> None:
+    await zula_casino(None, driver, channel)
+
+
+async def _run_sportzino(channel: discord.abc.Messageable) -> None:
+    await Sportzino(None, driver, channel)
+
+
+async def _run_nolimitcoins(channel: discord.abc.Messageable) -> None:
+    await nolimitcoins_flow(None, driver, channel)
+
+
+async def _run_funrize(channel: discord.abc.Messageable) -> None:
+    await funrize_flow(None, driver, channel)
+
+
+async def _run_global_poker(channel: discord.abc.Messageable) -> None:
+    await global_poker(None, driver, channel)
+
+
+async def _run_jefebet(channel: discord.abc.Messageable) -> None:
+    await jefebet_casino(None, driver, channel)
+
+
+async def _run_crowncoins(channel: discord.abc.Messageable) -> None:
+    await crowncoins_casino(driver, bot, None, channel)
+
+
+async def _run_modo(channel: discord.abc.Messageable) -> None:
+    bonus_claimed = await claim_modo_bonus(driver, bot, None, channel)
+    if not bonus_claimed:
+        await check_modo_countdown(driver, bot, None, channel)
+
+
+async def _run_rolling_riches(channel: discord.abc.Messageable) -> None:
+    await rolling_riches_casino(None, driver, channel)
+
+
+async def _run_stake(channel: discord.abc.Messageable) -> None:
+    await stake_claim(driver, bot, None, channel)
+
+
+async def _run_fortunewheelz(channel: discord.abc.Messageable) -> None:
+    await fortunewheelz_flow(None, driver, channel)
+
+
+async def _run_spinquest(channel: discord.abc.Messageable) -> None:
+    await spinquest_flow(None, driver, channel)
+
+
+LOOP_STAGGER_SECONDS = 30
+
+casino_loop_entries: List[CasinoLoopEntry] = [
+    CasinoLoopEntry("luckybird", "LuckyBird", _run_luckybird, 120),
+    CasinoLoopEntry("zula", "Zula Casino", _run_zula, 120),
+    CasinoLoopEntry("sportzino", "Sportzino", _run_sportzino, 120),
+    CasinoLoopEntry("nolimitcoins", "NoLimitCoins", _run_nolimitcoins, 120),
+    CasinoLoopEntry("funrize", "Funrize", _run_funrize, 120),
+    CasinoLoopEntry("globalpoker", "GlobalPoker", _run_global_poker, 120),
+    CasinoLoopEntry("jefebet", "JefeBet", _run_jefebet, 120),
+    CasinoLoopEntry("crowncoins", "CrownCoinsCasino", _run_crowncoins, 120),
+    CasinoLoopEntry("modo", "Modo", _run_modo, 120),
+    CasinoLoopEntry("rollingriches", "Rolling Riches", _run_rolling_riches, 120),
+    CasinoLoopEntry("stake", "Stake", _run_stake, 120),
+    CasinoLoopEntry("fortunewheelz", "Fortune Wheelz", _run_fortunewheelz, 480),
+    CasinoLoopEntry("spinquest", "SpinQuest", _run_spinquest, 480),
+]
+
+main_loop_task: Optional[asyncio.Task] = None
+main_loop_running: bool = False
+
+MANUAL_CASINO_COMMANDS = {
+    "chumba",
+    "rollingriches",
+    "jefebet",
+    "spinpals",
+    "spinquest",
+    "funrize",
+    "fortunewheelz",
+    "stake",
+    "chanced",
+    "luckybird",
+    "globalpoker",
+    "crowncoins",
+    "dingdingding",
+    "modo",
+    "zula",
+    "sportzino",
+    "nolimitcoins",
+}
+
+
+def casino_command_handler(display_name: str):
+    """Decorator to keep casino command tracebacks in the logs only."""
+
+    def decorator(func: Callable):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            ctx = args[0] if args else kwargs.get("ctx")
+            try:
+                return await func(*args, **kwargs)
+            except Exception as exc:
+                print(f"[{display_name}] Error during command: {exc}")
+                traceback.print_exc()
+
+        return wrapper
+
+    return decorator
+
+
+def reset_loop_schedule() -> None:
+    base_time = datetime.utcnow()
+    for index, entry in enumerate(casino_loop_entries):
+        entry.next_run = base_time + timedelta(seconds=index * LOOP_STAGGER_SECONDS)
+
+
+def get_loop_entry(key: str) -> Optional[CasinoLoopEntry]:
+    key_lower = key.lower()
+    for entry in casino_loop_entries:
+        if entry.key.lower() == key_lower:
+            return entry
+    return None
+
+
+def format_loop_config() -> str:
+    status = "running" if is_main_loop_running() else "stopped"
+    lines = [
+        "🎰 **Casino loop configuration**",
+        f"Status: **{status}**",
+        "Order and intervals:",
+    ]
+    for idx, entry in enumerate(casino_loop_entries, start=1):
+        lines.append(
+            f"{idx}. {entry.display_name} (`{entry.key}`) – every {entry.interval_minutes:.1f} minutes"
+        )
+    lines.append("")
+    lines.append("Use `!config interval <casino> <minutes>` to change an interval.")
+    lines.append(
+        "Use `!config order <casino1> <casino2> ...>` to set a new run order."
+    )
+    return "\n".join(lines)
+
+
+def is_main_loop_running() -> bool:
+    return main_loop_running and main_loop_task is not None and not main_loop_task.done()
+
+
+async def run_main_loop(channel: discord.abc.Messageable) -> None:
+    global main_loop_running
+    try:
+        while main_loop_running:
+            for entry in casino_loop_entries:
+                now = datetime.utcnow()
+                if now >= entry.next_run:
+                    try:
+                        await entry.runner(channel)
+                    except Exception as exc:
+                        print(f"[Loop] Error while running {entry.display_name}: {exc}")
+                        traceback.print_exc()
+                    finally:
+                        entry.schedule_next()
+            await asyncio.sleep(5)
+    except asyncio.CancelledError:
+        pass
+    finally:
+        main_loop_running = False
+
+
+async def start_main_loop(channel: Optional[discord.abc.Messageable] = None) -> bool:
+    global main_loop_task, main_loop_running
+    if is_main_loop_running():
+        return False
+    if channel is None:
+        channel = bot.get_channel(DISCORD_CHANNEL)
+    if channel is None:
+        print("[Loop] Unable to start main loop – channel not found.")
+        return False
+    reset_loop_schedule()
+    main_loop_running = True
+    main_loop_task = asyncio.create_task(run_main_loop(channel))
+    return True
+
+
+async def stop_main_loop() -> bool:
+    global main_loop_task, main_loop_running
+    if not is_main_loop_running():
+        return False
+    main_loop_running = False
+    if main_loop_task:
+        main_loop_task.cancel()
+        try:
+            await main_loop_task
+        except asyncio.CancelledError:
+            pass
+    main_loop_task = None
+    return True
+
+
+@bot.check
+async def prevent_manual_casino_commands(ctx: commands.Context) -> bool:
+    if ctx.command is None:
+        return True
+    if is_main_loop_running() and ctx.command.name.lower() in MANUAL_CASINO_COMMANDS:
+        await ctx.send(
+            "The automated casino loop is running. Use `!stop` before manually checking casinos."
+        )
+        return False
+    return True
 # ───────────────────────────────────────────────────────────
 # Bot events
 # ───────────────────────────────────────────────────────────
@@ -182,15 +419,89 @@ async def on_ready():
 
     # Start loops
     await asyncio.sleep(60)
-    if not casino_loop.is_running():
-        casino_loop.start()
-    await asyncio.sleep(1800)
-    if not eighthour_loop.is_running():
-        eighthour_loop.start()
+    if await start_main_loop(channel):
+        try:
+            await channel.send("Casino loop started with current configuration.")
+        except Exception:
+            pass
 
 # ───────────────────────────────────────────────────────────
 # Commands
 # ───────────────────────────────────────────────────────────
+
+
+@bot.command(name="start")
+async def start_loop_command(ctx: commands.Context):
+    started = await start_main_loop()
+    if started:
+        await ctx.send("Casino loop started.")
+    elif is_main_loop_running():
+        await ctx.send("Casino loop is already running.")
+    else:
+        await ctx.send("Casino loop could not start. Check the configured channel.")
+
+
+@bot.command(name="stop")
+async def stop_loop_command(ctx: commands.Context):
+    stopped = await stop_main_loop()
+    if stopped:
+        await ctx.send("Casino loop stopped. You can run manual casino commands now.")
+    else:
+        await ctx.send("Casino loop is not currently running.")
+
+
+@bot.group(name="config", invoke_without_command=True)
+async def config_group(ctx: commands.Context):
+    await ctx.send(format_loop_config())
+
+
+@config_group.command(name="interval")
+async def config_interval(ctx: commands.Context, casino: str, minutes: float):
+    entry = get_loop_entry(casino)
+    if entry is None:
+        await ctx.send(f"Casino `{casino}` is not part of the automated loop.")
+        return
+    if minutes <= 0:
+        await ctx.send("Interval must be greater than zero.")
+        return
+    entry.interval_minutes = minutes
+    entry.next_run = datetime.utcnow()
+    await ctx.send(
+        f"Updated {entry.display_name} to run every {minutes:.1f} minutes."
+    )
+
+
+@config_group.command(name="order")
+async def config_order(ctx: commands.Context, *casinos: str):
+    if not casinos:
+        await ctx.send(
+            "Provide the complete list of casino keys in the desired order."
+        )
+        return
+    desired_order = [name.lower() for name in casinos]
+    current_keys = [entry.key for entry in casino_loop_entries]
+    if len(desired_order) != len(current_keys):
+        await ctx.send(
+            "You must specify every casino exactly once when reordering the loop."
+        )
+        return
+    if set(desired_order) != set(current_keys):
+        missing = set(current_keys) - set(desired_order)
+        extra = set(desired_order) - set(current_keys)
+        parts = []
+        if missing:
+            parts.append("missing: " + ", ".join(sorted(missing)))
+        if extra:
+            parts.append("unknown: " + ", ".join(sorted(extra)))
+        await ctx.send("Unable to reorder – " + "; ".join(parts))
+        return
+    lookup = {entry.key: entry for entry in casino_loop_entries}
+    new_order = [lookup[key] for key in desired_order]
+    casino_loop_entries[:] = new_order
+    reset_loop_schedule()
+    await ctx.send("Casino loop order updated.\n" + format_loop_config())
+
+
 @bot.command(name="ping")
 async def ping(ctx):
     await ctx.send("Pong")
@@ -263,10 +574,12 @@ async def help_cmd(ctx):
     ---------------------------------------
     ⚙️ General Commands:                             
     !ping - Check if the bot is online
-    !restart - Restart the bot     
+    !restart - Restart the bot
     !help - Display the available commands
-    !captcha - Open the captcha solver extension page            
-    !stop - Stop the bot               
+    !captcha - Open the captcha solver extension page
+    !start - Start the automated casino loop
+    !stop - Stop the automated casino loop
+    !config - View or edit the casino loop order and intervals
 
     ---------------------------------------
     ✅ Auth Commands:
@@ -365,6 +678,7 @@ async def wait_for_2fa(site_name: str, timeout: int = 90) -> Optional[str]:
 
 # ── Site Commands ──────────────────────────────────────────
 @bot.command(name="chumba")
+@casino_command_handler("Chumba")
 async def chumba(ctx):
     await ctx.send("Checking Chumba for Bonus...")
     driver.get("https://lobby.chumbacasino.com/")
@@ -382,30 +696,35 @@ async def chumba(ctx):
         await ctx.send("Failed to reach the Chumba lobby.")
 
 @bot.command(name="RollingRiches")
+@casino_command_handler("Rolling Riches")
 async def rollingriches(ctx):
     await ctx.send("Checking Rolling Riches for Bonus...")
     channel = bot.get_channel(DISCORD_CHANNEL)
     await rolling_riches_casino(ctx, driver, channel)
 
 @bot.command(name="JefeBet")
+@casino_command_handler("JefeBet")
 async def jefebet(ctx):
     await ctx.send("Checking JefeBet for Bonus...")
     channel = bot.get_channel(DISCORD_CHANNEL)
     await jefebet_casino(ctx, driver, channel)
 
 @bot.command(name="SpinPals")
+@casino_command_handler("SpinPals")
 async def spinpals(ctx):
     await ctx.send("Checking SpinPals for Bonus...")
     channel = bot.get_channel(DISCORD_CHANNEL)
     await spinpals_flow(ctx, driver, channel)
 
 @bot.command(name="SpinQuest")
+@casino_command_handler("SpinQuest")
 async def spinquest(ctx):
     await ctx.send("Checking SpinQuest for Bonus...")
     channel = bot.get_channel(DISCORD_CHANNEL)
     await spinquest_flow(ctx, driver, channel)
 
 @bot.command(name="Funrize")
+@casino_command_handler("Funrize")
 async def funrize(ctx):
     global funrize_task
     if not funrize_task or funrize_task.done():
@@ -416,6 +735,7 @@ async def funrize(ctx):
         await ctx.send("Funrize automation is already running.")
 
 @bot.command(name="FortuneWheelz")
+@casino_command_handler("Fortune Wheelz")
 async def fortunewheelz(ctx):
     global fortunewheelz_task
     if not fortunewheelz_task or fortunewheelz_task.done():
@@ -427,12 +747,14 @@ async def fortunewheelz(ctx):
 
 
 @bot.command(name="Stake")
+@casino_command_handler("Stake")
 async def stake(ctx):
     await ctx.send("Checking Stake for Bonus...")
     channel = bot.get_channel(DISCORD_CHANNEL)
     await stake_claim(driver, bot, ctx, channel)
 
 @bot.command(name="chanced")
+@casino_command_handler("Chanced")
 async def chanced(ctx):
     await ctx.send("Checking Chanced.com for Bonus...")
     chanced_credentials = os.getenv("CHANCED")
@@ -445,34 +767,37 @@ async def chanced(ctx):
     await chanced_casino(ctx, driver, channel, credentials)
 
 @bot.command(name="luckybird")
+@casino_command_handler("LuckyBird")
 async def luckybird_command(ctx):
     """Run LuckyBird: auth if needed, then claim or report countdown."""
     channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
     await ctx.send("Checking LuckyBird or Bonus...")
-    try:
-        await luckybird_entry(ctx, driver, bot, channel)
-    except Exception as e:
-        await channel.send(f"Error running LuckyBird command: {e}")
+    await luckybird_entry(ctx, driver, bot, channel)
 
 @bot.command(name="globalpoker")
+@casino_command_handler("GlobalPoker")
 async def global_poker_command(ctx):
     global globalpoker_running
     if not globalpoker_running:
         await ctx.send("Checking GlobalPoker for Bonus...")
         globalpoker_running = True
         channel = bot.get_channel(DISCORD_CHANNEL)
-        await global_poker(ctx, driver, channel)
-        globalpoker_running = False
+        try:
+            await global_poker(ctx, driver, channel)
+        finally:
+            globalpoker_running = False
     else:
         await ctx.send("GlobalPoker automation is already running.")
 
 @bot.command(name="CrownCoins")
+@casino_command_handler("Crown Coins Casino")
 async def crowncoinscasino(ctx):
     await ctx.send("Checking Crown Coins Casino for Bonus...")
     channel = bot.get_channel(DISCORD_CHANNEL)
     await crowncoins_casino(driver, bot, ctx, channel)
 
 @bot.command(name="dingdingding")
+@casino_command_handler("DingDingDing")
 async def DingDingDing(ctx):
     await ctx.send("Checking DingDingDing for bonus...")
     channel = bot.get_channel(DISCORD_CHANNEL)
@@ -481,6 +806,7 @@ async def DingDingDing(ctx):
         await check_dingdingding_countdown(driver, bot, ctx, channel)
 
 @bot.command(name="modo")
+@casino_command_handler("Modo")
 async def modo(ctx):
     await ctx.send("Checking Modo for bonus...")
     channel = bot.get_channel(DISCORD_CHANNEL)
@@ -489,17 +815,20 @@ async def modo(ctx):
         await check_modo_countdown(driver, bot, ctx, channel)
 
 @bot.command(name="Zula")
+@casino_command_handler("Zula")
 async def zula(ctx):
     await ctx.send("Checking Zula Casino for Bonus...")
     await zula_casino(driver, bot, ctx)
 
 @bot.command(name="Sportzino")
+@casino_command_handler("Sportzino")
 async def sportzino(ctx):
     await ctx.send("Checking Sportzino for Bonus...")
     channel = bot.get_channel(DISCORD_CHANNEL)
     await Sportzino(ctx, driver, channel)
 
 @bot.command(name="nolimitcoins", aliases=["nlc"])
+@casino_command_handler("NoLimitCoins")
 async def nolimitcoins(ctx):
     """Check NoLimitCoins for a claim or report the countdown."""
     await ctx.send("Checking NoLimitCoins for bonus...")
@@ -630,118 +959,6 @@ async def authenticate_command(ctx, site: str, method: str = None):
 
 
 
-
-# ───────────────────────────────────────────────────────────
-# Loops
-# ───────────────────────────────────────────────────────────
-@tasks.loop(hours=2)
-async def casino_loop():
-    print("Starting casino_loop...")
-
-    channel = bot.get_channel(DISCORD_CHANNEL)
-    if channel is None:
-        print(f"Error: Invalid channel ID '{DISCORD_CHANNEL}' or bot is not connected.")
-        return
-
-    try:
-        try:
-            await luckybird_entry(None, driver, channel)
-            await asyncio.sleep(30)
-        except Exception:
-            print("Error in LuckyBird")
-            await asyncio.sleep(10)
-
-        # Run the casino tasks sequentially with sleeps between
-        try:
-            await asyncio.sleep(40)
-            await zula_casino(None, driver, channel)
-        except Exception:
-            print("Error in Zula")
-            await asyncio.sleep(50)
-        await asyncio.sleep(80)
-
-        try:
-            await Sportzino(None, driver, channel)
-            await asyncio.sleep(50)
-        except Exception:
-            print("Error in Sportzino")
-            await asyncio.sleep(50)
-        await asyncio.sleep(80)
-
-        # NoLimitCoins run
-        try:
-            await nolimitcoins_flow(None, driver, channel)
-        except Exception:
-            print("Error in NoLimitCoins")
-        await asyncio.sleep(10)
-        try:
-            await funrize_flow(None, driver, channel)
-        except Exception:
-            print("Error in Funrize")
-        await asyncio.sleep(10)
-        try:
-            await global_poker(None, driver, channel)
-            await asyncio.sleep(10)
-        except Exception:
-            print("Error in GlobalPoker")
-        await asyncio.sleep(10)
-        try:
-            await jefebet_casino(None, driver, channel)
-        except Exception:
-            print("Error in JefeBet")
-        await asyncio.sleep(30)
-
-        await asyncio.sleep(10)
-        try:
-            await crowncoins_casino(driver, bot, None, channel)
-        except Exception:
-            print("Error in CrownCoinsCasino")
-        await asyncio.sleep(30)
-        try:
-            bonus_claimed = await claim_modo_bonus(driver, bot, None, channel)
-            if not bonus_claimed:
-                await check_modo_countdown(driver, bot, None, channel)
-        except Exception:
-            print("Error in Modo")
-        await asyncio.sleep(100)
-
-        await asyncio.sleep(10)
-        try:
-            await rolling_riches_casino(None, driver, channel)
-        except Exception:
-            print("Error in RollingRiches")
-        try:
-            await stake_claim(driver, bot, None, channel)
-        except Exception:
-            print("Error in Stake")
-
-    except Exception as e:
-        print(f"Error in loop: {str(e)}")
-
-
-
-
-# ───────────────────────────────────────────────────────────────────────────────────────────────────────────
-# Loop ran on 8 hour intervals. Helpful for casinos without countdowns or missing logic for countdown.
-# ───────────────────────────────────────────────────────────────────────────────────────────────────────────
-@tasks.loop(hours=8)
-async def eighthour_loop():
-    print("Starting Eight Hour Loop")
-    channel = bot.get_channel(DISCORD_CHANNEL)
-    if channel is None:
-        print(f"Error: Invalid channel ID '{DISCORD_CHANNEL}' or bot is not connected.")
-        return
-    try:
-        try:
-            await fortunewheelz_flow(None, driver, channel)
-        except Exception:
-            print("Error in FortuneWheelz")            
-        try:
-            await spinquest_flow(None, driver, channel)
-        except Exception:
-            print("Error in SpinQuest")
-    except Exception as e:
-        print(f"Error in loop: {str(e)}")
 
 # ───────────────────────────────────────────────────────────────────────────────────────────────────────────
 # Run bot
