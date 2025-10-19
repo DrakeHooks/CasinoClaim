@@ -1,54 +1,52 @@
 # Use Ubuntu 22.04 as the base image
-FROM ubuntu:latest
+FROM ubuntu:22.04
 
-# Install necessary packages
+ENV DEBIAN_FRONTEND=noninteractive
+
+# … keep what you already have …
 RUN apt-get update && apt-get install -y \
-    xvfb \
-    x11vnc \
-    fluxbox \
-    wget \
-    unzip \
-    gnupg2 \
-    software-properties-common \
-    apt-utils \
-    ca-certificates \
-    python3 \
-    python3-venv \
-    python3-pip \
+    xvfb x11vnc fluxbox x11-apps x11-utils \
+    wget gnupg2 ca-certificates apt-transport-https \
+    python3 python3-venv python3-pip xdg-utils locales \
+    # ↓↓↓ add these for SeleniumBase GUI captcha / PyAutoGUI
+    python3-tk python3-dev python3-xlib scrot xclip xsel wmctrl \
+    libxtst6 libxi6 \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Chrome
-RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - && \
-    sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list' && \
+
+# 2) Google Chrome
+RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-linux-signing-keyring.gpg && \
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-linux-signing-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
+      > /etc/apt/sources.list.d/google-chrome.list && \
     apt-get update && apt-get install -y google-chrome-stable && \
     rm -rf /var/lib/apt/lists/*
 
-# Set the working directory to the root of the project
+# (Optional) remove enterprise policies
+RUN rm -rf /etc/opt/chrome/policies /etc/chromium/policies || true
+
+# 3) App files
 WORKDIR /app
+COPY requirements.txt /app/requirements.txt
+COPY main.py /app/main.py
+# If you need the crx available to Python, keep this:
+COPY CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx /temp/CAPTCHA-Solver.crx
 
-# Copy the .crx file to a temporary directory
-COPY ./CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx /temp/CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx
-
-# Copy the google-chrome directory to a temporary directory
-# COPY ./google-chrome /temp/google-chrome
-
-# Copy the entire project to /app in the container
-COPY . /app
-
-# Create virtual environment and install Python dependencies
+# 4) Python env
 RUN python3 -m venv /venv && \
-    /venv/bin/pip install --no-cache-dir -r /app/requirements.txt
+    /venv/bin/pip install --no-cache-dir -r /app/requirements.txt && \
+    /venv/bin/pip install --no-cache-dir brotli
 
-# Install common utilities
-RUN apt-get update && apt-get install -y xdg-utils ca-certificates
+ENV PATH="/venv/bin:${PATH}"
 
-# Ensure the lock file is removed on every container start
-RUN echo '#!/bin/bash\nrm -f /tmp/.X99-lock\nexec "$@"' > /usr/local/bin/docker-entrypoint.sh && chmod +x /usr/local/bin/docker-entrypoint.sh
+# 5) Entrypoint script (handles X locks + VNC + unique user-data-dir)
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
-# Set environment variables
-ENV PATH="/venv/bin:$PATH"
+# 6) Defaults for headed Chrome
 ENV DISPLAY=:99
+# Root for persistent Chrome profiles; compose will mount a volume here
+ENV CHROME_USER_DATA_DIR=/data/chrome
+ENV CHROME_PROFILE_DIR=Default
 
-# Start Xvfb, fluxbox, and x11vnc, ensuring no lock conflicts
-CMD ["/usr/local/bin/docker-entrypoint.sh", "bash", "-c", "Xvfb :99 -screen 0 1920x1080x24 & fluxbox & x11vnc -forever -usepw -create -display :99 & /venv/bin/python /app/main.py"]
+ENTRYPOINT ["/bin/bash","-lc","/app/entrypoint.sh"]

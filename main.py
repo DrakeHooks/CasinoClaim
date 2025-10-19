@@ -3,35 +3,47 @@
 # Never Miss a Casino Bonus Again! A discord app for claiming social casino bonuses.
 
 import os
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-import time
+import glob
 import re
+import time
 import sqlite3
 import discord
 import asyncio
 import traceback
+import datetime
+from dataclasses import dataclass, field
+from datetime import datetime as dt, timedelta
 from functools import wraps
+from typing import Awaitable, Callable, List, Optional
 
+from dotenv import load_dotenv
+
+# Selenium / Chrome
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from webdriver_manager.chrome import ChromeDriverManager
 
-import datetime
-from dotenv import load_dotenv
-import undetected_chromedriver as uc
+# Discord bot
 from discord import Intents, Client, Message
 from discord.ext import commands
-from seleniumbase import Driver
-from selenium.webdriver.common.action_chains import ActionChains
-from typing import Awaitable, Callable, List, Optional
+
+# Optional libs already in your repo
+import undetected_chromedriver as uc  # (kept for other modules using it)
+from seleniumbase import Driver       # (unused here but kept to avoid breaking other imports)
+
+# Bring in your new UC module for Fortune Coins (local-tested logic)
+try:
+    from fortunecoinsSB import fortunecoins_uc
+except Exception as _e:
+    # Keep the main bot running even if this module is missing
+    print(f"[warn] fortunecoinsSB import failed: {_e}")
 
 import importlib
 
@@ -56,7 +68,7 @@ api_modules = [
     "zulaAPI",
     "luckybirdAPI",
     "sportzinoAPI",
-    "nolimitcoinsAPI",   # ← NoLimitCoins
+    "nolimitcoinsAPI",
 ]
 
 for module_name in api_modules:
@@ -78,42 +90,62 @@ intents = Intents.default()
 intents.message_content = True
 
 # ───────────────────────────────────────────────────────────
-# Selenium driver
+# Selenium driver (headed, under Xvfb provided by entrypoint)
 # ───────────────────────────────────────────────────────────
 caps = DesiredCapabilities.CHROME
 caps["goog:loggingPrefs"] = {"performance": "ALL"}
 
 options = Options()
-options.add_argument('--ignore-certificate-errors')
-options.add_argument('--ignore-ssl-errors')
-options.add_argument("disable-infobars")
-options.add_argument('--disable-blink-features=AutomationControlled')
-options.add_argument('--no-sandbox')
-user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit(537.36) (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
-options.add_argument(f"--user-agent={user_agent}")
 
-# --- Persistent Chrome profile. Useful for sites that have social auth. (optional) ---
-USER_DATA_DIR = os.getenv("CHROME_USER_DATA_DIR", "").strip()   # e.g. /data/chrome  (Docker) or C:\bot\chrome
-PROFILE_DIR   = os.getenv("CHROME_PROFILE_DIR", "Default").strip()  # Chrome profile folder name
+# Prefer instance-scoped profile prepared by entrypoint (no collisions)
+instance_dir = os.getenv("CHROME_INSTANCE_DIR", "").strip()
+profile_dir = os.getenv("CHROME_PROFILE_DIR", "Default").strip()
 
-if USER_DATA_DIR:
-    try:
-        os.makedirs(USER_DATA_DIR, exist_ok=True)
-        options.add_argument(f"--user-data-dir={USER_DATA_DIR}")
-        options.add_argument(f"--profile-directory={PROFILE_DIR}")   # usually "Default"
-        print(f"[Chrome] Using persistent profile: {USER_DATA_DIR} ({PROFILE_DIR})")
-    except Exception as e:
-        print(f"[Chrome] Failed to set user-data-dir; continuing without persistence: {e}")
+if instance_dir:
+    os.makedirs(os.path.join(instance_dir, profile_dir), exist_ok=True)
+    for p in glob.glob(os.path.join(instance_dir, profile_dir, "Singleton*")):
+        try:
+            os.remove(p)
+        except Exception:
+            pass
+    options.add_argument(f"--user-data-dir={instance_dir}")
+    options.add_argument(f"--profile-directory={profile_dir}")
 else:
-    print("[Chrome] CHROME_USER_DATA_DIR not set — using ephemeral session.")
+    # Legacy persistent profile (only if instance_dir is NOT set)
+    user_data_root = os.getenv("CHROME_USER_DATA_DIR", "").strip()
+    if user_data_root:
+        try:
+            os.makedirs(user_data_root, exist_ok=True)
+            options.add_argument(f"--user-data-dir={user_data_root}")
+            options.add_argument(f"--profile-directory={profile_dir}")
+            print(f"[Chrome] Using persistent profile: {user_data_root} ({profile_dir})")
+        except Exception as e:
+            print(f"[Chrome] Failed to set user-data-dir; continuing without persistence: {e}")
+    else:
+        print("[Chrome] No CHROME_INSTANCE_DIR / CHROME_USER_DATA_DIR — using ephemeral session.")
 
-options.add_argument("--window-size=1920,1080")
+# Headed/X quirks & safety
+options.add_argument(f"--remote-debugging-port={9222 + (os.getpid() % 1000)}")
 options.add_argument("--no-first-run")
+options.add_argument("--no-default-browser-check")
+options.add_argument("--disable-dev-shm-usage")
+
+# Your existing flags
+options.add_argument("--ignore-certificate-errors")
+options.add_argument("--ignore-ssl-errors")
+options.add_argument("disable-infobars")
+options.add_argument("--disable-blink-features=AutomationControlled")
+options.add_argument("--no-sandbox")
+options.add_argument("--window-size=1920,1080")
 options.set_capability("goog:loggingPrefs", caps["goog:loggingPrefs"])
 options.add_argument("--allow-geolocation")
 options.add_argument("--disable-features=DisableLoadExtensionCommandLineSwitch")
 options.add_argument("--enable-third-party-cookies")
-options.add_argument('--disable-notifications')
+options.add_argument("--disable-notifications")
+
+# UA pin (you can update to match your Chrome)
+user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit(537.36) (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
+options.add_argument(f"--user-agent={user_agent}")
 
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
@@ -121,13 +153,13 @@ driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), opti
 # Discord bot
 # ───────────────────────────────────────────────────────────
 bot = commands.Bot(command_prefix='!', intents=intents, case_insensitive=True)
-# after bot = commands.Bot(...)
-bot.awaiting_2fa_for = None        # site name we're waiting for, e.g. "luckybird"
-bot.pending_2fa_code = None        # the captured code (string) when available
-bot._pending_2fa_event = asyncio.Event()  # event used to wake up waiting coroutine
+
+# State for 2FA capture
+bot.awaiting_2fa_for = None
+bot.pending_2fa_code = None
+bot._pending_2fa_event = asyncio.Event()
 
 bot.remove_command("help")
-# bot.two_fa_code = None  # Variable to store the 2FA code
 
 # Authentication flags
 auth_status = {
@@ -168,7 +200,6 @@ jefebet_running = False
 spinpals_running = False
 spinquest_running = False
 funrize_running = False
-funrize_running = False
 sportzino_running = False
 fortunewheelz_running = False
 
@@ -176,75 +207,60 @@ fortunewheelz_running = False
 # Casino loop configuration
 # ───────────────────────────────────────────────────────────
 
-
 @dataclass
 class CasinoLoopEntry:
     key: str
     display_name: str
     runner: Callable[[discord.abc.Messageable], Awaitable[None]]
     interval_minutes: float
-    next_run: datetime = field(default_factory=lambda: datetime.utcnow())
+    next_run: dt = field(default_factory=lambda: dt.utcnow())
 
     def interval_seconds(self) -> float:
         return self.interval_minutes * 60
 
     def schedule_next(self) -> None:
-        self.next_run = datetime.utcnow() + timedelta(seconds=self.interval_seconds())
-
+        self.next_run = dt.utcnow() + timedelta(seconds=self.interval_seconds())
 
 async def _run_luckybird(channel: discord.abc.Messageable) -> None:
     await luckybird_entry(None, driver, bot, channel)
 
-
 async def _run_zula(channel: discord.abc.Messageable) -> None:
     await zula_casino(None, driver, channel)
-
 
 async def _run_sportzino(channel: discord.abc.Messageable) -> None:
     await Sportzino(None, driver, channel)
 
-
 async def _run_nolimitcoins(channel: discord.abc.Messageable) -> None:
     await nolimitcoins_flow(None, driver, channel)
-
 
 async def _run_funrize(channel: discord.abc.Messageable) -> None:
     await funrize_flow(None, driver, channel)
 
-
 async def _run_global_poker(channel: discord.abc.Messageable) -> None:
     await global_poker(None, driver, channel)
-
 
 async def _run_jefebet(channel: discord.abc.Messageable) -> None:
     await jefebet_casino(None, driver, channel)
 
-
 async def _run_crowncoins(channel: discord.abc.Messageable) -> None:
     await crowncoins_casino(driver, bot, None, channel)
-
 
 async def _run_modo(channel: discord.abc.Messageable) -> None:
     bonus_claimed = await claim_modo_bonus(driver, bot, None, channel)
     if not bonus_claimed:
         await check_modo_countdown(driver, bot, None, channel)
 
-
 async def _run_rolling_riches(channel: discord.abc.Messageable) -> None:
     await rolling_riches_casino(None, driver, channel)
-
 
 async def _run_stake(channel: discord.abc.Messageable) -> None:
     await stake_claim(driver, bot, None, channel)
 
-
 async def _run_fortunewheelz(channel: discord.abc.Messageable) -> None:
     await fortunewheelz_flow(None, driver, channel)
 
-
 async def _run_spinquest(channel: discord.abc.Messageable) -> None:
     await spinquest_flow(None, driver, channel)
-
 
 LOOP_STAGGER_SECONDS = 30
 
@@ -287,12 +303,10 @@ MANUAL_CASINO_COMMANDS = {
     "nolimitcoins",
 }
 
-
 def reset_loop_schedule() -> None:
-    base_time = datetime.utcnow()
+    base_time = dt.utcnow()
     for index, entry in enumerate(casino_loop_entries):
         entry.next_run = base_time + timedelta(seconds=index * LOOP_STAGGER_SECONDS)
-
 
 def get_loop_entry(key: str) -> Optional[CasinoLoopEntry]:
     key_lower = key.lower()
@@ -300,7 +314,6 @@ def get_loop_entry(key: str) -> Optional[CasinoLoopEntry]:
         if entry.key.lower() == key_lower:
             return entry
     return None
-
 
 def format_loop_config() -> str:
     status = "running" if is_main_loop_running() else "stopped"
@@ -315,31 +328,25 @@ def format_loop_config() -> str:
         )
     lines.append("")
     lines.append("Use `!config interval <casino> <minutes>` to change an interval.")
-    lines.append(
-        "Use `!config order <casino1> <casino2> ...>` to set a new run order."
-    )
+    lines.append("Use `!config order <casino1> <casino2> ...>` to set a new run order.")
     return "\n".join(lines)
-
 
 def is_main_loop_running() -> bool:
     return main_loop_running and main_loop_task is not None and not main_loop_task.done()
-
 
 async def run_main_loop(channel: discord.abc.Messageable) -> None:
     global main_loop_running
     try:
         while main_loop_running:
             for entry in casino_loop_entries:
-                now = datetime.utcnow()
+                now = dt.utcnow()
                 if now >= entry.next_run:
                     try:
                         await entry.runner(channel)
                     except Exception as exc:
                         print(f"[Loop] Error while running {entry.display_name}: {exc}")
                         try:
-                            print(
-                                f"⚠️ Error while running {entry.display_name}: {exc}"
-                            )
+                            print(f"⚠️ Error while running {entry.display_name}: {exc}")
                         except Exception:
                             pass
                     finally:
@@ -349,7 +356,6 @@ async def run_main_loop(channel: discord.abc.Messageable) -> None:
         pass
     finally:
         main_loop_running = False
-
 
 async def start_main_loop(channel: Optional[discord.abc.Messageable] = None) -> bool:
     global main_loop_task, main_loop_running
@@ -365,7 +371,6 @@ async def start_main_loop(channel: Optional[discord.abc.Messageable] = None) -> 
     main_loop_task = asyncio.create_task(run_main_loop(channel))
     return True
 
-
 async def stop_main_loop() -> bool:
     global main_loop_task, main_loop_running
     if not is_main_loop_running():
@@ -380,7 +385,6 @@ async def stop_main_loop() -> bool:
     main_loop_task = None
     return True
 
-
 @bot.check
 async def prevent_manual_casino_commands(ctx: commands.Context) -> bool:
     if ctx.command is None:
@@ -391,6 +395,7 @@ async def prevent_manual_casino_commands(ctx: commands.Context) -> bool:
         )
         return False
     return True
+
 # ───────────────────────────────────────────────────────────
 # Bot events
 # ───────────────────────────────────────────────────────────
@@ -416,7 +421,6 @@ async def on_ready():
 # Commands
 # ───────────────────────────────────────────────────────────
 
-
 @bot.command(name="start")
 async def start_loop_command(ctx: commands.Context):
     started = await start_main_loop()
@@ -427,7 +431,6 @@ async def start_loop_command(ctx: commands.Context):
     else:
         await ctx.send("Casino loop could not start. Check the configured channel.")
 
-
 @bot.command(name="stop")
 async def stop_loop_command(ctx: commands.Context):
     stopped = await stop_main_loop()
@@ -436,11 +439,9 @@ async def stop_loop_command(ctx: commands.Context):
     else:
         await ctx.send("Casino loop is not currently running.")
 
-
 @bot.group(name="config", invoke_without_command=True)
 async def config_group(ctx: commands.Context):
     await ctx.send(format_loop_config())
-
 
 @config_group.command(name="interval")
 async def config_interval(ctx: commands.Context, casino: str, minutes: float):
@@ -452,25 +453,18 @@ async def config_interval(ctx: commands.Context, casino: str, minutes: float):
         await ctx.send("Interval must be greater than zero.")
         return
     entry.interval_minutes = minutes
-    entry.next_run = datetime.utcnow()
-    await ctx.send(
-        f"Updated {entry.display_name} to run every {minutes:.1f} minutes."
-    )
-
+    entry.next_run = dt.utcnow()
+    await ctx.send(f"Updated {entry.display_name} to run every {minutes:.1f} minutes.")
 
 @config_group.command(name="order")
 async def config_order(ctx: commands.Context, *casinos: str):
     if not casinos:
-        await ctx.send(
-            "Provide the complete list of casino keys in the desired order."
-        )
+        await ctx.send("Provide the complete list of casino keys in the desired order.")
         return
     desired_order = [name.lower() for name in casinos]
     current_keys = [entry.key for entry in casino_loop_entries]
     if len(desired_order) != len(current_keys):
-        await ctx.send(
-            "You must specify every casino exactly once when reordering the loop."
-        )
+        await ctx.send("You must specify every casino exactly once when reordering the loop.")
         return
     if set(desired_order) != set(current_keys):
         missing = set(current_keys) - set(desired_order)
@@ -487,7 +481,6 @@ async def config_order(ctx: commands.Context, *casinos: str):
     casino_loop_entries[:] = new_order
     reset_loop_schedule()
     await ctx.send("Casino loop order updated.\n" + format_loop_config())
-
 
 @bot.command(name="ping")
 async def ping(ctx):
@@ -514,28 +507,18 @@ async def captcha(ctx):
 async def about(ctx):
     """Show the exact Chrome build that SeleniumBase UC is running."""
     await ctx.send("🔍 Retrieving Chrome version …")
-
-    # 1) open the internal diagnostics page
     driver.get("chrome://version/")
-    await asyncio.sleep(2)          # small wait so the DOM is ready
-
-    # 2) pull the <span id="version"> text
+    await asyncio.sleep(2)
     try:
         version_raw = driver.find_element(By.ID, "version").text
-        # chrome://version/ puts lots of info; grab first word ⇒ "138.0.7204.157"
         version_num = version_raw.split()[0]
     except Exception:
         version_num = "unknown 🤷"
-
-    # 3) screenshot for extra context / troubleshooting
     snap = "chrome_version.png"
     driver.save_screenshot(snap)
-
     await ctx.send(f"🧩 **Chrome build running inside the bot:** `{version_num}`",
                    file=discord.File(snap))
-
     os.remove(snap)
-
 
 @bot.command(name="help")
 async def help_cmd(ctx):
@@ -610,90 +593,62 @@ async def on_message(message):
     """Capture 2FA codes posted in the bot channel."""
     if message.channel.id == DISCORD_CHANNEL:
         text = message.content.strip()
-
         # Accept 5–8 digit numeric codes (covers most sites)
         if text.isdigit() and 5 <= len(text) <= 8:
-            # Event-driven path (preferred)
             if getattr(bot, "awaiting_2fa_for", None):
                 bot.pending_2fa_code = text
                 try:
                     bot._pending_2fa_event.set()
                 except Exception:
-                    # first-run safety
                     bot._pending_2fa_event = asyncio.Event()
                     bot._pending_2fa_event.set()
             else:
-                # Legacy fallback if nobody is actively waiting
                 bot.two_fa_code = text
                 print(f"[2FA] Stored code (legacy): {bot.two_fa_code}")
-
     await bot.process_commands(message)
 
-
-
 async def wait_for_2fa(site_name: str, timeout: int = 90) -> Optional[str]:
-    """
-    Wait for a 2FA code for `site_name` up to `timeout` seconds.
-    Returns the captured code (string) or None if timed out.
-    Ensures only one waiter runs at a time.
-    """
-    # guard: don't let concurrent waits run
+    """Wait for a 2FA code up to `timeout` seconds; ensures only one waiter at a time."""
     if bot.awaiting_2fa_for:
-        # someone else is already waiting
         return None
-
     bot.awaiting_2fa_for = site_name
     bot.pending_2fa_code = None
-    # recreate/reset the event
     bot._pending_2fa_event = asyncio.Event()
-
     try:
-        # Wait until event is set or timeout
         await asyncio.wait_for(bot._pending_2fa_event.wait(), timeout=timeout)
     except asyncio.TimeoutError:
-        # timed out
         code = None
     else:
         code = bot.pending_2fa_code
-
-    # cleanup
     bot.awaiting_2fa_for = None
     bot.pending_2fa_code = None
-    # ensure event is cleared for next use
     bot._pending_2fa_event = asyncio.Event()
     return code
-
-# ── Site Commands ──────────────────────────────────────────
 
 # ───────────────────────────────────────────────────────────
 # Decorator for casino commands (simple error wrapper + nice message)
 # ───────────────────────────────────────────────────────────
-from functools import wraps
-import traceback
-
 def casino_command_handler(display_name: str):
     """Wrap a bot command so errors are caught and reported nicely."""
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            # First arg is usually ctx for discord.py commands
             ctx = args[0] if args else None
             try:
                 return await func(*args, **kwargs)
             except asyncio.CancelledError:
-                # let cancellations bubble out cleanly
                 raise
             except Exception as e:
-                # log + notify channel without killing the bot
                 traceback.print_exc()
                 if ctx is not None:
                     try:
-                        await print(f"⚠️ {display_name} error: {e}")
+                        await ctx.send(f"⚠️ {display_name} error: {e}")
                     except Exception:
                         pass
         return wrapper
     return decorator
 
+# ── Site Commands ──────────────────────────────────────────
 
 @bot.command(name="chumba")
 @casino_command_handler("Chumba")
@@ -763,7 +718,6 @@ async def fortunewheelz(ctx):
     else:
         await ctx.send("Fortune Wheelz automation is already running.")
 
-
 @bot.command(name="Stake")
 @casino_command_handler("Stake")
 async def stake(ctx):
@@ -787,7 +741,6 @@ async def chanced(ctx):
 @bot.command(name="luckybird")
 @casino_command_handler("LuckyBird")
 async def luckybird_command(ctx):
-    """Run LuckyBird: auth if needed, then claim or report countdown."""
     channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
     await ctx.send("Checking LuckyBird or Bonus...")
     await luckybird_entry(ctx, driver, bot, channel)
@@ -853,15 +806,21 @@ async def nolimitcoins(ctx):
     channel = bot.get_channel(DISCORD_CHANNEL)
     await nolimitcoins_flow(ctx, driver, channel)
 
+# New: UC-headed SeleniumBase Fortune Coins command (kept separate from normal flow)
+@bot.command(name="fortunecoins_uc")
+async def fortunecoins_uc_cmd(ctx):
+    channel = bot.get_channel(DISCORD_CHANNEL)
+    if 'fortunecoins_uc' in globals():
+        await fortunecoins_uc(ctx, channel)
+    else:
+        await ctx.send("Fortune Coins UC module not available on this build.")
+
 # ── Auth router ────────────────────────────────────────────
 @bot.command(name="auth")
 async def authenticate_command(ctx, site: str, method: str = None):
     channel = bot.get_channel(DISCORD_CHANNEL)
-
-    # Normalize site name (e.g., "no limit coins" -> "nolimitcoins")
     norm_site = re.sub(r"\s+", "", site.lower())
 
-    # 1) Global Google auth: !auth google
     if norm_site == "google":
         await ctx.send("Authenticating Google Account...")
         google_credentials = os.getenv("GOOGLE_LOGIN")
@@ -874,7 +833,6 @@ async def authenticate_command(ctx, site: str, method: str = None):
         await google_auth(ctx, driver, channel, credentials)
         return
 
-    # 2) CrownCoins
     elif norm_site == "crowncoins":
         if method is None:
             await ctx.send("Please specify the authentication method: `google` or `env`.")
@@ -898,7 +856,6 @@ async def authenticate_command(ctx, site: str, method: str = None):
         else:
             await ctx.send("Invalid authentication method. Use `google` or `env`.")
 
-    # 3) DingDingDing
     elif norm_site == "dingdingding":
         await ctx.send("Authenticating DingDingDing...")
         ok = await authenticate_dingdingding(driver, bot, ctx, channel)
@@ -908,7 +865,6 @@ async def authenticate_command(ctx, site: str, method: str = None):
             await ctx.send("Authentication failed. Unable to proceed.", file=discord.File(screenshot_path))
             os.remove(screenshot_path)
 
-    # 4) Modo
     elif norm_site == "modo":
         await ctx.send("Authenticating Modo...")
         ok = await authenticate_modo(driver, bot, ctx, channel)
@@ -918,7 +874,6 @@ async def authenticate_command(ctx, site: str, method: str = None):
             await ctx.send("Modo authentication failed. Unable to proceed.", file=discord.File(screenshot_path))
             os.remove(screenshot_path)
 
-    # 5) Stake
     elif norm_site == "stake":
         await ctx.send("Authenticating Stake...")
         ok = await stake_auth(driver, bot, ctx, channel)
@@ -928,7 +883,6 @@ async def authenticate_command(ctx, site: str, method: str = None):
             await ctx.send("Stake authentication failed. Unable to proceed.", file=discord.File(screenshot_path))
             os.remove(screenshot_path)
 
-    # 6) LuckyBird
     elif norm_site == "luckybird":
         await ctx.send("Authenticating LuckyBird...")
         ok = await authenticate_luckybird(driver, bot, ctx, channel)
@@ -938,29 +892,22 @@ async def authenticate_command(ctx, site: str, method: str = None):
             await ctx.send("LuckyBird authentication failed. Unable to proceed.", file=discord.File(screenshot_path))
             os.remove(screenshot_path)
 
-    # 7) NoLimitCoins (supports multiple aliases)
-    elif norm_site in {"nolimit", "nolimitcoins", "nlc", "no limit coins"}:
+    elif norm_site in {"nolimit", "nolimitcoins", "nlc", "nolimitcoins"}:
         if method is None:
             await ctx.send("Please specify the authentication method: `google` or `env`.")
             return
-
         if method.lower() == "google":
             await ctx.send("Authenticating NoLimitCoins using Google...")
             ok = await auth_nolimit_google(driver, channel, ctx)
-            if ok:
-                print("NoLimitCoins authentication via Google succeeded.")
-            else:
+            if not ok:
                 screenshot_path = "nolimit_google_auth_failed.png"
                 driver.save_screenshot(screenshot_path)
                 await ctx.send("", file=discord.File(screenshot_path))
                 os.remove(screenshot_path)
-
         elif method.lower() == "env":
             await ctx.send("Authenticating NoLimitCoins using .env credentials...")
             ok = await auth_nolimit_env(driver, channel, ctx)
-            if ok:
-                print("NoLimitCoins authentication via .env credentials succeeded.")
-            else:
+            if not ok:
                 screenshot_path = "nolimit_env_auth_failed.png"
                 driver.save_screenshot(screenshot_path)
                 await ctx.send("", file=discord.File(screenshot_path))
@@ -968,17 +915,10 @@ async def authenticate_command(ctx, site: str, method: str = None):
         else:
             await ctx.send("Invalid authentication method. Use `google` or `env`.")
 
-    # 8) Unknown
     else:
         await ctx.send(f"Authentication for '{site}' is not implemented.")
 
-
-
-
-
-
-
-# ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 # Run bot
-# ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 bot.run(DISCORD_TOKEN)
