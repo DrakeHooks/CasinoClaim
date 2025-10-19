@@ -88,16 +88,27 @@ options.add_argument('--no-sandbox')
 user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit(537.36) (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
 options.add_argument(f"--user-agent={user_agent}")
 
-# IMPORTANT. If you need custom user data dir for extensions, uncomment here and in Dockerfile.
-# user_data_dir = "/temp/google-chrome/"
-# options.add_argument(f"--user-data-dir={user_data_dir}")
+# --- Persistent Chrome profile. Useful for sites that have social auth. (optional) ---
+USER_DATA_DIR = os.getenv("CHROME_USER_DATA_DIR", "").strip()   # e.g. /data/chrome  (Docker) or C:\bot\chrome
+PROFILE_DIR   = os.getenv("CHROME_PROFILE_DIR", "Default").strip()  # Chrome profile folder name
+
+if USER_DATA_DIR:
+    try:
+        os.makedirs(USER_DATA_DIR, exist_ok=True)
+        options.add_argument(f"--user-data-dir={USER_DATA_DIR}")
+        options.add_argument(f"--profile-directory={PROFILE_DIR}")   # usually "Default"
+        print(f"[Chrome] Using persistent profile: {USER_DATA_DIR} ({PROFILE_DIR})")
+    except Exception as e:
+        print(f"[Chrome] Failed to set user-data-dir; continuing without persistence: {e}")
+else:
+    print("[Chrome] CHROME_USER_DATA_DIR not set — using ephemeral session.")
+
 options.add_argument("--window-size=1920,1080")
 options.add_argument("--no-first-run")
 options.set_capability("goog:loggingPrefs", caps["goog:loggingPrefs"])
 options.add_argument("--allow-geolocation")
 options.add_argument("--disable-features=DisableLoadExtensionCommandLineSwitch")
 options.add_argument("--enable-third-party-cookies")
-options.add_extension('/temp/CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx')
 options.add_argument('--disable-notifications')
 
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
