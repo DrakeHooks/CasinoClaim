@@ -10,6 +10,8 @@ import re
 import sqlite3
 import discord
 import asyncio
+import traceback
+from functools import wraps
 
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
@@ -663,6 +665,7 @@ async def wait_for_2fa(site_name: str, timeout: int = 90) -> Optional[str]:
 
 # ── Site Commands ──────────────────────────────────────────
 @bot.command(name="chumba")
+@casino_command_handler("Chumba")
 async def chumba(ctx):
     await ctx.send("Checking Chumba for Bonus...")
     driver.get("https://lobby.chumbacasino.com/")
@@ -680,30 +683,35 @@ async def chumba(ctx):
         await ctx.send("Failed to reach the Chumba lobby.")
 
 @bot.command(name="RollingRiches")
+@casino_command_handler("Rolling Riches")
 async def rollingriches(ctx):
     await ctx.send("Checking Rolling Riches for Bonus...")
     channel = bot.get_channel(DISCORD_CHANNEL)
     await rolling_riches_casino(ctx, driver, channel)
 
 @bot.command(name="JefeBet")
+@casino_command_handler("JefeBet")
 async def jefebet(ctx):
     await ctx.send("Checking JefeBet for Bonus...")
     channel = bot.get_channel(DISCORD_CHANNEL)
     await jefebet_casino(ctx, driver, channel)
 
 @bot.command(name="SpinPals")
+@casino_command_handler("SpinPals")
 async def spinpals(ctx):
     await ctx.send("Checking SpinPals for Bonus...")
     channel = bot.get_channel(DISCORD_CHANNEL)
     await spinpals_flow(ctx, driver, channel)
 
 @bot.command(name="SpinQuest")
+@casino_command_handler("SpinQuest")
 async def spinquest(ctx):
     await ctx.send("Checking SpinQuest for Bonus...")
     channel = bot.get_channel(DISCORD_CHANNEL)
     await spinquest_flow(ctx, driver, channel)
 
 @bot.command(name="Funrize")
+@casino_command_handler("Funrize")
 async def funrize(ctx):
     global funrize_task
     if not funrize_task or funrize_task.done():
@@ -714,6 +722,7 @@ async def funrize(ctx):
         await ctx.send("Funrize automation is already running.")
 
 @bot.command(name="FortuneWheelz")
+@casino_command_handler("Fortune Wheelz")
 async def fortunewheelz(ctx):
     global fortunewheelz_task
     if not fortunewheelz_task or fortunewheelz_task.done():
@@ -725,12 +734,14 @@ async def fortunewheelz(ctx):
 
 
 @bot.command(name="Stake")
+@casino_command_handler("Stake")
 async def stake(ctx):
     await ctx.send("Checking Stake for Bonus...")
     channel = bot.get_channel(DISCORD_CHANNEL)
     await stake_claim(driver, bot, ctx, channel)
 
 @bot.command(name="chanced")
+@casino_command_handler("Chanced")
 async def chanced(ctx):
     await ctx.send("Checking Chanced.com for Bonus...")
     chanced_credentials = os.getenv("CHANCED")
@@ -743,34 +754,37 @@ async def chanced(ctx):
     await chanced_casino(ctx, driver, channel, credentials)
 
 @bot.command(name="luckybird")
+@casino_command_handler("LuckyBird")
 async def luckybird_command(ctx):
     """Run LuckyBird: auth if needed, then claim or report countdown."""
     channel = bot.get_channel(int(os.getenv("DISCORD_CHANNEL")))
     await ctx.send("Checking LuckyBird or Bonus...")
-    try:
-        await luckybird_entry(ctx, driver, bot, channel)
-    except Exception as e:
-        await channel.send(f"Error running LuckyBird command: {e}")
+    await luckybird_entry(ctx, driver, bot, channel)
 
 @bot.command(name="globalpoker")
+@casino_command_handler("GlobalPoker")
 async def global_poker_command(ctx):
     global globalpoker_running
     if not globalpoker_running:
         await ctx.send("Checking GlobalPoker for Bonus...")
         globalpoker_running = True
         channel = bot.get_channel(DISCORD_CHANNEL)
-        await global_poker(ctx, driver, channel)
-        globalpoker_running = False
+        try:
+            await global_poker(ctx, driver, channel)
+        finally:
+            globalpoker_running = False
     else:
         await ctx.send("GlobalPoker automation is already running.")
 
 @bot.command(name="CrownCoins")
+@casino_command_handler("Crown Coins Casino")
 async def crowncoinscasino(ctx):
     await ctx.send("Checking Crown Coins Casino for Bonus...")
     channel = bot.get_channel(DISCORD_CHANNEL)
     await crowncoins_casino(driver, bot, ctx, channel)
 
 @bot.command(name="dingdingding")
+@casino_command_handler("DingDingDing")
 async def DingDingDing(ctx):
     await ctx.send("Checking DingDingDing for bonus...")
     channel = bot.get_channel(DISCORD_CHANNEL)
@@ -779,6 +793,7 @@ async def DingDingDing(ctx):
         await check_dingdingding_countdown(driver, bot, ctx, channel)
 
 @bot.command(name="modo")
+@casino_command_handler("Modo")
 async def modo(ctx):
     await ctx.send("Checking Modo for bonus...")
     channel = bot.get_channel(DISCORD_CHANNEL)
@@ -787,17 +802,20 @@ async def modo(ctx):
         await check_modo_countdown(driver, bot, ctx, channel)
 
 @bot.command(name="Zula")
+@casino_command_handler("Zula")
 async def zula(ctx):
     await ctx.send("Checking Zula Casino for Bonus...")
     await zula_casino(driver, bot, ctx)
 
 @bot.command(name="Sportzino")
+@casino_command_handler("Sportzino")
 async def sportzino(ctx):
     await ctx.send("Checking Sportzino for Bonus...")
     channel = bot.get_channel(DISCORD_CHANNEL)
     await Sportzino(ctx, driver, channel)
 
-@bot.command(name="nolimitcoins", aliases=["nlc","nolimit", "no limit coins"])
+@bot.command(name="nolimitcoins", aliases=["nlc"])
+@casino_command_handler("NoLimitCoins")
 async def nolimitcoins(ctx):
     """Check NoLimitCoins for a claim or report the countdown."""
     await ctx.send("Checking NoLimitCoins for bonus...")
