@@ -5,22 +5,21 @@ services:
     ports:
       - "5900:5900"
     environment:
-      - CHROME_USER_DATA_DIR=/data/chrome
+      - CHROME_INSTANCE_DIR=/data/chrome     # ← use the branch main.py prefers
       - CHROME_PROFILE_DIR=Default
-      # helpful for imports that do relative imports:
       - PYTHONPATH=/app:/app/apis:/app/app
+      # Optional: persist Fortune Coins SB/UC profile too:
+      - FC_USER_DATA_DIR=/data/fortunecoins  # ← optional
     volumes:
-      # 👇 mount your repo so /app/main.py and *API.py are visible in the container
       - ./:/app
-      # keep Chrome profile out of repo
-      - chrome-profile:/data/chrome
-      # your CRX if you still need it
-      - ./CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx:/temp/CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx
+      - chrome-profile:/data/chrome          # ← persistent named volume for main Selenium
+      # Optional: a separate FC profile directory inside the same named volume
+      - chrome-profile:/data/fortunecoins    # ← reuse the same volume namespace
+      - ./CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx:/temp/CAPTCHA-Solver.crx
     env_file:
       - .env
     shm_size: "2g"
     restart: unless-stopped
-    # 👇 ensure Xvfb + VNC + CHROME_INSTANCE_DIR get set
     entrypoint: ["/bin/bash","-lc","bash /app/entrypoint.sh"]
     labels:
       - com.centurylinklabs.watchtower.enable=true

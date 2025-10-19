@@ -117,6 +117,21 @@ else:
     else:
         print("[Chrome] No CHROME_INSTANCE_DIR / CHROME_USER_DATA_DIR — using ephemeral session.")
 
+
+# … existing options.add_argument(...) for user-data-dir/profile-directory …
+
+# Log the profile path Chrome should use
+resolved_profile_root = instance_dir or os.getenv("CHROME_USER_DATA_DIR", "").strip()
+print(f"[Chrome] Profile Root: {resolved_profile_root or '(ephemeral)'}  Profile Dir: {profile_dir}")
+
+# Ensure the directory exists (entrypoint already creates & fixes perms; this is a no-op if present)
+try:
+    if resolved_profile_root:
+        os.makedirs(os.path.join(resolved_profile_root, profile_dir), exist_ok=True)
+except Exception as e:
+    print(f"[Chrome] Could not ensure profile path exists: {e}")
+
+
 # Headed/X quirks & safety
 options.add_argument(f"--remote-debugging-port={9222 + (os.getpid() % 1000)}")
 options.add_argument("--no-first-run")
