@@ -45,5 +45,6 @@ export CHROME_INSTANCE_DIR="${CHROME_USER_DATA_DIR}/${HOSTTAG}/${RUN_ID}"
 mkdir -p "${CHROME_INSTANCE_DIR}/${CHROME_PROFILE_DIR}" || true
 find "${CHROME_INSTANCE_DIR}" -maxdepth 2 -type f -name 'Singleton*' -delete || true
 
+
 # ---- Run your app ----
 exec /venv/bin/python /app/main.py
