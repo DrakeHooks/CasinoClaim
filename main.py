@@ -340,7 +340,7 @@ async def run_main_loop(channel: discord.abc.Messageable) -> None:
                     except Exception as exc:
                         print(f"[Loop] Error while running {entry.display_name}: {exc}")
                         try:
-                            await channel.send(f"⚠️ Error while running {entry.display_name}: {exc}")
+                           print(f"⚠️ Error while running {entry.display_name}: {exc}")
                         except Exception:
                             pass
                     finally:
