@@ -34,16 +34,8 @@ from webdriver_manager.chrome import ChromeDriverManager
 from discord import Intents, Client, Message
 from discord.ext import commands
 
-# Optional libs already in your repo
 import undetected_chromedriver as uc  # (kept for other modules using it)
 from seleniumbase import Driver       # (unused here but kept to avoid breaking other imports)
-
-# Bring in your new UC module for Fortune Coins (local-tested logic)
-try:
-    from fortunecoinsSB import fortunecoins_uc
-except Exception as _e:
-    # Keep the main bot running even if this module is missing
-    print(f"[warn] fortunecoinsSB import failed: {_e}")
 
 import importlib
 
@@ -52,6 +44,7 @@ import importlib
 # ───────────────────────────────────────────────────────────
 api_modules = [
     "fortunewheelzAPI",
+    "fortunecoinsAPI",   # ← Fortune Coins UC now behaves like any other API module
     "stakeAPI",
     "modoAPI",
     "googleauthAPI",
@@ -301,6 +294,7 @@ MANUAL_CASINO_COMMANDS = {
     "zula",
     "sportzino",
     "nolimitcoins",
+    "fortunecoins",   # ← added
 }
 
 def reset_loop_schedule() -> None:
@@ -346,7 +340,7 @@ async def run_main_loop(channel: discord.abc.Messageable) -> None:
                     except Exception as exc:
                         print(f"[Loop] Error while running {entry.display_name}: {exc}")
                         try:
-                            print(f"⚠️ Error while running {entry.display_name}: {exc}")
+                            await channel.send(f"⚠️ Error while running {entry.display_name}: {exc}")
                         except Exception:
                             pass
                     finally:
@@ -806,14 +800,16 @@ async def nolimitcoins(ctx):
     channel = bot.get_channel(DISCORD_CHANNEL)
     await nolimitcoins_flow(ctx, driver, channel)
 
-# New: UC-headed SeleniumBase Fortune Coins command (kept separate from normal flow)
-@bot.command(name="fortunecoins_uc")
-async def fortunecoins_uc_cmd(ctx):
+# NEW: Fortune Coins (UC) as a standard API-driven command
+@bot.command(name="fortunecoins")
+@casino_command_handler("FortuneCoins")
+async def fortunecoins(ctx):
     channel = bot.get_channel(DISCORD_CHANNEL)
-    if 'fortunecoins_uc' in globals():
+    if 'fortunecoins_uc' in globals() and callable(fortunecoins_uc):
+        await ctx.send("Checking Fortune Coins for bonus (UC)…")
         await fortunecoins_uc(ctx, channel)
     else:
-        await ctx.send("Fortune Coins UC module not available on this build.")
+        await ctx.send("Fortune Coins module not available on this build.")
 
 # ── Auth router ────────────────────────────────────────────
 @bot.command(name="auth")
