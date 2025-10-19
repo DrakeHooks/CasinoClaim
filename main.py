@@ -27,7 +27,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException, SessionNotCreatedException
 from webdriver_manager.chrome import ChromeDriverManager
 
 # Discord bot
@@ -83,6 +83,83 @@ intents = Intents.default()
 intents.message_content = True
 
 # ───────────────────────────────────────────────────────────
+# Chrome profile cleanup helpers (prevents "already in use")
+# ───────────────────────────────────────────────────────────
+def _cleanup_chrome_profile(profile_root: str, profile_dir: str) -> None:
+    """Remove Chrome lock/socket files and any tmp sockets they reference."""
+    try:
+        if not profile_root:
+            return
+        prof = os.path.join(profile_root, profile_dir or "Default")
+
+        # Remove Singleton* files at both root and profile-level
+        paths = []
+        paths.extend(glob.glob(os.path.join(profile_root, "Singleton*")))
+        paths.extend(glob.glob(os.path.join(prof, "Singleton*")))
+        paths.append(os.path.join(prof, "DevToolsActivePort"))
+
+        for path in paths:
+            try:
+                if os.path.islink(path):
+                    # Delete symlink AND its target socket if present
+                    target = os.readlink(path)
+                    try:
+                        os.remove(target)
+                    except Exception:
+                        pass
+                    os.remove(path)
+                elif os.path.isfile(path):
+                    os.remove(path)
+            except Exception:
+                pass
+
+        # Chrome often leaves tmp sockets here; remove them
+        for d in glob.glob("/tmp/.org.chromium.*"):
+            try:
+                # recursive delete
+                for root, dirs, files in os.walk(d, topdown=False):
+                    for fn in files:
+                        try:
+                            os.remove(os.path.join(root, fn))
+                        except Exception:
+                            pass
+                    for dd in dirs:
+                        try:
+                            os.rmdir(os.path.join(root, dd))
+                        except Exception:
+                            pass
+                os.rmdir(d)
+            except Exception:
+                pass
+
+        # Some builds drop a direct /tmp/SingletonSocket
+        try:
+            os.remove("/tmp/SingletonSocket")
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
+def _start_driver_with_retry(options: Options, profile_root: str, profile_dir: str, attempts: int = 3, wait_secs: float = 2.0):
+    """Start ChromeDriver with a few retries, cleaning locks between attempts."""
+    last_err = None
+    for i in range(1, attempts + 1):
+        try:
+            _cleanup_chrome_profile(profile_root, profile_dir)
+            drv = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+            return drv
+        except SessionNotCreatedException as e:
+            last_err = e
+            print(f"[Chrome] SessionNotCreated on attempt {i}/{attempts}: {e}")
+            time.sleep(wait_secs)
+        except Exception as e:
+            last_err = e
+            print(f"[Chrome] Unexpected error on attempt {i}/{attempts}: {e}")
+            time.sleep(wait_secs)
+    raise last_err
+
+# ───────────────────────────────────────────────────────────
 # Selenium driver (headed, under Xvfb provided by entrypoint)
 # ───────────────────────────────────────────────────────────
 caps = DesiredCapabilities.CHROME
@@ -117,9 +194,6 @@ else:
     else:
         print("[Chrome] No CHROME_INSTANCE_DIR / CHROME_USER_DATA_DIR — using ephemeral session.")
 
-
-# … existing options.add_argument(...) for user-data-dir/profile-directory …
-
 # Log the profile path Chrome should use
 resolved_profile_root = instance_dir or os.getenv("CHROME_USER_DATA_DIR", "").strip()
 print(f"[Chrome] Profile Root: {resolved_profile_root or '(ephemeral)'}  Profile Dir: {profile_dir}")
@@ -130,7 +204,6 @@ try:
         os.makedirs(os.path.join(resolved_profile_root, profile_dir), exist_ok=True)
 except Exception as e:
     print(f"[Chrome] Could not ensure profile path exists: {e}")
-
 
 # Headed/X quirks & safety
 options.add_argument(f"--remote-debugging-port={9222 + (os.getpid() % 1000)}")
@@ -155,7 +228,8 @@ options.add_argument("--disable-notifications")
 user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit(537.36) (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
 options.add_argument(f"--user-agent={user_agent}")
 
-driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+# Start driver with cleanup + retry
+driver = _start_driver_with_retry(options, resolved_profile_root, profile_dir, attempts=3, wait_secs=2.0)
 
 # ───────────────────────────────────────────────────────────
 # Discord bot
@@ -214,7 +288,6 @@ fortunewheelz_running = False
 # ───────────────────────────────────────────────────────────
 # Casino loop configuration
 # ───────────────────────────────────────────────────────────
-
 @dataclass
 class CasinoLoopEntry:
     key: str
@@ -429,7 +502,6 @@ async def on_ready():
 # ───────────────────────────────────────────────────────────
 # Commands
 # ───────────────────────────────────────────────────────────
-
 @bot.command(name="start")
 async def start_loop_command(ctx: commands.Context):
     started = await start_main_loop()
@@ -527,6 +599,20 @@ async def about(ctx):
     driver.save_screenshot(snap)
     await ctx.send(f"🧩 **Chrome build running inside the bot:** `{version_num}`",
                    file=discord.File(snap))
+    os.remove(snap)
+
+@bot.command(name="profile")
+async def profile(ctx):
+    """Report Chrome's profile path from chrome://version plus a screenshot."""
+    driver.get("chrome://version/")
+    await asyncio.sleep(1.5)
+    snap = "chrome_profile.png"
+    driver.save_screenshot(snap)
+    try:
+        info = driver.find_element(By.ID, "profile_path").text
+    except Exception:
+        info = "Could not read profile_path element"
+    await ctx.send(f"🔧 Chrome profile path Chrome reports:\n```\n{info}\n```", file=discord.File(snap))
     os.remove(snap)
 
 @bot.command(name="help")
@@ -658,7 +744,6 @@ def casino_command_handler(display_name: str):
     return decorator
 
 # ── Site Commands ──────────────────────────────────────────
-
 @bot.command(name="chumba")
 @casino_command_handler("Chumba")
 async def chumba(ctx):
