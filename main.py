@@ -288,24 +288,6 @@ MANUAL_CASINO_COMMANDS = {
 }
 
 
-def casino_command_handler(display_name: str):
-    """Decorator to keep casino command tracebacks in the logs only."""
-
-    def decorator(func: Callable):
-        @wraps(func)
-        async def wrapper(*args, **kwargs):
-            ctx = args[0] if args else kwargs.get("ctx")
-            try:
-                return await func(*args, **kwargs)
-            except Exception as exc:
-                print(f"[{display_name}] Error during command: {exc}")
-                traceback.print_exc()
-
-        return wrapper
-
-    return decorator
-
-
 def reset_loop_schedule() -> None:
     base_time = datetime.utcnow()
     for index, entry in enumerate(casino_loop_entries):
@@ -354,7 +336,12 @@ async def run_main_loop(channel: discord.abc.Messageable) -> None:
                         await entry.runner(channel)
                     except Exception as exc:
                         print(f"[Loop] Error while running {entry.display_name}: {exc}")
-                        traceback.print_exc()
+                        try:
+                            await channel.send(
+                                f"⚠️ Error while running {entry.display_name}: {exc}"
+                            )
+                        except Exception:
+                            pass
                     finally:
                         entry.schedule_next()
             await asyncio.sleep(5)
