@@ -21,7 +21,7 @@ services:
     shm_size: "2g"
     restart: unless-stopped
     # 👇 ensure Xvfb + VNC + CHROME_INSTANCE_DIR get set
-    entrypoint: ["/bin/bash","-lc","/app/entrypoint.sh"]
+    entrypoint: ["/bin/bash","-lc","bash /app/entrypoint.sh"]
     labels:
       - com.centurylinklabs.watchtower.enable=true
 
