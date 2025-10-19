@@ -664,6 +664,37 @@ async def wait_for_2fa(site_name: str, timeout: int = 90) -> Optional[str]:
     return code
 
 # ── Site Commands ──────────────────────────────────────────
+
+# ───────────────────────────────────────────────────────────
+# Decorator for casino commands (simple error wrapper + nice message)
+# ───────────────────────────────────────────────────────────
+from functools import wraps
+import traceback
+
+def casino_command_handler(display_name: str):
+    """Wrap a bot command so errors are caught and reported nicely."""
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            # First arg is usually ctx for discord.py commands
+            ctx = args[0] if args else None
+            try:
+                return await func(*args, **kwargs)
+            except asyncio.CancelledError:
+                # let cancellations bubble out cleanly
+                raise
+            except Exception as e:
+                # log + notify channel without killing the bot
+                traceback.print_exc()
+                if ctx is not None:
+                    try:
+                        await print(f"⚠️ {display_name} error: {e}")
+                    except Exception:
+                        pass
+        return wrapper
+    return decorator
+
+
 @bot.command(name="chumba")
 @casino_command_handler("Chumba")
 async def chumba(ctx):
