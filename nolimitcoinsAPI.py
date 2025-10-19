@@ -1,6 +1,6 @@
 # Drake Hooks + WaterTrooper
 # Casino Claim 2
-# NoLimitCoins API (simple: Claim -> Collect; timer from countdown DIV; resilient Google chooser switch)
+# NoLimitCoins API (claim → collect; countdown fallback; robust Google chooser tab-scan)
 
 import os
 import re
@@ -42,13 +42,13 @@ COUNTDOWN_DIV_XPATH = "/html/body/div[1]/div/main/div/div[3]/div[5]/div[2]/div"
 # Optional overlay that can block clicks.
 OVERLAY_LOCATOR = (By.ID, "ModalDailyLogin")
 
-# Candidate XPaths for Google account row (handles minor A/B DOM shifts)
+# Your exact Google chooser row (first account)
+GOOGLE_CHOOSER_PRIMARY_XPATH = "/html/body/div[2]/div[1]/div[2]/c-wiz/main/div[2]/div/div/div[1]/form/span/section/div/div/div/div/ul/li[1]/div"
+
+# Backup candidate XPaths for Google account row (handles minor A/B DOM shifts)
 GOOGLE_ACCOUNT_XPATHS = [
-    # Your updated path with c-wiz
-    "/html/body/div[2]/div[1]/div[2]/c-wiz/main/div[2]/div/div/div[1]/form/span/section/div/div/div/div/ul/li[1]/div",
-    # Common v3 chooser path
+    GOOGLE_CHOOSER_PRIMARY_XPATH,
     "/html/body/div[1]/div[1]/div[2]/div/div/div[2]/div/div/div[1]/form/span/section/div/div/div/div/ul/li[1]/div",
-    # Fallback: any li in the account list
     "//ul/li[1]/div[contains(@class,'qk0lee') or contains(@role,'button') or @role='button']",
 ]
 
@@ -121,100 +121,40 @@ def read_countdown_from_div(driver) -> Optional[str]:
     except TimeoutException:
         return None
 
-# ---------- Google popup switching (promo-safe; waits for chooser) ----------
-def is_google_account_chooser_now(driver) -> bool:
-    """Detect the chooser by domain and hallmark text — tolerant of A/B markup."""
-    url = (driver.current_url or "").lower()
-    if "accounts.google.com" not in url:
-        return False
-    # Positive URL hints
-    if not any(k in url for k in ("accountchooser", "signin", "servicelogin", "/v3/")):
-        return False
-    # Either headline or sub-copy present
-    try:
-        WebDriverWait(driver, 1.2).until(EC.presence_of_element_located((By.XPATH, "//*[contains(., 'Choose an account')]")))
-        return True
-    except TimeoutException:
-        pass
-    try:
-        WebDriverWait(driver, 1.2).until(EC.presence_of_element_located((By.XPATH, "//*[contains(., 'to continue to')]")))
-        return True
-    except TimeoutException:
-        return False
-
-def is_chrome_promo_now(driver) -> bool:
-    """Heuristic to recognize the Chrome promo/welcome page."""
-    u = (driver.current_url or "").lower()
-    t = (driver.title or "").lower()
-    if "chrome" in u and "accounts.google.com" in u:
-        return True
-    return any(s in t for s in ("make chrome your own", "sign in to chrome", "get your passwords"))
-
-def switch_to_accounts_google_popup(driver, timeout=20):
+def scan_windows_and_click_xpath(driver, target_xpath: str, timeout: int = 30) -> bool:
     """
-    Look across ALL popups (even if the promo opens first) and switch to the real
-    Google account chooser as soon as it exists.
-    Returns (main_handle, chooser_handle).
+    Keep switching among all open windows/tabs until we find an element matching target_xpath,
+    click it, and return True. Returns False if not found within timeout.
     """
-    main = driver.current_window_handle
-    WebDriverWait(driver, timeout).until(lambda d: len(d.window_handles) > 1)
-
-    end = time.time() + timeout
-    seen = set([main])
-    chooser = None
-
-    while time.time() < end:
-        # New handles might appear after the promo — keep checking the full set
-        for h in driver.window_handles:
-            if h in seen:
-                continue
-            seen.add(h)
-            try:
-                driver.switch_to.window(h)
-            except Exception:
-                continue
-
-            if is_google_account_chooser_now(driver):
-                chooser = h
-                break
-            # Ignore promo and any other random windows; do not close them
-            # so we don't accidentally kill the OAuth flow.
-
-        if chooser:
-            break
-        time.sleep(5)
-
-    if not chooser:
-        # One last pass over all existing handles before giving up
-        for h in driver.window_handles:
-            if h == main:
+    end = time.monotonic() + timeout
+    seen = set()
+    while time.monotonic() < end:
+        # refresh the handle set each pass (chooser can appear late)
+        for handle in driver.window_handles:
+            if handle in seen and len(driver.window_handles) > 1:
+                # still try again, but prioritize unseen handles first
                 continue
             try:
-                driver.switch_to.window(h)
+                driver.switch_to.window(handle)
             except Exception:
                 continue
-            if is_google_account_chooser_now(driver):
-                chooser = h
-                break
+            seen.add(handle)
 
-    if not chooser:
-        raise TimeoutException("Google account chooser window not found")
+            try:
+                el = WebDriverWait(driver, 2.5).until(
+                    EC.element_to_be_clickable((By.XPATH, target_xpath))
+                )
+                safe_click(driver, el)
+                return True
+            except TimeoutException:
+                # try the next handle
+                pass
 
-    return main, chooser
-
-def click_first_google_account(driver, timeout=12):
-    """Try several known XPaths to click the first account in the chooser."""
-    for xp in GOOGLE_ACCOUNT_XPATHS:
-        try:
-            el = WebDriverWait(driver, timeout).until(EC.element_to_be_clickable((By.XPATH, xp)))
-            safe_click(driver, el)
-            return True
-        except TimeoutException:
-            continue
+        time.sleep(0.3)
     return False
 
 # ───────────────────────────────────────────────────────────
-# Simple two-step claim flow
+# Claim flow: claim → collect; countdown fallback
 # ───────────────────────────────────────────────────────────
 async def nolimitcoins_flow(ctx, driver, channel):
     """
@@ -227,7 +167,7 @@ async def nolimitcoins_flow(ctx, driver, channel):
     await asyncio.sleep(2)
     dismiss_overlay(driver)
 
-    # Step 1: Claim/Claim Reward
+    # Step 1: Claim/Claim Reward button on store
     if not try_click_any(driver, CLAIM_REWARD_SELECTORS, timeout_each=5):
         cd = read_countdown_from_div(driver)
         if cd:
@@ -237,7 +177,7 @@ async def nolimitcoins_flow(ctx, driver, channel):
             await send_screenshot(channel, driver)
         return
 
-    await asyncio.sleep(5)
+    await asyncio.sleep(1)
     dismiss_overlay(driver)
 
     # Step 2: Collect (modal)
@@ -259,49 +199,7 @@ async def claim_nolimitcoins_bonus(ctx, driver, channel):
     await nolimitcoins_flow(ctx, driver, channel)
 
 # ───────────────────────────────────────────────────────────
-# Login with .env, then claim
-# ───────────────────────────────────────────────────────────
-async def auth_nolimit_env(driver, channel, ctx):
-    try:
-        driver.get(SIGNIN_URL)
-        await asyncio.sleep(2)
-
-        creds = os.getenv("NOLIMITCOINS")
-        if not creds:
-            await channel.send("NoLimitCoins credentials not found in environment variables.")
-            return
-        username, password = creds.split(":", 1)
-
-        email_input = wait_present(driver, By.XPATH, "/html/body/div[1]/div/div[1]/div/form/label[1]/div/div[2]/input", 20)
-        email_input.send_keys(username)
-        await asyncio.sleep(2)
-
-        password_input = wait_present(driver, By.XPATH, "/html/body/div[1]/div/div[1]/div/form/label[2]/div/input", 20)
-        password_input.send_keys(password)
-        password_input.send_keys(Keys.ENTER)
-
-        await asyncio.sleep(2)
-        await send_screenshot(channel, driver)
-        await channel.send("Authenticated into NoLimitCoins!")
-    except Exception:
-        await channel.send("NoLimitCoins login with env creds failed. Perhaps you need to run !googleauth.")
-        await send_screenshot(channel, driver)
-
-# ───────────────────────────────────────────────────────────
-# Countdown only (reads from the provided DIV)
-# ───────────────────────────────────────────────────────────
-async def check_nolimitcoins_countdown(ctx, driver, channel):
-    driver.get(STORE_URL)
-    await asyncio.sleep(5)
-    cd = read_countdown_from_div(driver)
-    if cd:
-        await channel.send(f"Next No Limit Coins Bonus Available in: {cd}")
-    else:
-        await channel.send("NoLimitCoins: No countdown found.")
-        await send_screenshot(channel, driver)
-
-# ───────────────────────────────────────────────────────────
-# Auth helpers
+# Auth (.env) → then claim
 # ───────────────────────────────────────────────────────────
 async def auth_nolimit_env(driver, channel, ctx):
     try:
@@ -316,7 +214,7 @@ async def auth_nolimit_env(driver, channel, ctx):
 
         email_input = wait_present(driver, By.NAME, "email", 8)
         email_input.send_keys(username)
-        await asyncio.sleep(2)
+        await asyncio.sleep(0.2)
 
         password_input = wait_present(driver, By.NAME, "password", 8)
         password_input.send_keys(password)
@@ -328,34 +226,59 @@ async def auth_nolimit_env(driver, channel, ctx):
     except Exception:
         await channel.send("NoLimitCoins login with env creds failed. Perhaps you need to run !auth google.")
 
+# ───────────────────────────────────────────────────────────
+# Countdown only (reads from the provided DIV)
+# ───────────────────────────────────────────────────────────
+async def check_nolimitcoins_countdown(ctx, driver, channel):
+    driver.get(STORE_URL)
+    await asyncio.sleep(2)
+    cd = read_countdown_from_div(driver)
+    if cd:
+        await channel.send(f"Next No Limit Coins Bonus Available in: {cd}")
+    else:
+        await channel.send("NoLimitCoins: No countdown found.")
+        await send_screenshot(channel, driver)
+
+# ───────────────────────────────────────────────────────────
+# Google OAuth with tab scan for chooser → click → back to main
+# ───────────────────────────────────────────────────────────
 async def auth_nolimit_google(driver, channel, ctx):
     """
-    Handle Google popup where *two* windows can open:
-    - Chrome promo (ignore)
-    - Actual account chooser (target)
-    We keep scanning until the chooser appears, then click the first account.
+    Opens NLC sign-in, clicks the 'Continue with Google' button,
+    then iterates through all open windows/tabs until it finds the chooser
+    element at GOOGLE_CHOOSER_PRIMARY_XPATH, clicks it, and finally returns
+    to the original tab.
     """
     try:
         driver.get(SIGNIN_URL)
-        await asyncio.sleep(10)
+        await asyncio.sleep(2)
 
-        google_btn = WebDriverWait(driver, 30).until(
+        # Click "Continue with Google" on NLC
+        google_btn = WebDriverWait(driver, 20).until(
             EC.element_to_be_clickable((By.XPATH, "/html/body/div[1]/div/div[1]/div/form/div[1]/button[2]"))
         )
         safe_click(driver, google_btn)
 
-        # Switch to the true chooser (wait even if promo shows first)
-        main_handle, chooser_handle = switch_to_accounts_google_popup(driver, timeout=30)
-        driver.switch_to.window(chooser_handle)
+        main_handle = driver.current_window_handle
 
-        if not click_first_google_account(driver, timeout=30):
-            raise TimeoutException("Could not click first Google account")
+        # Keep scanning tabs for the chooser element and click it
+        clicked = scan_windows_and_click_xpath(driver, GOOGLE_CHOOSER_PRIMARY_XPATH, timeout=30)
 
-        # Back to main; wait for return to nolimitcoins
+        if not clicked:
+            # Try the backups if the primary failed (A/B markup differences)
+            for xp in GOOGLE_ACCOUNT_XPATHS[1:]:
+                if scan_windows_and_click_xpath(driver, xp, timeout=12):
+                    clicked = True
+                    break
+
+        if not clicked:
+            raise TimeoutException("Account chooser element not found/clickable in any tab")
+
+        # Return to main tab and wait to land back on nolimitcoins
         driver.switch_to.window(main_handle)
         WebDriverWait(driver, 30).until(lambda d: "nolimitcoins.com" in (d.current_url or "").lower())
-        await asyncio.sleep(5)
+        await asyncio.sleep(2)
 
         await channel.send("Authenticated into NoLimitCoins!")
     except Exception:
-        await channel.send("NoLimitCoins login with Google failed. Perhaps you need to run !auth google.")
+        await channel.send("NoLimitCoins login with Google failed. Perhaps you need to run !auth google again or try .env auth.")
