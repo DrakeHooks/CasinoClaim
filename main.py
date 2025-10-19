@@ -423,13 +423,13 @@ async def run_main_loop(channel: discord.abc.Messageable) -> None:
                     except asyncio.TimeoutError:
                         print(f"[Loop] ⏱️ {entry.display_name} timed out after {RUNNER_TIMEOUT_SECONDS}s")
                         try:
-                            await channel.send(f"⏱️ {entry.display_name} timed out after {RUNNER_TIMEOUT_SECONDS}s")
+                            await print(f"⏱️ {entry.display_name} timed out after {RUNNER_TIMEOUT_SECONDS}s")
                         except Exception:
                             pass
                     except Exception as exc:
                         print(f"[Loop] Error while running {entry.display_name}: {exc}")
                         try:
-                            await channel.send(f"⚠️ Error while running {entry.display_name}: {exc}")
+                            await print(f"⚠️ Error while running {entry.display_name}: {exc}")
                         except Exception:
                             pass
                     finally:
