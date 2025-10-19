@@ -27,7 +27,11 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, TimeoutException, SessionNotCreatedException
+from selenium.common.exceptions import (
+    NoSuchElementException,
+    TimeoutException,
+    SessionNotCreatedException,
+)
 from webdriver_manager.chrome import ChromeDriverManager
 
 # Discord bot
@@ -44,7 +48,7 @@ import importlib
 # ───────────────────────────────────────────────────────────
 api_modules = [
     "fortunewheelzAPI",
-    "fortunecoinsAPI",   # ← Fortune Coins UC now behaves like any other API module
+    "fortunecoinsAPI",
     "stakeAPI",
     "modoAPI",
     "googleauthAPI",
@@ -92,7 +96,6 @@ def _cleanup_chrome_profile(profile_root: str, profile_dir: str) -> None:
             return
         prof = os.path.join(profile_root, profile_dir or "Default")
 
-        # Remove Singleton* files at both root and profile-level
         paths = []
         paths.extend(glob.glob(os.path.join(profile_root, "Singleton*")))
         paths.extend(glob.glob(os.path.join(prof, "Singleton*")))
@@ -101,7 +104,6 @@ def _cleanup_chrome_profile(profile_root: str, profile_dir: str) -> None:
         for path in paths:
             try:
                 if os.path.islink(path):
-                    # Delete symlink AND its target socket if present
                     target = os.readlink(path)
                     try:
                         os.remove(target)
@@ -113,26 +115,19 @@ def _cleanup_chrome_profile(profile_root: str, profile_dir: str) -> None:
             except Exception:
                 pass
 
-        # Chrome often leaves tmp sockets here; remove them
         for d in glob.glob("/tmp/.org.chromium.*"):
             try:
-                # recursive delete
                 for root, dirs, files in os.walk(d, topdown=False):
                     for fn in files:
-                        try:
-                            os.remove(os.path.join(root, fn))
-                        except Exception:
-                            pass
+                        try: os.remove(os.path.join(root, fn))
+                        except Exception: pass
                     for dd in dirs:
-                        try:
-                            os.rmdir(os.path.join(root, dd))
-                        except Exception:
-                            pass
+                        try: os.rmdir(os.path.join(root, dd))
+                        except Exception: pass
                 os.rmdir(d)
             except Exception:
                 pass
 
-        # Some builds drop a direct /tmp/SingletonSocket
         try:
             os.remove("/tmp/SingletonSocket")
         except Exception:
@@ -141,7 +136,8 @@ def _cleanup_chrome_profile(profile_root: str, profile_dir: str) -> None:
         pass
 
 
-def _start_driver_with_retry(options: Options, profile_root: str, profile_dir: str, attempts: int = 3, wait_secs: float = 2.0):
+def _start_driver_with_retry(options: Options, profile_root: str, profile_dir: str,
+                             attempts: int = 3, wait_secs: float = 2.0):
     """Start ChromeDriver with a few retries, cleaning locks between attempts."""
     last_err = None
     for i in range(1, attempts + 1):
@@ -174,10 +170,8 @@ profile_dir = os.getenv("CHROME_PROFILE_DIR", "Default").strip()
 if instance_dir:
     os.makedirs(os.path.join(instance_dir, profile_dir), exist_ok=True)
     for p in glob.glob(os.path.join(instance_dir, profile_dir, "Singleton*")):
-        try:
-            os.remove(p)
-        except Exception:
-            pass
+        try: os.remove(p)
+        except Exception: pass
     options.add_argument(f"--user-data-dir={instance_dir}")
     options.add_argument(f"--profile-directory={profile_dir}")
 else:
@@ -194,11 +188,9 @@ else:
     else:
         print("[Chrome] No CHROME_INSTANCE_DIR / CHROME_USER_DATA_DIR — using ephemeral session.")
 
-# Log the profile path Chrome should use
 resolved_profile_root = instance_dir or os.getenv("CHROME_USER_DATA_DIR", "").strip()
 print(f"[Chrome] Profile Root: {resolved_profile_root or '(ephemeral)'}  Profile Dir: {profile_dir}")
 
-# Ensure the directory exists (entrypoint already creates & fixes perms; this is a no-op if present)
 try:
     if resolved_profile_root:
         os.makedirs(os.path.join(resolved_profile_root, profile_dir), exist_ok=True)
@@ -224,7 +216,6 @@ options.add_argument("--disable-features=DisableLoadExtensionCommandLineSwitch")
 options.add_argument("--enable-third-party-cookies")
 options.add_argument("--disable-notifications")
 
-# UA pin (you can update to match your Chrome)
 user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit(537.36) (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
 options.add_argument(f"--user-agent={user_agent}")
 
@@ -364,6 +355,9 @@ casino_loop_entries: List[CasinoLoopEntry] = [
 main_loop_task: Optional[asyncio.Task] = None
 main_loop_running: bool = False
 
+# ⏱ per-runner hard timeout so nothing can freeze the loop
+RUNNER_TIMEOUT_SECONDS = int(os.getenv("RUNNER_TIMEOUT_SECONDS", "240"))
+
 MANUAL_CASINO_COMMANDS = {
     "chumba",
     "rollingriches",
@@ -382,7 +376,7 @@ MANUAL_CASINO_COMMANDS = {
     "zula",
     "sportzino",
     "nolimitcoins",
-    "fortunecoins",   # ← added
+    "fortunecoins",
 }
 
 def reset_loop_schedule() -> None:
@@ -420,15 +414,22 @@ async def run_main_loop(channel: discord.abc.Messageable) -> None:
     global main_loop_running
     try:
         while main_loop_running:
+            now = dt.utcnow()
             for entry in casino_loop_entries:
-                now = dt.utcnow()
                 if now >= entry.next_run:
                     try:
-                        await entry.runner(channel)
+                        # ⏱ hard timeout wrapper
+                        await asyncio.wait_for(entry.runner(channel), timeout=RUNNER_TIMEOUT_SECONDS)
+                    except asyncio.TimeoutError:
+                        print(f"[Loop] ⏱️ {entry.display_name} timed out after {RUNNER_TIMEOUT_SECONDS}s")
+                        try:
+                            await channel.send(f"⏱️ {entry.display_name} timed out after {RUNNER_TIMEOUT_SECONDS}s")
+                        except Exception:
+                            pass
                     except Exception as exc:
                         print(f"[Loop] Error while running {entry.display_name}: {exc}")
                         try:
-                           print(f"⚠️ Error while running {entry.display_name}: {exc}")
+                            await channel.send(f"⚠️ Error while running {entry.display_name}: {exc}")
                         except Exception:
                             pass
                     finally:
@@ -551,10 +552,8 @@ async def config_order(ctx: commands.Context, *casinos: str):
         missing = set(current_keys) - set(desired_order)
         extra = set(desired_order) - set(current_keys)
         parts = []
-        if missing:
-            parts.append("missing: " + ", ".join(sorted(missing)))
-        if extra:
-            parts.append("unknown: " + ", ".join(sorted(extra)))
+        if missing: parts.append("missing: " + ", ".join(sorted(missing)))
+        if extra:   parts.append("unknown: " + ", ".join(sorted(extra)))
         await ctx.send("Unable to reorder – " + "; ".join(parts))
         return
     lookup = {entry.key: entry for entry in casino_loop_entries}
@@ -688,7 +687,6 @@ async def on_message(message):
     """Capture 2FA codes posted in the bot channel."""
     if message.channel.id == DISCORD_CHANNEL:
         text = message.content.strip()
-        # Accept 5–8 digit numeric codes (covers most sites)
         if text.isdigit() and 5 <= len(text) <= 8:
             if getattr(bot, "awaiting_2fa_for", None):
                 bot.pending_2fa_code = text
@@ -900,7 +898,7 @@ async def nolimitcoins(ctx):
     channel = bot.get_channel(DISCORD_CHANNEL)
     await nolimitcoins_flow(ctx, driver, channel)
 
-# NEW: Fortune Coins (UC) as a standard API-driven command
+# Fortune Coins (UC) as a standard API-driven command
 @bot.command(name="fortunecoins")
 @casino_command_handler("FortuneCoins")
 async def fortunecoins(ctx):
@@ -988,7 +986,7 @@ async def authenticate_command(ctx, site: str, method: str = None):
             await ctx.send("LuckyBird authentication failed. Unable to proceed.", file=discord.File(screenshot_path))
             os.remove(screenshot_path)
 
-    elif norm_site in {"nolimit", "nolimitcoins", "nlc", "nolimitcoins"}:
+    elif norm_site in {"nolimit", "nolimitcoins", "nlc", "no limit coins"}:
         if method is None:
             await ctx.send("Please specify the authentication method: `google` or `env`.")
             return
@@ -1014,7 +1012,7 @@ async def authenticate_command(ctx, site: str, method: str = None):
     else:
         await ctx.send(f"Authentication for '{site}' is not implemented.")
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────────────────
 # Run bot
-# ─────────────────────────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────────────────
 bot.run(DISCORD_TOKEN)
