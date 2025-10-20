@@ -234,7 +234,7 @@ class CasinoLoopEntry:
         self.next_run = datetime.utcnow() + timedelta(minutes=self.interval_minutes)
 
 LOOP_STAGGER_SECONDS = 30
-PER_CASINO_TIMEOUT_SEC = int(os.getenv("CASINO_TIMEOUT_SECONDS", "400"))  # hard cap
+PER_CASINO_TIMEOUT_SEC = int(os.getenv("CASINO_TIMEOUT_SECONDS", "500"))  # hard cap
 MAIN_TICK_SLEEP = 5
 
 async def _run_luckybird(channel):      await luckybird_entry(None, driver, bot, channel)
@@ -256,18 +256,17 @@ async def _run_spinquest(channel):      await spinquest_flow(None, driver, chann
 
 casino_loop_entries: List[CasinoLoopEntry] = [
     CasinoLoopEntry("luckybird",     "LuckyBird",         _run_luckybird,      120),
-    CasinoLoopEntry("zula",          "Zula Casino",       _run_zula,           120),
-    CasinoLoopEntry("sportzino",     "Sportzino",         _run_sportzino,      120),
     CasinoLoopEntry("nolimitcoins",  "NoLimitCoins",      _run_nlc,            120),
     CasinoLoopEntry("funrize",       "Funrize",           _run_funrize,        120),
     CasinoLoopEntry("globalpoker",   "GlobalPoker",       _run_globalpoker,    120),
     CasinoLoopEntry("jefebet",       "JefeBet",           _run_jefebet,        120),
-    CasinoLoopEntry("crowncoins",    "CrownCoinsCasino",  _run_crowncoins,     120),
+    CasinoLoopEntry("spinquest",     "SpinQuest",         _run_spinquest,      120),
+    CasinoLoopEntry("fortunewheelz", "Fortune Wheelz",    _run_fortunewheelz,  120),
     CasinoLoopEntry("modo",          "Modo",              _run_modo,           120),
     CasinoLoopEntry("rollingriches", "Rolling Riches",    _run_rollingriches,  120),
     CasinoLoopEntry("stake",         "Stake",             _run_stake,          120),
-    CasinoLoopEntry("fortunewheelz", "Fortune Wheelz",    _run_fortunewheelz,  120),
-    CasinoLoopEntry("spinquest",     "SpinQuest",         _run_spinquest,      120),
+    CasinoLoopEntry("zula",          "Zula Casino",       _run_zula,           120),
+    CasinoLoopEntry("sportzino",     "Sportzino",         _run_sportzino,      120),
 ]
 
 def reset_loop_schedule():
