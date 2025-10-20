@@ -445,6 +445,174 @@ async def restart(ctx):
     os._exit(0)
 
 # ───────────────────────────────────────────────────────────
+# Casino Commands (manual triggers)
+# ───────────────────────────────────────────────────────────
+@bot.command(name="luckybird")
+async def luckybird_cmd(ctx):
+    await ctx.send("Checking LuckyBird for bonus…")
+    channel = bot.get_channel(DISCORD_CHANNEL)
+    await luckybird_entry(ctx, driver, bot, channel)
+
+@bot.command(name="zula")
+async def zula_cmd(ctx):
+    await ctx.send("Checking Zula Casino for bonus…")
+    await zula_casino(ctx, driver, channel := bot.get_channel(DISCORD_CHANNEL))
+
+@bot.command(name="sportzino")
+async def sportzino_cmd(ctx):
+    await ctx.send("Checking Sportzino for bonus…")
+    await Sportzino(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
+
+@bot.command(name="nolimitcoins", aliases=["nlc"])
+async def nolimitcoins_cmd(ctx):
+    await ctx.send("Checking NoLimitCoins for bonus…")
+    await nolimitcoins_flow(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
+
+@bot.command(name="funrize")
+async def funrize_cmd(ctx):
+    await ctx.send("Checking Funrize for bonus…")
+    await funrize_flow(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
+
+@bot.command(name="globalpoker")
+async def globalpoker_cmd(ctx):
+    await ctx.send("Checking GlobalPoker for bonus…")
+    await global_poker(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
+
+@bot.command(name="jefebet")
+async def jefebet_cmd(ctx):
+    await ctx.send("Checking JefeBet for bonus…")
+    await jefebet_casino(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
+
+@bot.command(name="crowncoins")
+async def crowncoins_cmd(ctx):
+    await ctx.send("Checking Crown Coins Casino for bonus…")
+    await crowncoins_casino(driver, bot, ctx, bot.get_channel(DISCORD_CHANNEL))
+
+@bot.command(name="modo")
+async def modo_cmd(ctx):
+    await ctx.send("Checking Modo for bonus…")
+    channel = bot.get_channel(DISCORD_CHANNEL)
+    ok = await claim_modo_bonus(driver, bot, ctx, channel)
+    if not ok:
+        await check_modo_countdown(driver, bot, ctx, channel)
+
+@bot.command(name="rollingriches")
+async def rollingriches_cmd(ctx):
+    await ctx.send("Checking Rolling Riches for bonus…")
+    await rolling_riches_casino(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
+
+@bot.command(name="stake")
+async def stake_cmd(ctx):
+    await ctx.send("Checking Stake for bonus…")
+    await stake_claim(driver, bot, ctx, bot.get_channel(DISCORD_CHANNEL))
+
+@bot.command(name="fortunewheelz")
+async def fortunewheelz_cmd(ctx):
+    await ctx.send("Checking Fortune Wheelz for bonus…")
+    await fortunewheelz_flow(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
+
+@bot.command(name="fortunecoins")
+async def fortunecoins_cmd(ctx):
+    await ctx.send("Checking Fortune Coins for bonus…")
+    await fortunecoins_flow(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
+
+@bot.command(name="spinquest")
+async def spinquest_cmd(ctx):
+    await ctx.send("Checking SpinQuest for bonus…")
+    await spinquest_flow(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
+
+@bot.command(name="spinpals")
+async def spinpals_cmd(ctx):
+    await ctx.send("Checking SpinPals for bonus…")
+    await spinpals_flow(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
+
+@bot.command(name="chumba")
+async def chumba_cmd(ctx):
+    await ctx.send("Checking Chumba for bonus…")
+    driver.get("https://lobby.chumbacasino.com/")
+    await asyncio.sleep(5)
+    if driver.current_url.startswith("https://login.chumbacasino.com/"):
+        authenticated = await authenticate_chumba(driver, bot, ctx)
+        if not authenticated:
+            await ctx.send("Chumba authentication failed.")
+            return
+    if driver.current_url.startswith("https://lobby.chumbacasino.com/"):
+        await claim_chumba_bonus(driver, ctx)
+        await check_chumba_countdown(driver, ctx)
+    else:
+        await ctx.send("Failed to reach the Chumba lobby.")
+
+@bot.command(name="chanced")
+async def chanced_cmd(ctx):
+    await ctx.send("Checking Chanced.com for bonus…")
+    creds = os.getenv("CHANCED")
+    if creds:
+        u, p = creds.split(":", 1)
+        pair = (u, p)
+    else:
+        pair = (None, None)
+    await chanced_casino(ctx, driver, bot.get_channel(DISCORD_CHANNEL), pair)
+
+@bot.command(name="dingdingding")
+async def dingdingding_cmd(ctx):
+    await ctx.send("Checking DingDingDing for bonus…")
+    channel = bot.get_channel(DISCORD_CHANNEL)
+    claimed = await claim_dingdingding_bonus(driver, bot, ctx, channel)
+    if not claimed:
+        await check_dingdingding_countdown(driver, bot, ctx, channel)
+
+
+# ───────────────────────────────────────────────────────────
+# Help Command
+# ───────────────────────────────────────────────────────────
+@bot.command(name="help")
+async def help_cmd(ctx):
+    await ctx.send("""Commands are not recommended while the casino loop is running.
+
+🎰 **Casino Commands:**  
+!chanced - Check Chanced.com for bonus  
+!luckybird - Check LuckyBird.io for bonus  
+!globalpoker - Check GlobalPoker for bonus  
+!crowncoins - Check CrownCoinsCasino for bonus  
+!chumba - Check Chumba for bonus  
+!modo - Check Modo for bonus  
+!zula - Check Zula for bonus  
+!rollingriches - Check RollingRiches for bonus  
+!jefebet - Check JefeBet for bonus  
+!spinpals - Check SpinPals for bonus  
+!spinquest - Check SpinQuest for bonus  
+!funrize - Check Funrize for bonus  
+!sportzino - Check Sportzino for bonus  
+!fortunecoins - Check FortuneCoins for bonus  
+!nolimitcoins - Check NoLimitCoins for bonus  
+!fortunewheelz - Check Fortune Wheelz for bonus  
+!stake - Check Stake for bonus  
+!dingdingding - Check DingDingDing for bonus  
+
+---------------------------------------  
+⚙️ **General Commands:**  
+!ping - Check if the bot is online  
+!restart - Restart the bot  
+!help - Display this list  
+!stop - Stop the bot  
+!start - Start the automated casino loop  
+!about - Show Chrome version info  
+
+---------------------------------------  
+✅ **Auth Commands:**  
+!auth google - Authenticate global Google Account  
+!auth <site> - Authenticate into a specific site (e.g., Modo, DingDingDing, Stake, LuckyBird)  
+!auth <site> <method> - Authenticate using a specific method  
+   (e.g. !auth crowncoins google, !auth crowncoins env, !auth nolimitcoins env)
+
+---------------------------------------  
+💡 **Tip:**  
+The automated loop runs every 2 hours for main casinos, and every 8 hours for others.  
+Manual commands should only be used for testing or debugging individual sites.
+""")
+
+
+# ───────────────────────────────────────────────────────────
 # Run bot
 # ───────────────────────────────────────────────────────────
 bot.run(DISCORD_TOKEN)
