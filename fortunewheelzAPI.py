@@ -48,6 +48,7 @@ CLAIM_BUTTON = (
 
 # The collect button XPATH
 COLLECT_BUTTON = [
+    "/html/body/div[4]/div/div[2]/div[3]/button",
     "/html/body/div[5]/div/div[2]/div[3]/button",
     "/html/body/div[8]/div/div[2]/div[3]/button",
     "/html/body/div[9]/div/div[2]/div[3]/button"
