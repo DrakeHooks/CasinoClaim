@@ -1,6 +1,5 @@
 # Drake Hooks + WaterTrooper
-# Casino Claim 2
-# Fortune Wheelz API (non-recursive; one-shot actions)
+# Casino Claim 2 — Fortune Wheelz API (de-recursed + guarded)
 
 import os
 import re
@@ -12,163 +11,128 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 
-# ───────────────────────────────────────────────────────────
-# Config & Constants
-# ───────────────────────────────────────────────────────────
 load_dotenv()
-FORTUNEWHEELZ_CRED = os.getenv("FORTUNEWHEELZ")  # format "email:password"
 
+FORTUNEWHEELZ_CRED = os.getenv("FORTUNEWHEELZ")  # "email:password"
 SITE_URL  = "https://fortunewheelz.com"
 STORE_URL = "https://fortunewheelz.com/promotions"
 
-# XPaths / selectors (keep your working ones)
-LOGIN_BUTTON   = "/html/body/div[1]/div/div/div[1]/header/div[2]/button[1]"
-EMAIL_INPUT    = "/html/body/div[1]/div/div/div[2]/form/label[1]/div[2]/div[2]/input"
-PASSWORD_INPUT = "/html/body/div[1]/div/div/div[2]/form/label[2]/div[2]/input"
-LOGIN_SUBMIT   = "/html/body/div[1]/div/div/div[2]/form/div/button"
+# Locators
+LOGIN_BUTTON  = "/html/body/div[1]/div/div/div[1]/header/div[2]/button[1]"
+EMAIL_INPUT   = "/html/body/div[1]/div/div/div[2]/form/label[1]/div[2]/div[2]/input"
+PASSWORD_INPUT= "/html/body/div[1]/div/div/div[2]/form/label[2]/div[2]/input"
+LOGIN_SUBMIT  = "/html/body/div[1]/div/div/div[2]/form/div/button"
 
-CLAIM_BUTTON_CLASS = "promo-daily-login-button"  # "Claim Now" on promotions
-COLLECT_BUTTON_XP  = [
+CLAIM_CARD_CLASS   = "promo-daily-login-button"   # "Claim now" card on /promotions
+COLLECT_XPATHS     = [
     "/html/body/div[5]/div/div[2]/div[3]/button",
     "/html/body/div[8]/div/div[2]/div[3]/button",
     "/html/body/div[9]/div/div[2]/div[3]/button",
 ]
+COUNTDOWN_DISABLED_BTN = "//button[@disabled and contains(normalize-space(.), ':')]"
 
-XPATH_COUNTDOWN = "//button[@disabled and contains(normalize-space(.), ':')]"
+# Generic helper
+def _wait_clickable(driver, by, value, timeout=8):
+    return WebDriverWait(driver, timeout).until(EC.element_to_be_clickable((by, value)))
 
-# ───────────────────────────────────────────────────────────
-# Helpers (short, bounded waits)
-# ───────────────────────────────────────────────────────────
-def _wait_clickable(driver, by, sel, timeout=10):
-    return WebDriverWait(driver, timeout).until(EC.element_to_be_clickable((by, sel)))
-
-def _wait_present(driver, by, sel, timeout=10):
-    return WebDriverWait(driver, timeout).until(EC.presence_of_element_located((by, sel)))
+def _wait_present(driver, by, value, timeout=8):
+    return WebDriverWait(driver, timeout).until(EC.presence_of_element_located((by, value)))
 
 # ───────────────────────────────────────────────────────────
-# Public one-shot flow the loop/command will call
+# Public entry: one pass that never recurses
 # ───────────────────────────────────────────────────────────
 async def fortunewheelz_flow(ctx, driver, channel):
     """
-    One run:
-      1) Try claim directly on /promotions.
-      2) If nothing to claim, report countdown.
-      3) If likely logged out, login once and try claim once more.
-    Always returns.
+    Try in this order:
+      1) If claim dialog is reachable → claim
+      2) Else show countdown if present
+      3) Else login once, then try claim once
+    Never recurse; never loop forever.
     """
-    # Try direct claim
+    # Step 1: try claim directly
     driver.get(STORE_URL)
-    await asyncio.sleep(3)
+    await asyncio.sleep(5)
 
     claimed = await _try_claim(driver, channel)
     if claimed:
         return
 
-    # Try to read countdown
-    read = await _report_countdown(driver, channel)
-    if read:
+    # Step 2: try a countdown read
+    countdown = _read_countdown(driver)
+    if countdown:
+        await channel.send(f"Next Fortune Wheelz bonus Available in: {countdown}")
         return
 
-    # Probably logged out; login once and try claim once more
-    await _login_if_needed(driver, channel)
-    driver.get(STORE_URL)
-    await asyncio.sleep(2)
-    claimed = await _try_claim(driver, channel)
-    if not claimed:
-        await _report_countdown(driver, channel)
-
-# ───────────────────────────────────────────────────────────
-# Login
-# ───────────────────────────────────────────────────────────
-async def _login_if_needed(driver, channel):
+    # Step 3: login once, then attempt one claim pass
     if not FORTUNEWHEELZ_CRED:
-        try:
-            await channel.send("⚠️ Fortune Wheelz credentials not found in environment (FORTUNEWHEELZ).")
-        except Exception:
-            pass
+        await channel.send("Fortune Wheelz credentials not found in environment variables.")
         return
-
-    username, password = FORTUNEWHEELZ_CRED.split(":", 1)
-
-    driver.get(SITE_URL)
-    await asyncio.sleep(3)
 
     try:
-        btn = _wait_clickable(driver, By.XPATH, LOGIN_BUTTON, timeout=10)
-        btn.click()
-        await asyncio.sleep(1.5)
+        driver.get(SITE_URL)
+        await asyncio.sleep(3)
+        _wait_clickable(driver, By.XPATH, LOGIN_BUTTON, timeout=10).click()
+        await asyncio.sleep(1)
 
-        email_el = _wait_present(driver, By.XPATH, EMAIL_INPUT, timeout=10)
-        email_el.clear()
-        email_el.send_keys(username)
-
-        pw_el = _wait_present(driver, By.XPATH, PASSWORD_INPUT, timeout=10)
-        pw_el.clear()
-        pw_el.send_keys(password)
-
-        submit = _wait_clickable(driver, By.XPATH, LOGIN_SUBMIT, timeout=10)
-        submit.click()
-        await asyncio.sleep(4)
+        email = _wait_present(driver, By.XPATH, EMAIL_INPUT, timeout=10)
+        pw    = _wait_present(driver, By.XPATH, PASSWORD_INPUT, timeout=10)
+        user, passw = FORTUNEWHEELZ_CRED.split(":", 1)
+        email.send_keys(user)
+        pw.send_keys(passw)
+        _wait_clickable(driver, By.XPATH, LOGIN_SUBMIT, timeout=10).click()
+        await asyncio.sleep(3)
     except TimeoutException:
-        # If anything times out, just return; the loop timeout will protect us.
-        pass
+        await _shoot(channel, driver, "fortunewheelz_login_timeout.png",
+                     "Fortune Wheelz login timed out. Will try again next loop.")
+        return
+
+    # After login, one more single attempt:
+    driver.get(STORE_URL)
+    await asyncio.sleep(3)
+    claimed = await _try_claim(driver, channel)
+    if claimed:
+        return
+
+    countdown = _read_countdown(driver)
+    if countdown:
+        await channel.send(f"Next Fortune Wheelz bonus Available in: {countdown}")
+    # If neither was found, we silently return; the main loop will revisit later.
 
 # ───────────────────────────────────────────────────────────
-# Claim helpers
+# Helpers
 # ───────────────────────────────────────────────────────────
 async def _try_claim(driver, channel) -> bool:
-    """Return True if we successfully claimed."""
+    """Return True if we successfully claimed; False otherwise."""
     try:
-        claim = _wait_clickable(driver, By.CLASS_NAME, CLAIM_BUTTON_CLASS, timeout=10)
-        claim.click()
+        _wait_clickable(driver, By.CLASS_NAME, CLAIM_CARD_CLASS, timeout=6).click()
         await asyncio.sleep(2)
     except TimeoutException:
-        # Claim button not present
-        return False
+        # card not visible/clickable — might still have a collect modal from earlier
+        pass
 
-    # Try each possible "Collect" xpath once
-    for xp in COLLECT_BUTTON_XP:
+    for xp in COLLECT_XPATHS:
         try:
-            collect = _wait_clickable(driver, By.XPATH, xp, timeout=10)
-            collect.click()
-            await channel.send("✅ Fortune Wheelz daily bonus collected.")
+            _wait_clickable(driver, By.XPATH, xp, timeout=4).click()
+            await channel.send("Fortune Wheelz Daily Bonus Claimed!")
             return True
         except TimeoutException:
             continue
     return False
 
-async def _report_countdown(driver, channel) -> bool:
-    """Return True if we found and reported a timer."""
+def _read_countdown(driver) -> str | None:
     try:
-        btn = _wait_present(driver, By.XPATH, XPATH_COUNTDOWN, timeout=5)
-        raw = (btn.text or "").strip()      # e.g. "22 : 27 : 06"
-        countdown = re.sub(r"\s+", "", raw) # => "22:27:06"
-        await channel.send(f"Next Fortune Wheelz bonus Available in: {countdown}")
-        return True
+        btn = _wait_present(driver, By.XPATH, COUNTDOWN_DISABLED_BTN, timeout=3)
+        raw = btn.text.strip()              # e.g. "22 : 27 : 06"
+        return re.sub(r"\s+", "", raw)      # → "22:27:06"
     except TimeoutException:
-        return False
+        return None
 
-# ───────────────────────────────────────────────────────────
-# Optional explicit helpers if you call them elsewhere
-# ───────────────────────────────────────────────────────────
-async def fortunewheelz_casino(ctx, driver, channel):
-    """Kept for compatibility: just do a one-shot login, then try claim."""
-    await _login_if_needed(driver, channel)
-    driver.get(STORE_URL)
-    await asyncio.sleep(2)
-    if not await _try_claim(driver, channel):
-        await _report_countdown(driver, channel)
-
-async def claim_fortunewheelz_bonus(ctx, driver, channel):
-    """One-shot claim attempt. No recursion."""
-    driver.get(STORE_URL)
-    await asyncio.sleep(2)
-    if not await _try_claim(driver, channel):
-        await _report_countdown(driver, channel)
-
-async def check_fortunewheelz_countdown(ctx, driver, channel):
-    """One-shot timer read."""
-    driver.get(STORE_URL)
-    await asyncio.sleep(2)
-    if not await _report_countdown(driver, channel):
-        await channel.send("Could not find Fortune Wheelz timer; maybe available now.")
+async def _shoot(channel, driver, path, msg):
+    try:
+        driver.save_screenshot(path)
+        await channel.send(msg, file=discord.File(path))
+    except Exception:
+        await channel.send(msg)
+    finally:
+        try: os.remove(path)
+        except Exception: pass
