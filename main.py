@@ -78,66 +78,101 @@ intents.message_content = True
 # ───────────────────────────────────────────────────────────
 # Selenium driver (headed; Xvfb is started by entrypoint.sh)
 # ───────────────────────────────────────────────────────────
+from selenium.common.exceptions import SessionNotCreatedException
+
 caps = DesiredCapabilities.CHROME
 caps["goog:loggingPrefs"] = {"performance": "ALL"}
 
 options = Options()
 
-# Prefer a persistent profile mounted at /data/chrome
-# (entrypoint.sh already ensures lock files are removed)
 instance_dir = os.getenv("CHROME_INSTANCE_DIR", "").strip()
-profile_dir = os.getenv("CHROME_PROFILE_DIR", "Default").strip()
+profile_dir  = os.getenv("CHROME_PROFILE_DIR", "Default").strip()
 
+def _clean_chrome_locks(root: str, profile: str) -> None:
+    """Delete Chrome lock files that make Chrome think the profile is in use."""
+    try:
+        # root-level locks (e.g., /data/chrome/Singleton*)
+        for pat in ("Singleton*",):
+            for p in glob.glob(os.path.join(root, pat)):
+                try: os.remove(p)
+                except Exception: pass
+        # profile-level locks (e.g., /data/chrome/Default/Singleton*)
+        prof_path = os.path.join(root, profile)
+        os.makedirs(prof_path, exist_ok=True)
+        for pat in ("Singleton*",):
+            for p in glob.glob(os.path.join(prof_path, pat)):
+                try: os.remove(p)
+                except Exception: pass
+        # sometimes a stale DevToolsActivePort file shows up in the profile root
+        for p in ("DevToolsActivePort",):
+            fp = os.path.join(prof_path, p)
+            if os.path.exists(fp):
+                try: os.remove(fp)
+                except Exception: pass
+    except Exception:
+        pass
+
+def _apply_common_chrome_flags(opts: Options) -> None:
+    opts.add_argument("--window-size=1920,1080")
+    opts.add_argument("--no-first-run")
+    opts.add_argument("--no-default-browser-check")
+    opts.add_argument("--disable-dev-shm-usage")
+    opts.add_argument("--disable-notifications")
+    opts.add_argument("--enable-third-party-cookies")
+    opts.add_argument("--disable-blink-features=AutomationControlled")
+    opts.add_argument("--disable-features=DisableLoadExtensionCommandLineSwitch")
+    opts.add_argument("--no-sandbox")
+    opts.add_argument("--ignore-certificate-errors")
+    opts.add_argument("--ignore-ssl-errors")
+    opts.add_argument("disable-infobars")
+    opts.add_argument(f"--remote-debugging-port={9222 + (os.getpid() % 1000)}")
+    ua = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+          "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36")
+    opts.add_argument(f"--user-agent={ua}")
+    opts.set_capability("goog:loggingPrefs", caps["goog:loggingPrefs"])
+
+# Prefer persistent profile if provided
 if instance_dir:
     print(f"[Chrome] Profile Root: {instance_dir}  Profile Dir: {profile_dir}")
-    os.makedirs(os.path.join(instance_dir, profile_dir), exist_ok=True)
-    for p in glob.glob(os.path.join(instance_dir, profile_dir, "Singleton*")):
-        try: os.remove(p)
-        except Exception: pass
+    _clean_chrome_locks(instance_dir, profile_dir)
     options.add_argument(f"--user-data-dir={instance_dir}")
     options.add_argument(f"--profile-directory={profile_dir}")
 else:
-    # Fallback to CHROME_USER_DATA_DIR for backwards compatibility
     user_data_root = os.getenv("CHROME_USER_DATA_DIR", "").strip()
     if user_data_root:
         print(f"[Chrome] Profile Root: {user_data_root}  Profile Dir: {profile_dir}")
-        os.makedirs(user_data_root, exist_ok=True)
+        _clean_chrome_locks(user_data_root, profile_dir)
         options.add_argument(f"--user-data-dir={user_data_root}")
         options.add_argument(f"--profile-directory={profile_dir}")
     else:
         print("[Chrome] No persistent profile configured (ephemeral session).")
 
-# Headed under X
-options.add_argument("--window-size=1920,1080")
-options.add_argument("--no-first-run")
-options.add_argument("--no-default-browser-check")
-options.add_argument("--disable-dev-shm-usage")
-options.add_argument("--disable-notifications")
-options.add_argument("--enable-third-party-cookies")
-options.add_argument("--disable-blink-features=AutomationControlled")
-options.add_argument("--disable-features=DisableLoadExtensionCommandLineSwitch")
-options.add_argument("--no-sandbox")
-options.add_argument("--ignore-certificate-errors")
-options.add_argument("--ignore-ssl-errors")
-options.add_argument("disable-infobars")
-options.add_argument(f"--remote-debugging-port={9222 + (os.getpid() % 1000)}")
-
-user_agent = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
-)
-options.add_argument(f"--user-agent={user_agent}")
-options.set_capability("goog:loggingPrefs", caps["goog:loggingPrefs"])
-
-# If you ship the captcha solver, you can load it here
+# Optional CRX
 crx_path = "/temp/CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx"
 if os.path.exists(crx_path):
     options.add_extension(crx_path)
 
-driver = webdriver.Chrome(
-    service=Service(ChromeDriverManager().install()),
-    options=options,
-)
+_apply_common_chrome_flags(options)
+
+def _build_driver_with_retry(opts: Options):
+    """Create the Chrome driver; if Chrome says 'profile in use', force-unlock and retry once."""
+    try:
+        return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=opts)
+    except SessionNotCreatedException as e:
+        msg = str(e)
+        if "user data directory is already in use" in msg:
+            # Try one more time after an aggressive cleanup.
+            root = instance_dir or os.getenv("CHROME_USER_DATA_DIR", "").strip()
+            prof = profile_dir
+            if root:
+                print("[Chrome] Retrying after force-unlock of profile…")
+                _clean_chrome_locks(root, prof)
+                time.sleep(1.0)
+                return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=opts)
+        raise  # not that error or second attempt also failed
+
+driver = _build_driver_with_retry(options)
+
 
 # ───────────────────────────────────────────────────────────
 # Discord bot
