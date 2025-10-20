@@ -234,7 +234,7 @@ class CasinoLoopEntry:
         self.next_run = datetime.utcnow() + timedelta(minutes=self.interval_minutes)
 
 LOOP_STAGGER_SECONDS = 30
-PER_CASINO_TIMEOUT_SEC = int(os.getenv("CASINO_TIMEOUT_SECONDS", "120"))  # hard cap
+PER_CASINO_TIMEOUT_SEC = int(os.getenv("CASINO_TIMEOUT_SECONDS", "400"))  # hard cap
 MAIN_TICK_SLEEP = 5
 
 async def _run_luckybird(channel):      await luckybird_entry(None, driver, bot, channel)
