@@ -266,8 +266,8 @@ casino_loop_entries: List[CasinoLoopEntry] = [
     CasinoLoopEntry("modo",          "Modo",              _run_modo,           120),
     CasinoLoopEntry("rollingriches", "Rolling Riches",    _run_rollingriches,  120),
     CasinoLoopEntry("stake",         "Stake",             _run_stake,          120),
-    CasinoLoopEntry("fortunewheelz", "Fortune Wheelz",    _run_fortunewheelz,  480),
-    CasinoLoopEntry("spinquest",     "SpinQuest",         _run_spinquest,      480),
+    CasinoLoopEntry("fortunewheelz", "Fortune Wheelz",    _run_fortunewheelz,  120),
+    CasinoLoopEntry("spinquest",     "SpinQuest",         _run_spinquest,      120),
 ]
 
 def reset_loop_schedule():
