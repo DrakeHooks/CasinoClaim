@@ -18,26 +18,42 @@ SITE_URL  = "https://fortunewheelz.com"
 STORE_URL = "https://fortunewheelz.com/promotions"
 
 # Locators
-LOGIN_BUTTON  = "/html/body/div[1]/div/div/div[1]/header/div[2]/button[1]"
-EMAIL_INPUT   = "/html/body/div[1]/div/div/div[2]/form/label[1]/div[2]/div[2]/input"
-PASSWORD_INPUT= "/html/body/div[1]/div/div/div[2]/form/label[2]/div[2]/input"
-LOGIN_SUBMIT  = "/html/body/div[1]/div/div/div[2]/form/div/button"
+LOGIN_BUTTON    = "/html/body/div[1]/div/div/div[1]/header/div[2]/button[1]"
+EMAIL_INPUT     = "/html/body/div[1]/div/div/div[2]/form/label[1]/div[2]/div[2]/input"
+PASSWORD_INPUT  = "/html/body/div[1]/div/div/div[2]/form/label[2]/div[2]/input"
+LOGIN_SUBMIT    = "/html/body/div[1]/div/div/div[2]/form/div/button"
 
-CLAIM_CARD_CLASS   = "promo-daily-login-button"   # "Claim now" card on /promotions
-COLLECT_XPATHS     = [
+CLAIM_CARD_CLASS = "promo-daily-login-button"    # "Claim now" card on /promotions
+COLLECT_XPATHS   = [
     "/html/body/div[5]/div/div[2]/div[3]/button",
     "/html/body/div[8]/div/div[2]/div[3]/button",
     "/html/body/div[9]/div/div[2]/div[3]/button",
 ]
-COUNTDOWN_DISABLED_BTN = "//button[@disabled and contains(normalize-space(.), ':')]"
 
-COUNTDOWN_XPATH = "/html/body/div[4]/div/div[2]/div[3]/p"
-# Generic helper
+# Countdown sources:
+MODAL_COUNTDOWN_P = "/html/body/div[4]/div/div[2]/div[3]/p"
+STORE_DISABLED_BTN_ABS = "/html/body/div[1]/div/div/div[2]/main/div/div[1]/div[2]/div[3]/div/div[1]/div[2]/button"
+COUNTDOWN_DISABLED_BTN_GENERIC = "//button[@disabled and contains(normalize-space(.), ':')]"
+
+# Generic helpers
 def _wait_clickable(driver, by, value, timeout=8):
     return WebDriverWait(driver, timeout).until(EC.element_to_be_clickable((by, value)))
 
 def _wait_present(driver, by, value, timeout=8):
     return WebDriverWait(driver, timeout).until(EC.presence_of_element_located((by, value)))
+
+def _normalize_countdown(txt: str) -> str | None:
+    """
+    Accepts strings like '22 : 27 : 06' or '22:27:06'
+    Returns 'HH:MM:SS' or None if not parseable.
+    """
+    if not txt:
+        return None
+    m = re.search(r'(\d{1,2})\s*:\s*(\d{2})\s*:\s*(\d{2})', txt)
+    if not m:
+        return None
+    h, mnt, s = m.groups()
+    return f"{int(h):02d}:{int(mnt):02d}:{int(s):02d}"
 
 # ───────────────────────────────────────────────────────────
 # Public entry: one pass that never recurses
@@ -46,8 +62,8 @@ async def fortunewheelz_flow(ctx, driver, channel):
     """
     Try in this order:
       1) If claim dialog is reachable → claim
-      2) Else show countdown if present
-      3) Else login once, then try claim once
+      2) Else show countdown if present (modal p OR disabled button on store)
+      3) Else login once, then try claim once, then read countdown again
     Never recurse; never loop forever.
     """
     # Step 1: try claim directly
@@ -58,7 +74,7 @@ async def fortunewheelz_flow(ctx, driver, channel):
     if claimed:
         return
 
-    # Step 2: try a countdown read
+    # Step 2: try a countdown read (modal p, store button abs, generic fallback)
     countdown = _read_countdown(driver)
     if countdown:
         await channel.send(f"Next Fortune Wheelz bonus Available in: {countdown}")
@@ -121,12 +137,41 @@ async def _try_claim(driver, channel) -> bool:
     return False
 
 def _read_countdown(driver) -> str | None:
+    """
+    Try the modal paragraph, then the absolute store button, then a generic
+    disabled button with a colon in its text. Normalize to HH:MM:SS.
+    """
+    # 1) Modal paragraph countdown
     try:
-        btn = _wait_present(driver, By.XPATH, COUNTDOWN_XPATH, timeout=10)
-        raw = btn.text.strip()              # e.g. "22 : 27 : 06"
-        return re.sub(r"\s+", "", raw)      # → "22:27:06"
+        el = _wait_present(driver, By.XPATH, MODAL_COUNTDOWN_P, timeout=3)
+        txt = (el.text or "").strip()
+        norm = _normalize_countdown(txt)
+        if norm:
+            return norm
     except TimeoutException:
-        return None
+        pass
+
+    # 2) Store page disabled button (absolute xpath)
+    try:
+        el = _wait_present(driver, By.XPATH, STORE_DISABLED_BTN_ABS, timeout=3)
+        txt = (el.text or "").strip()
+        norm = _normalize_countdown(txt)
+        if norm:
+            return norm
+    except TimeoutException:
+        pass
+
+    # 3) Generic disabled button containing a colon
+    try:
+        el = _wait_present(driver, By.XPATH, COUNTDOWN_DISABLED_BTN_GENERIC, timeout=3)
+        txt = (el.text or "").strip()
+        norm = _normalize_countdown(txt)
+        if norm:
+            return norm
+    except TimeoutException:
+        pass
+
+    return None
 
 async def _shoot(channel, driver, path, msg):
     try:
