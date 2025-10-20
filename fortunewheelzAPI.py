@@ -31,6 +31,7 @@ COLLECT_XPATHS     = [
 ]
 COUNTDOWN_DISABLED_BTN = "//button[@disabled and contains(normalize-space(.), ':')]"
 
+COUNTDOWN_XPATH = "/html/body/div[4]/div/div[2]/div[3]/p"
 # Generic helper
 def _wait_clickable(driver, by, value, timeout=8):
     return WebDriverWait(driver, timeout).until(EC.element_to_be_clickable((by, value)))
@@ -121,7 +122,7 @@ async def _try_claim(driver, channel) -> bool:
 
 def _read_countdown(driver) -> str | None:
     try:
-        btn = _wait_present(driver, By.XPATH, COUNTDOWN_DISABLED_BTN, timeout=3)
+        btn = _wait_present(driver, By.XPATH, COUNTDOWN_XPATH, timeout=10)
         raw = btn.text.strip()              # e.g. "22 : 27 : 06"
         return re.sub(r"\s+", "", raw)      # → "22:27:06"
     except TimeoutException:
