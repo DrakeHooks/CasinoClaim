@@ -54,6 +54,7 @@ api_modules = [
     "sportzinoAPI",
     "nolimitcoinsAPI",          # ← NoLimitCoins
     "smilescasinoAPI",          # ← Smiles Casino
+    "taofortuneAPI",            # ← TaoFortune
 ]
 
 for module_name in api_modules:
@@ -136,6 +137,7 @@ funrize_task = None
 fortunewheelz_task = None
 sportzino_task = None
 smilescasino_task = None
+taofortune_task = None
 
 # Running flags
 chanced_casino_running = False
@@ -154,6 +156,7 @@ funrize_running = False
 fortunewheelz_running = False
 sportzino_running = False
 smilescasino_running = False
+taofortune_running = False
 
 # ───────────────────────────────────────────────────────────
 # Bot events
@@ -222,6 +225,7 @@ async def help_cmd(ctx):
     !fortunecoins - Check Fortunecoins for bonus
     !nolimitcoins - Check NoLimitCoins for bonus
     !smilescasino - Check Smiles Casino for bonus
+    !taofortune - Check TaoFortune for bonus
 
     ---------------------------------------
     ⚙️ General Commands:                             
@@ -349,6 +353,12 @@ async def smilescasino(ctx):
     await ctx.send("Checking Smiles Casino for Bonus...")
     channel = bot.get_channel(DISCORD_CHANNEL)
     await smilescasino_flow(ctx, driver, channel)
+
+@bot.command(name="TaoFortune")
+async def taofortune(ctx):
+    await ctx.send("Checking TaoFortune for Bonus...")
+    channel = bot.get_channel(DISCORD_CHANNEL)
+    await taofortune_flow(ctx, driver, channel)
 
 @bot.command(name="Stake")
 async def stake(ctx):
@@ -667,6 +677,11 @@ async def eighthour_loop():
             await smilescasino_flow(None, driver, channel)
         except:
             print("Error in Smiles Casino")
+        await asyncio.sleep(10)
+        try:
+            await taofortune_flow(None, driver, channel)
+        except:
+            print("Error in TaoFortune")
 
     except Exception as e:
         print(f"Error in loop: {str(e)}")
