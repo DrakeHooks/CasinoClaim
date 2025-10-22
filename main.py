@@ -514,7 +514,9 @@ async def fortunewheelz_cmd(ctx):
 @bot.command(name="fortunecoins")
 async def fortunecoins_cmd(ctx):
     await ctx.send("Checking Fortune Coins for bonus…")
-    await fortunecoins_flow(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
+    channel = bot.get_channel(DISCORD_CHANNEL)
+    await fortunecoins_uc(ctx, channel)
+
 
 @bot.command(name="spinquest")
 async def spinquest_cmd(ctx):

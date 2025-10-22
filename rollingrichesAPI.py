@@ -37,9 +37,9 @@ async def rolling_riches_casino(ctx, driver, channel):
             email_input.send_keys(username)
             password_input.send_keys(password)
             password_input.send_keys(Keys.ENTER)
-            await asyncio.sleep(5)
+            await asyncio.sleep(10)
             print("Logging into Rolling Riches...")
-        except TimeoutException:
+        except:
             print("Already logged into Rolling Riches or login form not found.")
 
         # Proceed to claim
