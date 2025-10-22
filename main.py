@@ -24,6 +24,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.common.exceptions import SessionNotCreatedException
 
 # Discord
 from discord import Intents
@@ -33,12 +34,11 @@ from discord.ext import commands
 import undetected_chromedriver as uc  # noqa: F401
 
 # ───────────────────────────────────────────────────────────
-# Dynamic API imports
-# (only names are referenced in runners; missing ones are OK)
+# Dynamic API imports (missing modules are OK)
 # ───────────────────────────────────────────────────────────
 api_modules = [
-    "fortunewheelzAPI",   # <- fixed and guarded below
-    "fortunecoinsAPI",
+    "fortunewheelzAPI",
+    "fortunecoinsAPI",  # UC flow
     "stakeAPI",
     "modoAPI",
     "googleauthAPI",
@@ -57,7 +57,6 @@ api_modules = [
     "sportzinoAPI",
     "nolimitcoinsAPI",
 ]
-
 for module_name in api_modules:
     try:
         module = importlib.import_module(module_name)
@@ -78,37 +77,39 @@ intents.message_content = True
 # ───────────────────────────────────────────────────────────
 # Selenium driver (headed; Xvfb is started by entrypoint.sh)
 # ───────────────────────────────────────────────────────────
-from selenium.common.exceptions import SessionNotCreatedException
-
 caps = DesiredCapabilities.CHROME
 caps["goog:loggingPrefs"] = {"performance": "ALL"}
 
 options = Options()
 
 instance_dir = os.getenv("CHROME_INSTANCE_DIR", "").strip()
-profile_dir  = os.getenv("CHROME_PROFILE_DIR", "Default").strip()
+profile_dir = os.getenv("CHROME_PROFILE_DIR", "Default").strip()
 
 def _clean_chrome_locks(root: str, profile: str) -> None:
     """Delete Chrome lock files that make Chrome think the profile is in use."""
     try:
-        # root-level locks (e.g., /data/chrome/Singleton*)
         for pat in ("Singleton*",):
             for p in glob.glob(os.path.join(root, pat)):
-                try: os.remove(p)
-                except Exception: pass
-        # profile-level locks (e.g., /data/chrome/Default/Singleton*)
+                try:
+                    os.remove(p)
+                except Exception:
+                    pass
         prof_path = os.path.join(root, profile)
         os.makedirs(prof_path, exist_ok=True)
-        for pat in ("Singleton*",):
+        for pat in ("Singleton*", "LOCK", "LOCKFILE", "Safe Browsing*"):
             for p in glob.glob(os.path.join(prof_path, pat)):
-                try: os.remove(p)
-                except Exception: pass
-        # sometimes a stale DevToolsActivePort file shows up in the profile root
+                try:
+                    os.remove(p)
+                except Exception:
+                    pass
+        # Sometimes a stale DevToolsActivePort file shows up in the profile root
         for p in ("DevToolsActivePort",):
             fp = os.path.join(prof_path, p)
             if os.path.exists(fp):
-                try: os.remove(fp)
-                except Exception: pass
+                try:
+                    os.remove(fp)
+                except Exception:
+                    pass
     except Exception:
         pass
 
@@ -131,7 +132,7 @@ def _apply_common_chrome_flags(opts: Options) -> None:
     opts.add_argument(f"--user-agent={ua}")
     opts.set_capability("goog:loggingPrefs", caps["goog:loggingPrefs"])
 
-# Prefer persistent profile if provided
+# Persistent profile (prefer CHROME_INSTANCE_DIR)
 if instance_dir:
     print(f"[Chrome] Profile Root: {instance_dir}  Profile Dir: {profile_dir}")
     _clean_chrome_locks(instance_dir, profile_dir)
@@ -161,7 +162,6 @@ def _build_driver_with_retry(opts: Options):
     except SessionNotCreatedException as e:
         msg = str(e)
         if "user data directory is already in use" in msg:
-            # Try one more time after an aggressive cleanup.
             root = instance_dir or os.getenv("CHROME_USER_DATA_DIR", "").strip()
             prof = profile_dir
             if root:
@@ -169,18 +169,16 @@ def _build_driver_with_retry(opts: Options):
                 _clean_chrome_locks(root, prof)
                 time.sleep(1.0)
                 return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=opts)
-        raise  # not that error or second attempt also failed
+        raise
 
 driver = _build_driver_with_retry(options)
 
-
 # ───────────────────────────────────────────────────────────
-# Discord bot
+# Discord bot + 2FA capture plumbing
 # ───────────────────────────────────────────────────────────
 bot = commands.Bot(command_prefix="!", intents=intents, case_insensitive=True)
 bot.remove_command("help")
 
-# 2FA capture plumbing (shared by APIs that ask for codes)
 bot.awaiting_2fa_for = None
 bot.pending_2fa_code = None
 bot._pending_2fa_event = asyncio.Event()
@@ -253,20 +251,23 @@ async def _run_rollingriches(channel):  await rolling_riches_casino(None, driver
 async def _run_stake(channel):          await stake_claim(driver, bot, None, channel)
 async def _run_fortunewheelz(channel):  await fortunewheelz_flow(None, driver, channel)
 async def _run_spinquest(channel):      await spinquest_flow(None, driver, channel)
+async def _run_fortunecoins(channel):   await fortunecoins_uc(None, channel)  # <- UC flow, 24h interval
 
 casino_loop_entries: List[CasinoLoopEntry] = [
-    CasinoLoopEntry("luckybird",     "LuckyBird",         _run_luckybird,      120),
-    CasinoLoopEntry("nolimitcoins",  "NoLimitCoins",      _run_nlc,            120),
-    CasinoLoopEntry("funrize",       "Funrize",           _run_funrize,        120),
-    CasinoLoopEntry("globalpoker",   "GlobalPoker",       _run_globalpoker,    120),
-    CasinoLoopEntry("jefebet",       "JefeBet",           _run_jefebet,        120),
-    CasinoLoopEntry("spinquest",     "SpinQuest",         _run_spinquest,      120),
-    CasinoLoopEntry("fortunewheelz", "Fortune Wheelz",    _run_fortunewheelz,  120),
-    CasinoLoopEntry("modo",          "Modo",              _run_modo,           120),
-    CasinoLoopEntry("rollingriches", "Rolling Riches",    _run_rollingriches,  120),
-    CasinoLoopEntry("stake",         "Stake",             _run_stake,          120),
-    CasinoLoopEntry("zula",          "Zula Casino",       _run_zula,           120),
-    CasinoLoopEntry("sportzino",     "Sportzino",         _run_sportzino,      120),
+    CasinoLoopEntry("luckybird",     "LuckyBird",         _run_luckybird,       120),
+    CasinoLoopEntry("nolimitcoins",  "NoLimitCoins",      _run_nlc,             120),
+    CasinoLoopEntry("funrize",       "Funrize",           _run_funrize,         120),
+    CasinoLoopEntry("globalpoker",   "GlobalPoker",       _run_globalpoker,     120),
+    CasinoLoopEntry("jefebet",       "JefeBet",           _run_jefebet,         120),
+    CasinoLoopEntry("spinquest",     "SpinQuest",         _run_spinquest,       120),
+    CasinoLoopEntry("fortunewheelz", "Fortune Wheelz",    _run_fortunewheelz,   120),
+    CasinoLoopEntry("modo",          "Modo",              _run_modo,            120),
+    CasinoLoopEntry("rollingriches", "Rolling Riches",    _run_rollingriches,   120),
+    CasinoLoopEntry("stake",         "Stake",             _run_stake,           120),
+    CasinoLoopEntry("zula",          "Zula Casino",       _run_zula,            120),
+    CasinoLoopEntry("sportzino",     "Sportzino",         _run_sportzino,       120),
+    # NEW: Fortune Coins runs every 24 hours
+    CasinoLoopEntry("fortunecoins",  "Fortune Coins",     _run_fortunecoins,    1440),
 ]
 
 def reset_loop_schedule():
@@ -288,7 +289,6 @@ async def run_main_loop(channel: discord.abc.Messageable):
             for entry in casino_loop_entries:
                 if now >= entry.next_run:
                     try:
-                        # HARD TIMEOUT (prevents Discord heartbeat blocking)
                         await asyncio.wait_for(entry.runner(channel), timeout=PER_CASINO_TIMEOUT_SEC)
                     except asyncio.TimeoutError:
                         try:
@@ -343,7 +343,6 @@ async def on_ready():
     channel = bot.get_channel(DISCORD_CHANNEL)
     if channel:
         await channel.send("Discord bot has started…")
-        # give the gateway a moment before we start scheduling
         await asyncio.sleep(10)
         if await start_main_loop(channel):
             await channel.send("🎰 Casino loop started with current configuration.")
@@ -353,12 +352,12 @@ async def on_ready():
 MANUAL_CASINO_COMMANDS = {
     "chumba","rollingriches","jefebet","spinpals","spinquest","funrize",
     "fortunewheelz","stake","chanced","luckybird","globalpoker","crowncoins",
-    "dingdingding","modo","zula","sportzino","nolimitcoins"
+    "dingdingding","modo","zula","sportzino","nolimitcoins","fortunecoins"
 }
 
 @bot.check
 async def prevent_manual_casino_commands(ctx: commands.Context) -> bool:
-    if ctx.command is None:  # not a command
+    if ctx.command is None:
         return True
     if is_main_loop_running() and ctx.command.name.lower() in MANUAL_CASINO_COMMANDS:
         await ctx.send("The automated casino loop is running. Use `!stop` before manually checking casinos.")
@@ -368,15 +367,20 @@ async def prevent_manual_casino_commands(ctx: commands.Context) -> bool:
 @bot.command(name="start")
 async def start_loop_command(ctx: commands.Context):
     started = await start_main_loop()
-    if started: await ctx.send("Casino loop started.")
-    elif is_main_loop_running(): await ctx.send("Casino loop is already running.")
-    else: await ctx.send("Casino loop could not start (channel missing).")
+    if started:
+        await ctx.send("Casino loop started.")
+    elif is_main_loop_running():
+        await ctx.send("Casino loop is already running.")
+    else:
+        await ctx.send("Casino loop could not start (channel missing).")
 
 @bot.command(name="stop")
 async def stop_loop_command(ctx: commands.Context):
     stopped = await stop_main_loop()
-    if stopped: await ctx.send("Casino loop stopped. You can run manual casino commands now.")
-    else: await ctx.send("Casino loop is not currently running.")
+    if stopped:
+        await ctx.send("Casino loop stopped. You can run manual casino commands now.")
+    else:
+        await ctx.send("Casino loop is not currently running.")
 
 def format_loop_config() -> str:
     status = "running" if is_main_loop_running() else "stopped"
@@ -394,7 +398,7 @@ bot.add_command(_config)
 
 @_config.command(name="interval")
 async def config_interval(ctx: commands.Context, casino: str, minutes: float):
-    target = next((e for e in casino_loop_entries if e.key.lower()==casino.lower()), None)
+    target = next((e for e in casino_loop_entries if e.key.lower() == casino.lower()), None)
     if not target:
         await ctx.send(f"Casino `{casino}` is not part of the automated loop.")
         return
@@ -415,13 +419,14 @@ async def config_order(ctx: commands.Context, *casinos: str):
     if len(desired) != len(current) or set(desired) != set(current):
         await ctx.send(f"You must include each of: {', '.join(current)} (exactly once).")
         return
-    lookup = {e.key:e for e in casino_loop_entries}
+    lookup = {e.key: e for e in casino_loop_entries}
     casino_loop_entries[:] = [lookup[k] for k in desired]
     reset_loop_schedule()
     await ctx.send("Casino loop order updated.\n" + format_loop_config())
 
 @bot.command(name="ping")
-async def ping(ctx): await ctx.send("Pong")
+async def ping(ctx):
+    await ctx.send("Pong")
 
 @bot.command(name="about")
 async def about(ctx):
@@ -445,7 +450,7 @@ async def restart(ctx):
     os._exit(0)
 
 # ───────────────────────────────────────────────────────────
-# Casino Commands (manual triggers)
+# Manual casino commands
 # ───────────────────────────────────────────────────────────
 @bot.command(name="luckybird")
 async def luckybird_cmd(ctx):
@@ -517,7 +522,6 @@ async def fortunecoins_cmd(ctx):
     channel = bot.get_channel(DISCORD_CHANNEL)
     await fortunecoins_uc(ctx, channel)
 
-
 @bot.command(name="spinquest")
 async def spinquest_cmd(ctx):
     await ctx.send("Checking SpinQuest for bonus…")
@@ -563,7 +567,6 @@ async def dingdingding_cmd(ctx):
     if not claimed:
         await check_dingdingding_countdown(driver, bot, ctx, channel)
 
-
 # ───────────────────────────────────────────────────────────
 # Help Command
 # ───────────────────────────────────────────────────────────
@@ -572,47 +575,19 @@ async def help_cmd(ctx):
     await ctx.send("""Commands are not recommended while the casino loop is running.
 
 🎰 **Casino Commands:**  
-!chanced - Check Chanced.com for bonus  
-!luckybird - Check LuckyBird.io for bonus  
-!globalpoker - Check GlobalPoker for bonus  
-!crowncoins - Check CrownCoinsCasino for bonus  
-!chumba - Check Chumba for bonus  
-!modo - Check Modo for bonus  
-!zula - Check Zula for bonus  
-!rollingriches - Check RollingRiches for bonus  
-!jefebet - Check JefeBet for bonus  
-!spinpals - Check SpinPals for bonus  
-!spinquest - Check SpinQuest for bonus  
-!funrize - Check Funrize for bonus  
-!sportzino - Check Sportzino for bonus  
-!fortunecoins - Check FortuneCoins for bonus  
-!nolimitcoins - Check NoLimitCoins for bonus  
-!fortunewheelz - Check Fortune Wheelz for bonus  
-!stake - Check Stake for bonus  
-!dingdingding - Check DingDingDing for bonus  
+!chanced, !luckybird, !globalpoker, !crowncoins, !chumba, !modo, !zula,  
+!rollingriches, !jefebet, !spinpals, !spinquest, !funrize, !sportzino,  
+!fortunecoins, !nolimitcoins, !fortunewheelz, !stake, !dingdingding
 
 ---------------------------------------  
 ⚙️ **General Commands:**  
-!ping - Check if the bot is online  
-!restart - Restart the bot  
-!help - Display this list  
-!stop - Stop the bot  
-!start - Start the automated casino loop  
-!about - Show Chrome version info  
+!ping, !restart, !help, !start, !stop, !about
 
 ---------------------------------------  
 ✅ **Auth Commands:**  
-!auth google - Authenticate global Google Account  
-!auth <site> - Authenticate into a specific site (e.g., Modo, DingDingDing, Stake, LuckyBird)  
-!auth <site> <method> - Authenticate using a specific method  
-   (e.g. !auth crowncoins google, !auth crowncoins env, !auth nolimitcoins env)
-
----------------------------------------  
-💡 **Tip:**  
-The automated loop runs every 2 hours for main casinos, and every 8 hours for others.  
-Manual commands should only be used for testing or debugging individual sites.
+!auth google  
+!auth <site> <method>  (e.g. `!auth crowncoins google`, `!auth nolimitcoins env`)
 """)
-
 
 # ───────────────────────────────────────────────────────────
 # Run bot
