@@ -449,6 +449,23 @@ async def restart(ctx):
     await bot.close()
     os._exit(0)
 
+@bot.command(name="cleardatadir")
+async def clear_data_dir(ctx):
+    """Delete the Chrome user data directory (profile) so the bot starts clean next run."""
+    root = instance_dir or os.getenv("CHROME_USER_DATA_DIR", "").strip()
+    if not root:
+        await ctx.send("⚠️ No CHROME_INSTANCE_DIR or CHROME_USER_DATA_DIR configured — nothing to clear.")
+        return
+
+    try:
+        await ctx.send(f"🧹 Clearing Chrome data directory at `{root}` …")
+        import shutil
+        shutil.rmtree(root, ignore_errors=True)
+        await ctx.send("✅ Chrome user data directory has been cleared. Restart the bot to create a fresh profile.")
+    except Exception as e:
+        await ctx.send(f"⚠️ Failed to clear Chrome data directory: {e}")
+
+
 # ───────────────────────────────────────────────────────────
 # Manual casino commands
 # ───────────────────────────────────────────────────────────
