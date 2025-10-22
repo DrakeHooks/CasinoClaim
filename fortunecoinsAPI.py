@@ -12,8 +12,9 @@ load_dotenv()
 FC_EMAIL = os.getenv("FORTUNECOINSEMAIL", "")
 FC_PASSWORD = os.getenv("FORTUNECOINSPASSWORD", "")
 
+
 async def _snap_and_send(sb, channel: discord.abc.Messageable, path: str, caption: str = ""):
-    """Consistent screenshot -> send -> cleanup, matches your existing style."""
+    """Consistent screenshot -> send -> cleanup."""
     try:
         sb.save_screenshot(path)
         if os.path.exists(path):
@@ -27,15 +28,60 @@ async def _snap_and_send(sb, channel: discord.abc.Messageable, path: str, captio
         except Exception:
             pass
 
-def _try_click_any_xpath(sb: SB, xpaths, timeout=4):
-    """Try clicking the first available XPath from a list."""
-    for xp in xpaths:
+
+def _force_click_xpath(sb: SB, xpath: str, timeout: float = 12) -> bool:
+    """
+    Robust click for stubborn elements:
+    1) wait visible
+    2) scroll into view
+    3) regular click
+    4) slow_click
+    5) js_click
+    6) direct JS on element
+    Returns True if any strategy works.
+    """
+    try:
+        sb.wait_for_element_visible(xpath, timeout=timeout)
+    except Exception:
+        return False
+
+    try:
+        sb.scroll_to(xpath)
+    except Exception:
+        pass
+
+    # Try a few strategies
+    for attempt in ("click", "slow", "js", "directjs"):
         try:
-            sb.click_xpath(xp, timeout=timeout)
+            if attempt == "click":
+                sb.click_xpath(xpath, timeout=2)
+            elif attempt == "slow":
+                sb.slow_click(xpath)
+            elif attempt == "js":
+                sb.js_click(xpath)
+            else:
+                # direct JS on the element node (more forceful than js_click on selector)
+                el = sb.find_element(xpath)
+                sb.execute_script("arguments[0].click();", el)
             return True
         except Exception:
             continue
     return False
+
+
+def _try_click_any_xpath(sb: SB, xpaths, timeout_each=8, snap_tag: str = "") -> bool:
+    """Try a list of XPaths with the robust click routine."""
+    for xp in xpaths:
+        if _force_click_xpath(sb, xp, timeout=timeout_each):
+            return True
+    # Optional: small diagnostic highlight
+    try:
+        if xpaths:
+            sb.highlight(xpaths[0], loops=1)
+    except Exception:
+        pass
+    return False
+
 
 async def fortunecoins_uc(ctx, channel: discord.abc.Messageable):
     """
@@ -49,77 +95,99 @@ async def fortunecoins_uc(ctx, channel: discord.abc.Messageable):
         return
 
     try:
-        # Self-contained SB session; headed=True helps with visual debugging
         with SB(uc=True, headed=True) as sb:
-            # 1) Login page
+            # Make sure document is ready between actions
             sb.uc_open_with_reconnect("https://fortunecoins.com/login", 4)
-            sb.wait(2)
+            sb.wait_for_ready_state_complete()
             await _snap_and_send(sb, channel, "fc_uc_login.png", "🔐 Fortune Coins login page")
 
-            # 2) Credentials + (optional) captcha
+            # Credentials (and optional captcha)
             sb.type("input[id='emailAddress']", FC_EMAIL)
             sb.type("input[id='password']", FC_PASSWORD)
             try:
                 sb.uc_gui_click_captcha()
             except Exception:
-                # Captcha might not show every time
                 pass
 
-            # 3) Submit login
-            sb.click_xpath("/html/body/div[1]/div[5]/div/div/div/div[2]/form/div[4]/button")
+            # Submit login
+            _force_click_xpath(sb, "/html/body/div[1]/div[5]/div/div/div/div[2]/form/div[4]/button", timeout=12)
             sb.wait(6)
-
-            # 4) Land in lobby, refresh to stabilize
             sb.refresh_page()
-            sb.wait(5)
+            sb.wait_for_ready_state_complete()
             await _snap_and_send(sb, channel, "fc_uc_after_login.png", "✅ Logged in (UC)")
 
-            # 5) Close popups if present (multiple variants)
-            _try_click_any_xpath(
+            # --- Step 5: Close popups/overlays if present (several variants) ---
+            closed_popup = _try_click_any_xpath(
                 sb,
                 xpaths=[
                     "/html/body/div[5]/div/div[1]/div/div/button",
                     "/html/body/div[4]/div/div[1]/div/div/div[3]/div/button[2]",
                     "/html/body/div[4]/div/div[1]/div/div/button",
                 ],
-                timeout=30,
+                timeout_each=6,
             )
+            if closed_popup:
+                sb.wait(1)
 
-            # 6) Open Rewards / Get Coins (header variants)
-            _try_click_any_xpath(
+            # Extra nudge: press ESC to dismiss any stray overlays
+            try:
+                sb.press_keys("body", "ESCAPE")
+            except Exception:
+                pass
+
+            # --- Step 6: Open Rewards / Get Coins (header variants) ---
+            opened_rewards = _try_click_any_xpath(
                 sb,
                 xpaths=[
                     "/html/body/div[1]/div[2]/div[1]/div/nav/div[2]/div[3]/button",
                     "/html/body/div[1]/div[2]/div/nav/div[2]/div[3]/button",
                     "/html/body/div[1]/div[2]/div[1]/div/nav/div[2]/div[3]/button",
                 ],
-                timeout=30,
+                timeout_each=10,
             )
-            sb.wait(5)
-            await _snap_and_send(sb, channel, "fc_uc_rewards.png", "🎁 Rewards modal opened")
+            sb.wait_for_ready_state_complete()
+            sb.wait(2)
+            await _snap_and_send(sb, channel, "fc_uc_rewards.png",
+                                 "🎁 Rewards/Get Coins view (after open attempt)")
 
-            # 7) Click “Collect” (try known layouts)
-            clicked = _try_click_any_xpath(
+            # --- Step 7: Click “Collect” (various modal layouts) ---
+            collected = _try_click_any_xpath(
                 sb,
                 xpaths=[
                     "/html/body/div[4]/div/div[1]/div/div/div[2]/div/div[2]/div[2]/div[1]/div/div[3]/button[1]",
                     "/html/body/div[4]/div/div[1]/div/div/div[2]/div/div[1]/div[2]/div[1]/div/div[3]/button[1]",
                 ],
-                timeout=5,
+                timeout_each=8,
             )
 
-            if clicked:
+            if collected:
                 sb.wait(3)
                 await channel.send("Fortune Coins Daily Bonus Claimed!")
                 await _snap_and_send(sb, channel, "fc_uc_claimed.png", "📸 Post-claim")
             else:
-                await channel.send("ℹ️ Claim button not clickable (maybe already claimed).")
-                await _snap_and_send(sb, channel, "fc_uc_no_claim.png", "📸 Claim not available")
+                # One more pass: sometimes the modal re-renders; try again quickly
+                sb.wait(2)
+                collected_retry = _try_click_any_xpath(
+                    sb,
+                    xpaths=[
+                        "/html/body/div[4]/div/div[1]/div/div/div[2]/div/div[2]/div[2]/div[1]/div/div[3]/button[1]",
+                        "/html/body/div[4]/div/div[1]/div/div/div[2]/div/div[1]/div[2]/div[1]/div/div[3]/button[1]",
+                    ],
+                    timeout_each=4,
+                )
+                if collected_retry:
+                    sb.wait(2)
+                    await channel.send("Fortune Coins Daily Bonus Claimed!")
+                    await _snap_and_send(sb, channel, "fc_uc_claimed.png", "📸 Post-claim")
+                else:
+                    await channel.send("ℹ️ Claim button not clickable (maybe already claimed).")
+                    await _snap_and_send(sb, channel, "fc_uc_no_claim.png", "📸 Claim not available")
 
     except Exception as e:
-        # On failure, try to show context with a screenshot; fall back to text if needed
+        # Best-effort context if something blew up before we could screenshot
         try:
             with SB(uc=True, headed=True) as sb:
-                await _snap_and_send(sb, channel, "fc_uc_error.png", f"⚠️ Fortune Coins (UC) error")
+                await _snap_and_send(sb, channel, "fc_uc_error.png", "⚠️ Fortune Coins (UC) error")
         except Exception:
-            await channel.send(f"⚠️ Fortune Coins (UC) error")
+            pass
+        await channel.send(f"⚠️ Fortune Coins (UC) error: {e}")
