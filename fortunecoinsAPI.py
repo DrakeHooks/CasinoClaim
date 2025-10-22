@@ -82,7 +82,7 @@ async def fortunecoins_uc(ctx, channel: discord.abc.Messageable):
                     "/html/body/div[4]/div/div[1]/div/div/div[3]/div/button[2]",
                     "/html/body/div[4]/div/div[1]/div/div/button",
                 ],
-                timeout=2,
+                timeout=15,
             )
 
             # 6) Open Rewards / Get Coins (header variants)
@@ -92,7 +92,7 @@ async def fortunecoins_uc(ctx, channel: discord.abc.Messageable):
                     "/html/body/div[1]/div[2]/div/nav/div[2]/div[3]/button",
                     "/html/body/div[1]/div[2]/div[1]/div/nav/div[2]/div[3]/button",
                 ],
-                timeout=6,
+                timeout=15,
             )
             sb.wait(3)
             await _snap_and_send(sb, channel, "fc_uc_rewards.png", "🎁 Rewards modal opened")
@@ -109,7 +109,7 @@ async def fortunecoins_uc(ctx, channel: discord.abc.Messageable):
 
             if clicked:
                 sb.wait(3)
-                await channel.send("🎉 **Fortune Coins Daily Bonus Claimed!**")
+                await channel.send("Fortune Coins Daily Bonus Claimed!")
                 await _snap_and_send(sb, channel, "fc_uc_claimed.png", "📸 Post-claim")
             else:
                 await channel.send("ℹ️ Claim button not clickable (maybe already claimed).")
@@ -121,4 +121,4 @@ async def fortunecoins_uc(ctx, channel: discord.abc.Messageable):
             with SB(uc=True, headed=True) as sb:
                 await _snap_and_send(sb, channel, "fc_uc_error.png", f"⚠️ Fortune Coins (UC) error: `{e}`")
         except Exception:
-            await channel.send(f"⚠️ Fortune Coins (UC) error: `{e}`")
+            await channel.send(f"⚠️ Fortune Coins (UC) error")
