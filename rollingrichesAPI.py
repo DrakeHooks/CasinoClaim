@@ -1,132 +1,101 @@
 # Drake Hooks
 # Casino Claim 2
-# Rolling Riches API
+# Rolling Riches API (Updated Flow)
 
-import re
 import os
-import asyncio
+import re
 import discord
+import asyncio
 from dotenv import load_dotenv
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
-from helperAPI import open_captcha_solver_page
 
-# Load environment variables from the .env file
 load_dotenv()
 
-# ───────────────────────────────────────────────────────────
-# Main function + auth
-# ───────────────────────────────────────────────────────────
+
 async def rolling_riches_casino(ctx, driver, channel):
-
-    # For hidden recaptcha 
-    await open_captcha_solver_page(driver)
-
+    """Login to Rolling Riches and claim the 6-hour bonus."""
     try:
-        # Get the ROLLING_RICHES credentials from the .env file
         rolling_riches_credentials = os.getenv("ROLLING_RICHES")
-
-        if rolling_riches_credentials:
-            # Split the credentials into username and password using the ':' delimiter
-            username, password = rolling_riches_credentials.split(':')
-        else:
+        if not rolling_riches_credentials:
             await channel.send("Rolling Riches credentials not found in environment variables.")
             return
 
-        # Get the URL and allow page to load
+        username, password = rolling_riches_credentials.split(":")
         driver.get("https://rollingriches.com/login")
-        await asyncio.sleep(10)
+        await asyncio.sleep(5)
+
+        # Try to find login inputs
         try:
             email_input = WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.ID, "email"))
             )
-            login_button_present = True
-        except TimeoutException:
-            login_button_present = False
-
-        # If login button is found, perform login with credentials
-        if login_button_present:
-            email_input.send_keys(username)
             password_input = driver.find_element(By.ID, "password")
+            email_input.send_keys(username)
             password_input.send_keys(password)
             password_input.send_keys(Keys.ENTER)
-            await asyncio.sleep(5)  # Wait for login process to complete
-        else:
-            # If no login button is found, assume already logged in
-            await channel.send("Rolling Riches unable to login. Will try again later.")
-            screenshot = "rr_login_error.png"
-            driver.save_screenshot(screenshot)
-            await channel.send(
-            file=discord.File(screenshot))
-            os.remove(screenshot)
+            await asyncio.sleep(5)
+            print("Logging into Rolling Riches...")
+        except TimeoutException:
+            print("Already logged into Rolling Riches or login form not found.")
 
-
-
-            
-        # Now proceed with claiming the bonus
+        # Proceed to claim
         await claim_rolling_riches_bonus(ctx, driver, channel)
 
-    except TimeoutException as e:
-        print(f"Login timeout: {e}")
-        await channel.send("Login to Rolling Riches failed.")
     except Exception as e:
-        print(f"Error in rolling_riches_casino")
+        print(f"[RollingRiches] Login error: {e}")
+        await channel.send("Rolling Riches login failed.")
+        screenshot_path = "rr_login_error.png"
+        driver.save_screenshot(screenshot_path)
+        await channel.send(file=discord.File(screenshot_path))
+        os.remove(screenshot_path)
 
 
-# ───────────────────────────────────────────────────────────
-# Claim function
-# ───────────────────────────────────────────────────────────
 async def claim_rolling_riches_bonus(ctx, driver, channel):
+    """Claim the bonus directly from the lobby flow."""
     try:
-        # Navigate to the main page to claim the bonus
-        driver.get("https://www.rollingriches.com/get-coins")
+        # Ensure we're in the lobby
         await asyncio.sleep(5)
-        
-        # Click the claim button
-        claim_btn = WebDriverWait(driver, 5).until(
-            EC.element_to_be_clickable((By.XPATH, "/html/body/app-root/app-get-coin/div/div/div/div/div/div/app-hourly-bonus/div[2]/div/div/div[3]/button"))
+
+        # Step 1: Click the "bonus section" div
+        section_xpath = "/html/body/div/div[3]/div/div[1]/div[2]/div[4]/div/div[5]/div[1]"
+        section_div = WebDriverWait(driver, 15).until(
+            EC.element_to_be_clickable((By.XPATH, section_xpath))
         )
-        claim_btn.click()
-        await channel.send("Rolling Riches 6-Hour Bonus Claimed!")
+        section_div.click()
+        await asyncio.sleep(5)
+
+        # Step 2: Click the "claim bonus" div
+        claim_xpath = "/html/body/div/div[3]/div/div[1]/div[3]/div[3]/div[1]/div/div[3]/div/div/div[5]"
+        try:
+            claim_btn = WebDriverWait(driver, 15).until(
+                EC.element_to_be_clickable((By.XPATH, claim_xpath))
+            )
+            claim_btn.click()
+            await channel.send("Rolling Riches Daily Bonus claimed!")
+        except TimeoutException:
+            print("RR Bonus not available to claim right now.")
+        finally:
+        # Step 3: Read countdown value
+            countdown_xpath = "/html/body/div/div[3]/div/div[1]/div[3]/div[3]/div[1]/div/div[3]/div/div/div[2]"
+            countdown_element = WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((By.XPATH, countdown_xpath))
+            )
+            countdown_text = countdown_element.text.strip()
+
+        # Parse "Available in 21:23:00"
+            match = re.search(r"(\d{1,2}:\d{2}:\d{2})", countdown_text)
+            formatted_time = match.group(1) if match else "Unknown"
+
+            await channel.send(f"Next Rolling Riches bonus available in: `{formatted_time}`")
 
     except Exception as e:
-        print(f"Error: {str(e)}")
-    finally:
-        await asyncio.sleep(10)
-        print("Checking for countdown element.")
-        
-        # List of possible XPaths for the countdown element
-        countdown_xpaths = [
-            "/html/body/app-root/app-get-coin/div/div/div/div/div/div/app-hourly-bonus/div[2]/div/div/div[3]/div/label",
-            "/html/body/app-root/app-get-coin/div/div[2]/div/app-hourly-bonus/div/div/div[5]/div/label"
-        ]
-        countdown_element = None
-        for xpath in countdown_xpaths:
-            try:
-                countdown_element = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, xpath)))
-                if countdown_element:
-                    break
-            except:
-                continue
-        
-        if countdown_element:
-            countdown_value = countdown_element.text.strip()
-
-            # Replace spaces with colons to format it correctly as HH:MM:SS
-            countdown_value = countdown_value.replace(" ", ":")
-            
-            # In case the value has fewer than 6 characters, prepend zeros to maintain the format
-            time_parts = countdown_value.split(":")
-            while len(time_parts) < 3:  # Ensure we have 3 parts (HH:MM:SS)
-                time_parts.insert(0, "00")
-            formatted_countdown = ":".join(time_parts)
-
-            await channel.send(f"Next Rolling Riches Bonus Available in: {formatted_countdown}")
-        else:
-            print("Unable to retrieve Rolling Riches countdown value.")
-
-
-
+        print(f"[RollingRiches] Error during claim flow: {e}")
+        await channel.send("Error while claiming Rolling Riches bonus.")
+        screenshot_path = "rr_claim_error.png"
+        driver.save_screenshot(screenshot_path)
+        await channel.send(file=discord.File(screenshot_path))
+        os.remove(screenshot_path)
