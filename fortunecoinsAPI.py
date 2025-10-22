@@ -82,19 +82,20 @@ async def fortunecoins_uc(ctx, channel: discord.abc.Messageable):
                     "/html/body/div[4]/div/div[1]/div/div/div[3]/div/button[2]",
                     "/html/body/div[4]/div/div[1]/div/div/button",
                 ],
-                timeout=15,
+                timeout=30,
             )
 
             # 6) Open Rewards / Get Coins (header variants)
             _try_click_any_xpath(
                 sb,
                 xpaths=[
+                    "/html/body/div[1]/div[2]/div[1]/div/nav/div[2]/div[3]/button",
                     "/html/body/div[1]/div[2]/div/nav/div[2]/div[3]/button",
                     "/html/body/div[1]/div[2]/div[1]/div/nav/div[2]/div[3]/button",
                 ],
-                timeout=15,
+                timeout=30,
             )
-            sb.wait(3)
+            sb.wait(5)
             await _snap_and_send(sb, channel, "fc_uc_rewards.png", "🎁 Rewards modal opened")
 
             # 7) Click “Collect” (try known layouts)
@@ -119,6 +120,6 @@ async def fortunecoins_uc(ctx, channel: discord.abc.Messageable):
         # On failure, try to show context with a screenshot; fall back to text if needed
         try:
             with SB(uc=True, headed=True) as sb:
-                await _snap_and_send(sb, channel, "fc_uc_error.png", f"⚠️ Fortune Coins (UC) error: `{e}`")
+                await _snap_and_send(sb, channel, "fc_uc_error.png", f"⚠️ Fortune Coins (UC) error")
         except Exception:
             await channel.send(f"⚠️ Fortune Coins (UC) error")
