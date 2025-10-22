@@ -59,7 +59,7 @@ async def jefebet_casino(ctx, driver, channel):
         email_input.send_keys(username)
         password_input.send_keys(password)
         password_input.send_keys(Keys.ENTER)
-        await channel.send("Logging into JefeBet…")
+        print("Logging into JefeBet…")
         await asyncio.sleep(20)
 
         await check_and_close_popup(driver)
@@ -138,6 +138,6 @@ async def claim_jefebet_bonus(ctx, driver, channel):
             while len(time_parts) < 3:
                 time_parts.insert(0, "00")
             formatted = ":".join(time_parts)
-            await channel.send(f"Next JefeBet Bonus Available in: `{formatted}`")
+            await channel.send(f"Next JefeBet Bonus Available in: {formatted}")
         else:
             print("[JefeBet] Countdown element not found.")
