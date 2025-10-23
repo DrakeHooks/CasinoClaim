@@ -67,6 +67,7 @@ The bot is designed to run automatically in 2-hour intervals, with commands to c
 | Pulsz          | IN DEVELOPMENT | IN DEVELOPMENT | IN DEVELOPMENT            | Varies between $0.20-$3 bonus/day | Yes      |
 |                |                |                |                           |                                   |          |
 | SpinQuest      | ✓              | ✓             | No                        | $1.00 Daily Bonus | No      |
+| Funrize        | ✓              | ✗             | No                        | $0.17 Daily Bonus | No      |
 | DingDingDing   | ✓          | ✓               | No                          | No SC granted anymore from bonus | Exit scammed as of 4/2/25 - Do not put your money into DDD. No 💩 |
 
 
