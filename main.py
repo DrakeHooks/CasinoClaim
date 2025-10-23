@@ -598,7 +598,7 @@ async def help_cmd(ctx):
 
 ---------------------------------------  
 ⚙️ **General Commands:**  
-!ping, !restart, !help, !start, !stop, !about
+!ping, !restart, !help, !start, !stop, !about, !config
 
 ---------------------------------------  
 ✅ **Auth Commands:**  

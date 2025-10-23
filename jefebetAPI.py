@@ -123,7 +123,7 @@ async def claim_jefebet_bonus(ctx, driver, channel):
         countdown_element = None
         for xpath in countdown_xpaths:
             try:
-                countdown_element = WebDriverWait(driver, 8).until(
+                countdown_element = WebDriverWait(driver, 10).until(
                     EC.presence_of_element_located((By.XPATH, xpath))
                 )
                 if countdown_element:
