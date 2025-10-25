@@ -119,6 +119,7 @@ def _apply_common_chrome_flags(opts: Options) -> None:
     opts.add_argument("--no-default-browser-check")
     opts.add_argument("--disable-dev-shm-usage")
     opts.add_argument("--disable-notifications")
+    opts.add_argument("--allow-geolocation")
     opts.add_argument("--enable-third-party-cookies")
     opts.add_argument("--disable-blink-features=AutomationControlled")
     opts.add_argument("--disable-features=DisableLoadExtensionCommandLineSwitch")
