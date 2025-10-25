@@ -451,20 +451,81 @@ async def restart(ctx):
     os._exit(0)
 
 @bot.command(name="cleardatadir")
-async def clear_data_dir(ctx):
-    """Delete the Chrome user data directory (profile) so the bot starts clean next run."""
+async def clear_data_dir(ctx: commands.Context):
+    """
+    Interactively clear the persistent Chrome user-data directory.
+    This will stop the loop, quit Chrome, delete the directory, and restart the bot.
+    """
     root = instance_dir or os.getenv("CHROME_USER_DATA_DIR", "").strip()
     if not root:
         await ctx.send("⚠️ No CHROME_INSTANCE_DIR or CHROME_USER_DATA_DIR configured — nothing to clear.")
         return
 
+    # Confirm with the invoking user
+    await ctx.send(
+        "🧹 **Clear Chrome data directory?**\n"
+        f"This will stop the loop, quit Chrome, delete:\n```{root}```\n"
+        "and restart the bot.\n\n"
+        "Type **YES** within 20 seconds to confirm, or anything else to cancel."
+    )
+
+    def _check(m: discord.Message) -> bool:
+        return m.channel.id == ctx.channel.id and m.author.id == ctx.author.id
+
     try:
-        await ctx.send(f"🧹 Clearing Chrome data directory at `{root}` …")
+        reply: discord.Message = await bot.wait_for("message", timeout=20, check=_check)
+    except asyncio.TimeoutError:
+        await ctx.send("❎ Timed out — cancelled.")
+        return
+
+    if reply.content.strip().upper() != "YES":
+        await ctx.send("❎ Cancelled.")
+        return
+
+    # Proceed
+    await ctx.send("⏳ Stopping the loop and shutting down Chrome…")
+
+    # Stop the automated loop if needed
+    try:
+        if is_main_loop_running():
+            await stop_main_loop()
+    except Exception:
+        pass
+
+    # Quit Chrome to release locks
+    try:
+        driver.quit()
+    except Exception:
+        pass
+
+    # Extra safeguard: kill any stray chrome that might still be alive
+    try:
+        import signal, psutil  # psutil is optional; ignore if not available
+        for p in psutil.process_iter(attrs=["name", "cmdline"]):
+            name = (p.info.get("name") or "").lower()
+            cmd  = " ".join(p.info.get("cmdline") or [])
+            if "chrome" in name or "--user-data-dir=" in cmd:
+                try:
+                    p.send_signal(signal.SIGKILL)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    # Delete directory
+    try:
         import shutil
         shutil.rmtree(root, ignore_errors=True)
-        await ctx.send("✅ Chrome user data directory has been cleared. Restart the bot to create a fresh profile.")
+        await ctx.send("✅ Chrome user data directory cleared. Restarting bot…")
     except Exception as e:
-        await ctx.send(f"⚠️ Failed to clear Chrome data directory: {e}")
+        await ctx.send(f"⚠️ Failed to clear Chrome data directory: `{e}`")
+        return
+
+    # Restart the bot process (entrypoint will relaunch and recreate a fresh profile)
+    try:
+        await bot.close()
+    finally:
+        os._exit(0)
 
 
 # ───────────────────────────────────────────────────────────
