@@ -646,6 +646,185 @@ async def dingdingding_cmd(ctx):
     if not claimed:
         await check_dingdingding_countdown(driver, bot, ctx, channel)
 
+
+# ───────────────────────────────────────────────────────────
+# Auth router
+# ───────────────────────────────────────────────────────────
+@bot.command(name="auth")
+async def authenticate_command(ctx: commands.Context, site: str, method: str = None):
+    """
+    Examples:
+      !auth google
+      !auth nolimitcoins google
+      !auth nolimitcoins env
+      !auth luckybird
+      !auth crowncoins google
+      !auth crowncoins env
+      !auth modo
+      !auth dingdingding
+      !auth stake
+    """
+    channel = bot.get_channel(DISCORD_CHANNEL)
+    norm_site = re.sub(r"\s+", "", site.lower())
+
+    # 1) Global Google: !auth google
+    if norm_site == "google":
+        await ctx.send("Authenticating Google Account…")
+        google_credentials = os.getenv("GOOGLE_LOGIN")
+        if google_credentials:
+            u, p = google_credentials.split(":", 1)
+            creds = (u, p)
+        else:
+            await ctx.send("🔐 Google credentials not found in `.env` (`GOOGLE_LOGIN`).")
+            creds = (None, None)
+        try:
+            await google_auth(ctx, driver, channel, creds)
+        except Exception as e:
+            snap = "google_auth_failed.png"
+            try:
+                driver.save_screenshot(snap)
+                await ctx.send(f"Google auth error: `{e}`", file=discord.File(snap))
+            finally:
+                try: os.remove(snap)
+                except Exception: pass
+        return
+
+    # 2) CrownCoins with method
+    if norm_site == "crowncoins":
+        if method is None:
+            await ctx.send("Usage: `!auth crowncoins google` or `!auth crowncoins env`")
+            return
+        if method.lower() == "google":
+            await ctx.send("Authenticating CrownCoins via Google…")
+            ok = await auth_crown_google(driver, bot, ctx, channel)
+        elif method.lower() == "env":
+            await ctx.send("Authenticating CrownCoins via .env credentials…")
+            ok = await auth_crown_env(driver, bot, ctx, channel)
+        else:
+            await ctx.send("Invalid method. Use `google` or `env`.")
+            return
+
+        if not ok:
+            snap = f"crowncoins_{method.lower()}_auth_failed.png"
+            try:
+                driver.save_screenshot(snap)
+                await ctx.send("CrownCoins authentication failed.", file=discord.File(snap))
+            finally:
+                try: os.remove(snap)
+                except Exception: pass
+        return
+
+    # 3) DingDingDing
+    if norm_site == "dingdingding":
+        await ctx.send("Authenticating DingDingDing…")
+        ok = await authenticate_dingdingding(driver, bot, ctx, channel)
+        if not ok:
+            snap = "dingdingding_auth_failed.png"
+            try:
+                driver.save_screenshot(snap)
+                await ctx.send("Authentication failed.", file=discord.File(snap))
+            finally:
+                try: os.remove(snap)
+                except Exception: pass
+        return
+
+    # 4) Modo
+    if norm_site == "modo":
+        await ctx.send("Authenticating Modo…")
+        ok = await authenticate_modo(driver, bot, ctx, channel)
+        if not ok:
+            snap = "modo_auth_failed.png"
+            try:
+                driver.save_screenshot(snap)
+                await ctx.send("Modo authentication failed.", file=discord.File(snap))
+            finally:
+                try: os.remove(snap)
+                except Exception: pass
+        return
+
+    # 5) Stake
+    if norm_site == "stake":
+        await ctx.send("Authenticating Stake…")
+        ok = await stake_auth(driver, bot, ctx, channel)
+        if not ok:
+            snap = "stake_auth_failed.png"
+            try:
+                driver.save_screenshot(snap)
+                await ctx.send("Stake authentication failed.", file=discord.File(snap))
+            finally:
+                try: os.remove(snap)
+                except Exception: pass
+        return
+
+    # 6) LuckyBird
+    if norm_site == "luckybird":
+        await ctx.send("Authenticating LuckyBird…")
+        ok = await authenticate_luckybird(driver, bot, ctx, channel)
+        if not ok:
+            snap = "luckybird_auth_failed.png"
+            try:
+                driver.save_screenshot(snap)
+                await ctx.send("LuckyBird authentication failed.", file=discord.File(snap))
+            finally:
+                try: os.remove(snap)
+                except Exception: pass
+        return
+
+    # 7) NoLimitCoins (aliases)
+    if norm_site in {"nolimitcoins", "nlc", "nolimit", "nolimitcoin", "nolimitco"}:
+        if method is None:
+            await ctx.send("Usage: `!auth nolimitcoins google` or `!auth nolimitcoins env`")
+            return
+        if method.lower() == "google":
+            await ctx.send("Authenticating NoLimitCoins via Google…")
+            ok = await auth_nolimit_google(driver, channel, ctx)
+        elif method.lower() == "env":
+            await ctx.send("Authenticating NoLimitCoins via .env credentials…")
+            ok = await auth_nolimit_env(driver, channel, ctx)
+        else:
+            await ctx.send("Invalid method. Use `google` or `env`.")
+            return
+
+        if not ok:
+            snap = f"nolimit_{method.lower()}_auth_failed.png"
+            try:
+                driver.save_screenshot(snap)
+                await ctx.send("NoLimitCoins authentication failed.", file=discord.File(snap))
+            finally:
+                try: os.remove(snap)
+                except Exception: pass
+        return
+
+    # Unknown site for !auth
+    await ctx.send(f"❓ Authentication for `{site}` is not implemented. Run `!help` for supported sites.")
+
+
+# ───────────────────────────────────────────────────────────
+# Invalid command handler
+# ───────────────────────────────────────────────────────────
+from discord.ext import commands
+
+@bot.event
+async def on_command_error(ctx: commands.Context, error: Exception):
+    # Command not found → guide user to !help
+    if isinstance(error, commands.CommandNotFound):
+        await ctx.send("❌ Invalid command. Run `!help` to see valid commands.")
+        return
+
+    # Let subcommand errors for groups fall through nicely
+    if isinstance(error, commands.BadArgument):
+        await ctx.send(f"⚠️ {error}")
+        return
+
+    # Anything else: log + show a lightweight notice
+    try:
+        print(f"[on_command_error] {type(error).__name__}: {error}")
+    except Exception:
+        pass
+    await ctx.send("⚠️ An error occurred while handling that command.")
+
+
+
 # ───────────────────────────────────────────────────────────
 # Help Command
 # ───────────────────────────────────────────────────────────
