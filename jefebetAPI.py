@@ -78,6 +78,14 @@ def _format_countdown(raw: str) -> Optional[str]:
     return ":".join(parts[:3])
 
 
+async def send_screenshot(channel: discord.TextChannel, driver, name="jefe.png"):
+    driver.save_screenshot(name)
+    await channel.send(file=discord.File(name))
+    try:
+        os.remove(name)
+    except OSError:
+        pass
+
 # ────────────────────────────────────────────────────────────
 # Main JefeBet Flow
 # ────────────────────────────────────────────────────────────
@@ -130,17 +138,10 @@ async def jefebet_casino(ctx, driver, channel):
         print("[JefeBet] Login successful, proceeding to claim.")
         await claim_jefebet_bonus(ctx, driver, channel)
 
-    except TimeoutException as e:
+    except:
         print(f"[JefeBet] Login timeout: {e}")
         await channel.send("JefeBet Authentication timed out, will try again later.")
-        screenshot_path = "jefe_auth_error.png"
-        driver.save_screenshot(screenshot_path)
-        await channel.send(file=discord.File(screenshot_path))
-        os.remove(screenshot_path)
-
-    except Exception as e:
-        print(f"[JefeBet] Login failed: {e}")
-        await channel.send("Login to JefeBet failed.")
+        await send_screenshot(channel, driver)
 
 
 # ────────────────────────────────────────────────────────────
