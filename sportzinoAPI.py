@@ -1,160 +1,179 @@
-# Drake Hooks
-# Casino Claim
-# Sportzino API
-
-
-
+# Drake Hooks + WaterTrooper
+# Casino Claim 2
+# Sportzino API (SeleniumBase UC) 
 
 import os
-import sqlite3
-import asyncio
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
-from selenium.webdriver.common.keys import Keys
+import discord
 from dotenv import load_dotenv
-from datetime import datetime, timedelta
+from seleniumbase import SB
 
-# Load environment variables from the .env file
 load_dotenv()
 
-# Initialize SQLite connection
-conn = sqlite3.connect('casino_bonus.db')
-cursor = conn.cursor()
+# Expect "email:password" in SPORTZINO
+SPORTZINO_CRED = os.getenv("SPORTZINO", "")
 
-# Create a table to store claimed timestamps if it doesn't already exist
-cursor.execute('''
-CREATE TABLE IF NOT EXISTS bonus_claims (
-    id INTEGER PRIMARY KEY,
-    casino_name TEXT NOT NULL,
-    last_claimed TIMESTAMP NOT NULL
-)
-''')
-conn.commit()
+# ───────────────────────────────────────────────────────────
+# Helpers
+# ───────────────────────────────────────────────────────────
+async def _send_post_claim(sb: SB, channel: discord.abc.Messageable, path: str, caption: str):
+    """Only used on successful claim to avoid screenshot spam."""
+    try:
+        sb.save_screenshot(path)
+        await channel.send(caption, file=discord.File(path))
+    finally:
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+        except Exception:
+            pass
 
-# Function to get the last claimed time from the database
-def get_last_claimed(casino_name):
-    cursor.execute("SELECT last_claimed FROM bonus_claims WHERE casino_name = ?", (casino_name,))
-    row = cursor.fetchone()
-    if row:
-        # Parse the timestamp string into a datetime object (with microseconds)
-        return datetime.strptime(row[0], '%Y-%m-%d %H:%M:%S.%f')
-    return None  # Return None if no record is found
 
-# Function to update the claimed time in the database
-def update_claimed_time(casino_name):
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Ensure proper formatting for database
-    cursor.execute("INSERT OR REPLACE INTO bonus_claims (casino_name, last_claimed) VALUES (?, ?)", (casino_name, now))
-    conn.commit()
-    print(f"Updated claimed time for {casino_name} to {now}")
+def _force_click_xpath(sb: SB, xpath: str, timeout: float = 12) -> bool:
+    """Robust click chain for stubborn elements."""
+    try:
+        sb.wait_for_element_visible(xpath, timeout=timeout)
+    except Exception:
+        return False
+    try:
+        sb.scroll_to(xpath)
+    except Exception:
+        pass
+    for mode in ("click", "slow", "js", "directjs"):
+        try:
+            if mode == "click":
+                sb.click_xpath(xpath, timeout=2)
+            elif mode == "slow":
+                sb.slow_click(xpath)
+            elif mode == "js":
+                sb.js_click(xpath)
+            else:
+                el = sb.find_element(xpath)
+                sb.execute_script("arguments[0].click();", el)
+            return True
+        except Exception:
+            continue
+    return False
 
-# Function to calculate the countdown for the next bonus
-def get_countdown(last_claimed_time, interval_hours=24):
-    if last_claimed_time is None:
-        return "00:00:00"  # Default when there's no previous record
 
-    now = datetime.now()
-    next_claim_time = last_claimed_time + timedelta(hours=interval_hours)
-    remaining_time = next_claim_time - now
+def _try_click_any(sb: SB, xpaths, timeout_each=10) -> bool:
+    for xp in xpaths:
+        if _force_click_xpath(sb, xp, timeout=timeout_each):
+            return True
+    return False
 
-    if remaining_time.total_seconds() > 0:
-        # Format the remaining time into HH:MM:SS
-        hours, remainder = divmod(int(remaining_time.total_seconds()), 3600)
-        minutes, seconds = divmod(remainder, 60)
-        return f"{hours:02}:{minutes:02}:{seconds:02}"
-    
-    return "00:00:00"  # Bonus is available now
 
-# Close popups logic for Sportzino
-def close_popups_sz(driver):
-    popup_xpaths_sz = [
+def _close_popups_before_rewards(sb: SB):
+    # Close known Sportzino popups BEFORE Rewards only.
+    popup_xpaths = [
         "/html/body/div[3]/div/div[1]/div/div/div/div[1]/div[2]/button",
         "/html/body/div[3]/div/div[1]/div/div/button",
-        "/html/body/div[1]/div[1]/div/div/div/div[2]/div[2]/button",
         "/html/body/div[4]/div/div[1]/div/div/button",
-        "/html/body/div[1]/div[1]/div/div/div/div[2]/div[2]/button",
         "/html/body/div[5]/div/div[1]/div/div/button",
-        "/html/body/div[4]/div/div[1]/div/div/div/div[2]/button",
-        "/html/body/div[6]/div/div[1]/div/div/div/div[2]/button"
+        "/html/body/div[6]/div/div[1]/div/div/div/div[2]/button",
     ]
+    if _try_click_any(sb, popup_xpaths, timeout_each=6):
+        print("[Sportzino] Closed a popup.")
+    try:
+        sb.press_keys("body", "ESCAPE")
+    except Exception:
+        pass
 
-    retries = 3  # Retry a few times to ensure all popups are closed
-    for _ in range(retries):
-        for xpath in popup_xpaths_sz:
-            try:
-                popup_close_button = WebDriverWait(driver, 3).until(
-                    EC.element_to_be_clickable((By.XPATH, xpath))
-                )
-                popup_close_button.click()
-                print(f"Closed popup with XPath: {xpath}")
-            except TimeoutException:
-                pass  # Continue if the popup is not found
 
-        # Check for common close buttons
-        try:
-            close_buttons = driver.find_elements(By.XPATH, "//button[contains(text(),'Close')]")
-            for close_button in close_buttons:
-                if close_button.is_displayed():
-                    close_button.click()
-                    print("Closed a popup using a general 'Close' button.")
-                    
-        except Exception as e:
-            print(f"Error while closing popups using general 'Close' buttons: {e}")
+# ───────────────────────────────────────────────────────────
+# Main UC-based flow
+# ───────────────────────────────────────────────────────────
+async def Sportzino(ctx, driver, channel: discord.abc.Messageable):
+    
+    # Sportzino via SeleniumBase (uc=True).
+    # Sends **only** a post-claim screenshot if the claim succeeds.
+    # Otherwise prints concise logs/errors (no Discord text).
+    
+    if ":" not in SPORTZINO_CRED:
+        print("[Sportzino][ERROR] Missing SPORTZINO 'email:password' in .env")
+        return
 
-# Main function for automating Sportzino
-async def Sportzino(ctx, driver, channel):
-    casino_name = "Sportzino"
-    driver.get("https://sportzino.com/login?")
-    await asyncio.sleep(5)
+    username, password = SPORTZINO_CRED.split(":", 1)
 
     try:
-        # Login process
-        await asyncio.sleep(5)
-        WebDriverWait(driver, 90).until(EC.presence_of_element_located((By.ID, "emailAddress")))
+        with SB(uc=True, headed=True) as sb:
+            # 1) Login
+            sb.uc_open_with_reconnect("https://sportzino.com/login", 4)
+            sb.wait_for_ready_state_complete()
+            print("[Sportzino] Login page loaded.")
 
-        creds = os.getenv("SPORTZINO")
-        if not creds:
-            await channel.send("SPORTZINO credentials not found in environment variables.")
-            return
-        credentials = creds.split(":")
-        username_text = credentials[0]
-        password_text = credentials[1]
+            try:
+                sb.type("input[id='emailAddress']", username)
+                sb.type("input[id='password']", password)
+                try:
+                    sb.uc_gui_click_captcha()
+                except Exception:
+                    pass
+            except Exception as e:
+                print(f"[Sportzino][ERROR] Login fields not found: {e}")
+                return
 
-        # Input credentials
-        username_field = driver.find_element(By.ID, "emailAddress")
-        for char in username_text:
-            username_field.send_keys(char)
-            await asyncio.sleep(0.3)
+            # Submit
+            submitted = False
+            try:
+                sb.press_keys("input[id='password']", "\n")
+                submitted = True
+            except Exception:
+                pass
+            if not submitted:
+                submitted = _try_click_any(
+                    sb,
+                    ["//button[@type='submit']", "//button[contains(.,'Log in')]"],
+                    timeout_each=10,
+                )
+            if not submitted:
+                print("[Sportzino][ERROR] Could not submit login.")
+                return
 
-        password_field = driver.find_element(By.ID, "password")
-        for char in password_text:
-            password_field.send_keys(char)
-            await asyncio.sleep(0.3)
-        
-        password_field.send_keys(Keys.ENTER)
-        await asyncio.sleep(10)
-        close_popups_sz(driver)  # Close any pop-ups
+            # Post-login settle
+            sb.wait(8)
+            sb.refresh_page()
+            sb.wait_for_ready_state_complete()
+            print("[Sportzino] Post-login refresh complete.")
 
-        # Claim bonus
-        free_coins_btn_xpath = "/html/body/div[1]/div/nav/div/div[4]/div[1]/button"
-        free_coins_btn = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, free_coins_btn_xpath)))
-        free_coins_btn.click()
+            # 2) Close popups BEFORE Rewards
+            _close_popups_before_rewards(sb)
 
-        # Click the collect button
-        try:
-            collect_btn_xpath = "/html/body/div[4]/div/div[1]/div/div/div[2]/div[2]/div[2]/div[1]/div/div[3]/div/div[1]/button"
-            collect_btn = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, collect_btn_xpath)))
-            collect_btn.click()
-            update_claimed_time(casino_name)  # Update claimed time in the DB
-            await channel.send("Sportzino Daily Bonus Claimed!")
-        except:
-            print("Sportzino Bonus not available, checking countdown...")
+            # 3) Open Rewards / Free Coins
+            opened_rewards = _try_click_any(
+                sb,
+                [
+                    "/html/body/div[1]/div/nav/div/div[4]/div[1]/button",
+                    "/html/body/div[1]/div[1]/div/nav/div/div[4]/div[1]/button",
+                    "//button[contains(.,'Free Coins') or contains(.,'Rewards') or contains(.,'Get Coins')]",
+                ],
+                timeout_each=12,
+            )
+            if not opened_rewards:
+                print("[Sportzino] Rewards/Coins section not found.")
+                return
 
-        # Bonus not available, calculate countdown
-        last_claimed = get_last_claimed(casino_name)
-        countdown = get_countdown(last_claimed, interval_hours=24)
-        await channel.send(f"Next Sportzino Bonus Available in: {countdown}")
-        
+            sb.wait(10)  # give modal time to render
+            print("[Sportzino] Rewards modal should be open (proceeding).")
+
+            # 4) Click Collect (do NOT close popups anymore)
+            collected = _try_click_any(
+                sb,
+                [
+                    "/html/body/div[5]/div/div[1]/div/div/div[2]/div[2]/div[2]/div[1]/div/div[3]/div/div[1]/button",
+                    "/html/body/div[4]/div/div[1]/div/div/div[2]/div[2]/div[2]/div[1]/div/div[3]/div/div[1]/button",
+                    "//button[contains(.,'Collect') and not(@disabled)]",
+                    "//button[.//span[contains(.,'Collect')] and not(@disabled)]",
+                    "//button[contains(.,'Claim') and not(@disabled)]",
+                ],
+                timeout_each=12,
+            )
+
+            if collected:
+                sb.wait(3)
+                await _send_post_claim(sb, channel, "sportzino_claimed.png", "Sportzino Daily Bonus Claimed!")
+                print("[Sportzino] Claimed successfully.")
+            else:
+                print("[Sportzino] No claim available (likely already claimed).")
+
     except Exception as e:
-        print(f"Error during Sportzino automation: {e}")
+        print(f"[Sportzino][ERROR] Exception during automation: {e}")
