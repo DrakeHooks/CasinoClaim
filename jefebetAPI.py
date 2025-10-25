@@ -12,7 +12,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
-
+import discord
 load_dotenv()
 
 # ────────────────────────────────────────────────────────────
@@ -133,6 +133,11 @@ async def jefebet_casino(ctx, driver, channel):
     except TimeoutException as e:
         print(f"[JefeBet] Login timeout: {e}")
         await channel.send("JefeBet Authentication timed out, will try again later.")
+        screenshot_path = "jefe_auth_error.png"
+        driver.save_screenshot(screenshot_path)
+        await channel.send(file=discord.File(screenshot_path))
+        os.remove(screenshot_path)
+
     except Exception as e:
         print(f"[JefeBet] Login failed: {e}")
         await channel.send("Login to JefeBet failed.")
