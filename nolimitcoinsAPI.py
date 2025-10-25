@@ -88,7 +88,7 @@ def try_click_any_xpath(driver, xpaths: Iterable[str], timeout_each=3) -> bool:
 def dismiss_overlay(driver, timeout=4):
     """Best-effort overlay close; no error if it isn't there."""
     try:
-        if WebDriverWait(driver, 1).until(EC.visibility_of_element_located(OVERLAY_LOCATOR)):
+        if WebDriverWait(driver, 10).until(EC.visibility_of_element_located(OVERLAY_LOCATOR)):
             try_click_any_xpath(driver, CLAIM_XPATHS, timeout_each=2)
             WebDriverWait(driver, timeout).until(EC.invisibility_of_element_located(OVERLAY_LOCATOR))
     except Exception:
@@ -251,10 +251,10 @@ async def auth_nolimit_google(driver, channel, ctx):
     """
     try:
         driver.get(SIGNIN_URL)
-        await asyncio.sleep(2)
+        await asyncio.sleep(5)
 
         # Click "Continue with Google" on NLC
-        google_btn = WebDriverWait(driver, 20).until(
+        google_btn = WebDriverWait(driver, 30).until(
             EC.element_to_be_clickable((By.XPATH, "/html/body/div[1]/div/div[1]/div/form/div[1]/button[2]"))
         )
         safe_click(driver, google_btn)

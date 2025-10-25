@@ -256,18 +256,19 @@ async def _run_fortunecoins(channel):   await fortunecoins_uc(None, channel)  # 
 
 casino_loop_entries: List[CasinoLoopEntry] = [
     CasinoLoopEntry("luckybird",     "LuckyBird",         _run_luckybird,       120),
-    CasinoLoopEntry("nolimitcoins",  "NoLimitCoins",      _run_nlc,             120),
     CasinoLoopEntry("funrize",       "Funrize",           _run_funrize,         120),
     CasinoLoopEntry("globalpoker",   "GlobalPoker",       _run_globalpoker,     120),
     CasinoLoopEntry("jefebet",       "JefeBet",           _run_jefebet,         120),
+    CasinoLoopEntry("rollingriches", "Rolling Riches",    _run_rollingriches,   120),
     CasinoLoopEntry("spinquest",     "SpinQuest",         _run_spinquest,       120),
     CasinoLoopEntry("fortunewheelz", "Fortune Wheelz",    _run_fortunewheelz,   120),
+    CasinoLoopEntry("nolimitcoins",  "NoLimitCoins",      _run_nlc,             120),
     CasinoLoopEntry("modo",          "Modo",              _run_modo,            120),
-    CasinoLoopEntry("rollingriches", "Rolling Riches",    _run_rollingriches,   120),
     CasinoLoopEntry("stake",         "Stake",             _run_stake,           120),
-    CasinoLoopEntry("zula",          "Zula Casino",       _run_zula,            120),
-    CasinoLoopEntry("sportzino",     "Sportzino",         _run_sportzino,       120),
-    # NEW: Fortune Coins runs every 24 hours
+    
+    # These sites do not provide a countdown, so we run them every 24hr.
+    CasinoLoopEntry("zula",          "Zula Casino",       _run_zula,            1440),
+    CasinoLoopEntry("sportzino",     "Sportzino",         _run_sportzino,       1440),
     CasinoLoopEntry("fortunecoins",  "Fortune Coins",     _run_fortunecoins,    1440),
 ]
 
