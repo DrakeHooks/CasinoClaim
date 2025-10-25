@@ -51,7 +51,7 @@ def _force_click_xpath(sb: SB, xpath: str, timeout: float = 12) -> bool:
             continue
     return False
 
-def _try_click_any(sb: SB, xpaths, timeout_each=8) -> bool:
+def _try_click_any(sb: SB, xpaths, timeout_each=10) -> bool:
     for xp in xpaths:
         if _force_click_xpath(sb, xp, timeout=timeout_each):
             return True
