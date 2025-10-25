@@ -11,7 +11,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementClickInterceptedException
 import discord
 load_dotenv()
 
@@ -21,7 +21,6 @@ load_dotenv()
 def _present(driver, by, value, timeout=8):
     return WebDriverWait(driver, timeout).until(EC.presence_of_element_located((by, value)))
 
-
 def _clickable(driver, by, value, timeout=8):
     return WebDriverWait(driver, timeout).until(EC.element_to_be_clickable((by, value)))
 
@@ -29,7 +28,10 @@ def _try_click_any_xpath(driver, xpaths: List[str], timeout_each=3) -> bool:
     for xp in xpaths:
         try:
             btn = WebDriverWait(driver, timeout_each).until(EC.element_to_be_clickable((By.XPATH, xp)))
-            btn.click()
+            try:
+                btn.click()
+            except ElementClickInterceptedException:
+                driver.execute_script("arguments[0].click();", btn)
             return True
         except Exception:
             continue
@@ -57,7 +59,6 @@ def _is_logged_in(driver) -> bool:
         return True
     except NoSuchElementException:
         pass
-
     try:
         driver.find_element(By.CSS_SELECTOR, "header button[aria-label*='profile'], header img[alt*='avatar']")
         return True
@@ -77,14 +78,16 @@ def _format_countdown(raw: str) -> Optional[str]:
         parts.insert(0, "00")
     return ":".join(parts[:3])
 
-
-async def send_screenshot(channel: discord.TextChannel, driver, name="jefe.png"):
-    driver.save_screenshot(name)
-    await channel.send(file=discord.File(name))
+async def send_screenshot(channel: discord.abc.Messageable, driver, name="jefe.png"):
     try:
-        os.remove(name)
-    except OSError:
-        pass
+        driver.save_screenshot(name)
+        await channel.send(file=discord.File(name))
+    finally:
+        try:
+            if os.path.exists(name):
+                os.remove(name)
+        except Exception:
+            pass
 
 # ────────────────────────────────────────────────────────────
 # Main JefeBet Flow
@@ -122,6 +125,7 @@ async def jefebet_casino(ctx, driver, channel):
                 await claim_jefebet_bonus(ctx, driver, channel)
                 return
             await channel.send("JefeBet Authentication timed out, will try again later.")
+            await send_screenshot(channel, driver)  # ensure we actually attach a screenshot here
             return
 
         email_input = _present(driver, By.ID, "email", timeout=10)
@@ -138,11 +142,14 @@ async def jefebet_casino(ctx, driver, channel):
         print("[JefeBet] Login successful, proceeding to claim.")
         await claim_jefebet_bonus(ctx, driver, channel)
 
-    except:
-        print(f"[JefeBet] Login timeout: {e}")
+    except Exception as e:
+        print(f"[JefeBet] Login timeout/error: {e}")
         await channel.send("JefeBet Authentication timed out, will try again later.")
-        await send_screenshot(channel, driver)
-
+        # This now actually runs even on server/LXC
+        try:
+            await send_screenshot(channel, driver)
+        except Exception as ss_e:
+            print(f"[JefeBet] Failed to send screenshot: {ss_e}")
 
 # ────────────────────────────────────────────────────────────
 # Claim Function
