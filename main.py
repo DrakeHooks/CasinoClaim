@@ -10,9 +10,8 @@ import discord
 import asyncio
 import importlib
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Awaitable, Callable, List, Optional
-
 from dotenv import load_dotenv
 
 # ───────────────────────────────────────────────────────────
@@ -226,10 +225,10 @@ class CasinoLoopEntry:
     display_name: str
     runner: Callable[[discord.abc.Messageable], Awaitable[None]]
     interval_minutes: float
-    next_run: datetime = field(default_factory=lambda: datetime.utcnow())
+    next_run: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def schedule_next(self):
-        self.next_run = datetime.utcnow() + timedelta(minutes=self.interval_minutes)
+        self.next_run = datetime.now(timezone.utc) + timedelta(minutes=self.interval_minutes)
 
 LOOP_STAGGER_SECONDS = 30
 PER_CASINO_TIMEOUT_SEC = int(os.getenv("CASINO_TIMEOUT_SECONDS", "500"))  # hard cap
@@ -271,7 +270,7 @@ casino_loop_entries: List[CasinoLoopEntry] = [
 ]
 
 def reset_loop_schedule():
-    base = datetime.utcnow()
+    base = datetime.now(timezone.utc)
     for i, entry in enumerate(casino_loop_entries):
         entry.next_run = base + timedelta(seconds=i * LOOP_STAGGER_SECONDS)
 
@@ -285,7 +284,7 @@ async def run_main_loop(channel: discord.abc.Messageable):
     global main_loop_running
     try:
         while main_loop_running:
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             for entry in casino_loop_entries:
                 if now >= entry.next_run:
                     try:
@@ -406,7 +405,7 @@ async def config_interval(ctx: commands.Context, casino: str, minutes: float):
         await ctx.send("Interval must be greater than zero.")
         return
     target.interval_minutes = minutes
-    target.next_run = datetime.utcnow()
+    target.next_run = datetime.now(timezone.utc)
     await ctx.send(f"Updated {target.display_name} to run every {minutes:.1f} minutes.")
 
 @_config.command(name="order")
