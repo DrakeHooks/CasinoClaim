@@ -10,8 +10,9 @@ import discord
 import asyncio
 import importlib
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Awaitable, Callable, List, Optional
+
 from dotenv import load_dotenv
 
 # ───────────────────────────────────────────────────────────
@@ -225,10 +226,10 @@ class CasinoLoopEntry:
     display_name: str
     runner: Callable[[discord.abc.Messageable], Awaitable[None]]
     interval_minutes: float
-    next_run: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    next_run: datetime = field(default_factory=lambda: datetime.utcnow())
 
     def schedule_next(self):
-        self.next_run = datetime.now(timezone.utc) + timedelta(minutes=self.interval_minutes)
+        self.next_run = datetime.utcnow() + timedelta(minutes=self.interval_minutes)
 
 LOOP_STAGGER_SECONDS = 30
 PER_CASINO_TIMEOUT_SEC = int(os.getenv("CASINO_TIMEOUT_SECONDS", "500"))  # hard cap
@@ -263,14 +264,14 @@ casino_loop_entries: List[CasinoLoopEntry] = [
     CasinoLoopEntry("modo",          "Modo",              _run_modo,            120),
     CasinoLoopEntry("rollingriches", "Rolling Riches",    _run_rollingriches,   120),
     CasinoLoopEntry("stake",         "Stake",             _run_stake,           120),
-    # NEW: No countdown provided so run every 24 hours
-    CasinoLoopEntry("zula",          "Zula Casino",       _run_zula,            1440),
-    CasinoLoopEntry("sportzino",     "Sportzino",         _run_sportzino,       1440),
+    CasinoLoopEntry("zula",          "Zula Casino",       _run_zula,            120),
+    CasinoLoopEntry("sportzino",     "Sportzino",         _run_sportzino,       120),
+    # NEW: Fortune Coins runs every 24 hours
     CasinoLoopEntry("fortunecoins",  "Fortune Coins",     _run_fortunecoins,    1440),
 ]
 
 def reset_loop_schedule():
-    base = datetime.now(timezone.utc)
+    base = datetime.utcnow()
     for i, entry in enumerate(casino_loop_entries):
         entry.next_run = base + timedelta(seconds=i * LOOP_STAGGER_SECONDS)
 
@@ -284,7 +285,7 @@ async def run_main_loop(channel: discord.abc.Messageable):
     global main_loop_running
     try:
         while main_loop_running:
-            now = datetime.now(timezone.utc)
+            now = datetime.utcnow()
             for entry in casino_loop_entries:
                 if now >= entry.next_run:
                     try:
@@ -405,7 +406,7 @@ async def config_interval(ctx: commands.Context, casino: str, minutes: float):
         await ctx.send("Interval must be greater than zero.")
         return
     target.interval_minutes = minutes
-    target.next_run = datetime.now(timezone.utc)
+    target.next_run = datetime.utcnow()
     await ctx.send(f"Updated {target.display_name} to run every {minutes:.1f} minutes.")
 
 @_config.command(name="order")
