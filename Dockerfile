@@ -8,11 +8,16 @@ RUN apt-get update && apt-get install -y \
     xvfb x11vnc fluxbox x11-apps x11-utils \
     wget gnupg2 ca-certificates apt-transport-https \
     python3 python3-venv python3-pip xdg-utils locales \
-    # ↓↓↓ add these for SeleniumBase GUI captcha / PyAutoGUI
+    # GUI automation deps
     python3-tk python3-dev python3-xlib scrot xclip xsel wmctrl \
-    libxtst6 libxi6 \
+    # X11 libs Pillow/ImageGrab relies on
+    libx11-6 libxext6 libxrender1 libxfixes3 libxi6 libsm6 libxrandr2 \
+    libxcb1 libxkbcommon0 libxtst6 \
+    # Screenshot backend requested by Pillow/pyscreeze
+    gnome-screenshot \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
+
 
 
 # 2) Google Chrome
