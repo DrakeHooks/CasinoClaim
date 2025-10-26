@@ -262,10 +262,13 @@ casino_loop_entries: List[CasinoLoopEntry] = [
     CasinoLoopEntry("spinquest",     "SpinQuest",         _run_spinquest,       120),
     CasinoLoopEntry("fortunewheelz", "Fortune Wheelz",    _run_fortunewheelz,   120),
     CasinoLoopEntry("nolimitcoins",  "NoLimitCoins",      _run_nlc,             120),
-    CasinoLoopEntry("modo",          "Modo",              _run_modo,            120),
-    CasinoLoopEntry("stake",         "Stake",             _run_stake,           120),
+   
+    # These sites have broken and need maintenance.
+    # CasinoLoopEntry("modo",          "Modo",              _run_modo,            120),
+    # CasinoLoopEntry("stake",         "Stake",             _run_stake,           120),
     
-    # These sites do not provide a countdown or are problematic, so we run them every 24hr by default
+    # These sites below do not provide a countdown or are problematic, 
+    # so we run them every 24hr by default
     # change these values with !config
     CasinoLoopEntry("rollingriches", "Rolling Riches",    _run_rollingriches,   1440),
     CasinoLoopEntry("fortunecoins",  "Fortune Coins",     _run_fortunecoins,    1440),
