@@ -10,7 +10,7 @@ from seleniumbase import SB
 load_dotenv()
 
 # Expect "email:password" in SPORTZINO
-SPORTZINO_CRED = os.getenv("SPORTZINO", "")
+SPORTZINO_CRED = os.getenv("SPORTZINO")
 
 # ───────────────────────────────────────────────────────────
 # Helpers
@@ -89,7 +89,9 @@ async def Sportzino(ctx, driver, channel: discord.abc.Messageable):
     # Otherwise prints concise logs/errors (no Discord text).
     
     if ":" not in SPORTZINO_CRED:
+        await channel.send("[Sportzino][ERROR] Missing SPORTZINO 'email:password' in .env")
         print("[Sportzino][ERROR] Missing SPORTZINO 'email:password' in .env")
+
         return
 
     username, password = SPORTZINO_CRED.split(":", 1)
