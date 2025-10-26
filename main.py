@@ -265,11 +265,12 @@ casino_loop_entries: List[CasinoLoopEntry] = [
     CasinoLoopEntry("modo",          "Modo",              _run_modo,            120),
     CasinoLoopEntry("stake",         "Stake",             _run_stake,           120),
     
-    # These sites do not provide a countdown or are problematic, so we run them every 24hr.
+    # These sites do not provide a countdown or are problematic, so we run them every 24hr by default
+    # change these values with !config
+    CasinoLoopEntry("rollingriches", "Rolling Riches",    _run_rollingriches,   1440),
+    CasinoLoopEntry("fortunecoins",  "Fortune Coins",     _run_fortunecoins,    1440),
     CasinoLoopEntry("zula",          "Zula Casino",       _run_zula,            1440),
     CasinoLoopEntry("sportzino",     "Sportzino",         _run_sportzino,       1440),
-    CasinoLoopEntry("fortunecoins",  "Fortune Coins",     _run_fortunecoins,    1440),
-    CasinoLoopEntry("rollingriches", "Rolling Riches",    _run_rollingriches,   1440),
 ]
 
 def reset_loop_schedule():
