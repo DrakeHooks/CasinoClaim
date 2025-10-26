@@ -1,6 +1,6 @@
 # Drake Hooks + WaterTrooper
 # Casino Claim 2
-# Funrize API (countdown-first; modal-aware; no false “claimed”)
+# Funrize API (always open modal; try Collect first; then report countdown; no false “claimed”)
 
 import os
 import re
@@ -24,24 +24,27 @@ FUNRIZE_CRED = os.getenv("FUNRIZE")  # "username:password"
 SITE_URL  = "https://funrize.com"
 STORE_URL = "https://funrize.com/promotions"
 
-# Buttons / controls
-CLAIM_CARD_CLASS = "daily-login-prize"  # opens daily reward modal
+# Card on the promotions page that opens the daily reward modal
+CLAIM_CARD_CLASS = "daily-login-prize"
 
-# Collect buttons inside modal (a few indices for safety)
+# Known Collect buttons inside modal (several overlay indices for safety)
 COLLECT_XPATHS = [
     "/html/body/div[3]/div/div/div[2]/div[2]/button",
     "/html/body/div[4]/div/div/div[2]/div[2]/button",
     "/html/body/div[5]/div/div/div[2]/div[2]/button",
     "/html/body/div[6]/div/div/div[2]/div[2]/button",
+    # Generic fallbacks by text (case-insensitive)
+    "//div[contains(@class,'modal') or contains(@class,'Dialog') or contains(@class,'dialog')]//button[contains(translate(., 'collect', 'COLLECT'),'COLLECT')]",
+    "//button[contains(translate(., 'collect', 'COLLECT'),'COLLECT')]",
 ]
 
-# Countdown on promotions page (wrapper DIV) – corrected
+# Countdown on promotions page (wrapper DIV)
 COUNTDOWN_PAGE_XPATH = "/html/body/div[1]/div/div[1]/main/div/div/div[2]/div[6]/div/div[2]/div[1]/div[1]/div"
 
 # Countdown inside the modal (your provided xpath)
 COUNTDOWN_MODAL_XPATH = "/html/body/div[3]/div/div/div[2]/div[2]/div/span[2]/span"
 
-# Modal root to wait for close
+# Modal roots (for invisibility wait after Collect)
 MODAL_ROOT_XPATHS = [
     "/html/body/div[3]/div",
     "/html/body/div[4]/div",
@@ -50,7 +53,7 @@ MODAL_ROOT_XPATHS = [
 ]
 
 # ───────────────────────────────────────────────────────────
-# Small helpers
+# Helpers
 # ───────────────────────────────────────────────────────────
 def wait_clickable(driver, by, sel, timeout=10):
     return WebDriverWait(driver, timeout).until(EC.element_to_be_clickable((by, sel)))
@@ -145,64 +148,67 @@ async def send_screenshot(channel: discord.TextChannel, driver, name="funrize.pn
         pass
 
 # ───────────────────────────────────────────────────────────
-# Flow: countdown first → open card → modal timer? → try collect
+# Flow: ALWAYS open modal → try Collect → else report countdown
 # ───────────────────────────────────────────────────────────
 async def funrize_flow(ctx, driver, channel):
+    """
+    Behavior tweak: Funrize shows a countdown even when claimable,
+    so we *do not* early-return on countdown. We *always* open the
+    daily reward modal and attempt to click a Collect button first.
+    Only if no Collect is clickable do we report the countdown.
+    """
     driver.get(STORE_URL)
     await asyncio.sleep(2)
 
-    # 1) Report PAGE countdown first if present
-    cd = read_funrize_page_countdown(driver)
-    if cd:
-        await channel.send(f"Next Funrize Bonus Available in: {cd}")
-        return
-
-    # 2) No page timer → open the daily card (modal)
+    # 1) Open the daily reward modal via the card
     opened = False
     try:
-        card = wait_clickable(driver, By.CLASS_NAME, CLAIM_CARD_CLASS, timeout=7)
+        card = wait_clickable(driver, By.CLASS_NAME, CLAIM_CARD_CLASS, timeout=10)
         safe_click(driver, card)
         opened = True
-        await asyncio.sleep(1)
+        await asyncio.sleep(1.0)
     except TimeoutException:
-        pass
+        # If card isn't found, we might be logged out. Fall back to login flow.
+        await funrize_casino(ctx, driver, channel)
+        return
 
-    # 3) If modal shows a countdown, report it and stop
+    # 2) Try to click a Collect button in the modal first (primary goal)
     if opened:
-        modal_cd = read_funrize_modal_countdown(driver)
-        if modal_cd:
-            await channel.send(f"Next Funrize Bonus Available in: {modal_cd}")
-            return
-
-    # 4) Try to find & click a Collect button in the modal
-    if opened:
-        clicked = try_click_any_xpath(driver, COLLECT_XPATHS, timeout_each=4)
+        clicked = try_click_any_xpath(driver, COLLECT_XPATHS, timeout_each=5)
         if clicked:
-            # Confirm claim by modal closing OR absence of any timers
+            # Confirm: modal closes or at least not showing timer anymore
             closed = wait_invisible_any(driver, MODAL_ROOT_XPATHS, timeout=6)
             if not closed:
-                # If modal didn't close, check again if a timer is present (means NOT claimable)
-                modal_cd = read_funrize_modal_countdown(driver)
-                if modal_cd:
-                    await channel.send(f"Next Funrize Bonus Available in: {modal_cd}")
-                    return
+                # If modal didn't close, give it a moment and proceed
+                await asyncio.sleep(0.7)
 
-            # As a final sanity check, refresh page timer: if still no timer → assume claimed
-            await asyncio.sleep(0.5)
-            page_cd = read_funrize_page_countdown(driver)
-            if not page_cd:
-                await channel.send("Funrize Daily Bonus Claimed!")
-                await send_screenshot(channel, driver)
-                return
-            else:
-                await channel.send(f"Next Funrize Bonus Available in: {page_cd}")
+            # Light sanity check: if modal countdown is *still* visible, assume not claimable
+            modal_cd = read_funrize_modal_countdown(driver)
+            if modal_cd:
+                await channel.send(f"Next Funrize Bonus Available in: {modal_cd}")
                 return
 
-    # 5) Nothing actionable → likely logged out; do login flow
+            # Otherwise, treat as claimed
+            await channel.send("Funrize Daily Bonus Claimed!")
+            await send_screenshot(channel, driver)
+            return
+
+    # 3) No Collect found/clickable → report the most specific countdown we can see
+    modal_cd = read_funrize_modal_countdown(driver)
+    if modal_cd:
+        await channel.send(f"Next Funrize Bonus Available in: {modal_cd}")
+        return
+
+    page_cd = read_funrize_page_countdown(driver)
+    if page_cd:
+        await channel.send(f"Next Funrize Bonus Available in: {page_cd}")
+        return
+
+    # 4) If we get here, things are unusual (DOM changes, logged out, etc.) → try login
     await funrize_casino(ctx, driver, channel)
 
 # ───────────────────────────────────────────────────────────
-# Login then retry (countdown-first again)
+# Login then retry flow
 # ───────────────────────────────────────────────────────────
 async def funrize_casino(ctx, driver, channel):
     if not FUNRIZE_CRED:
@@ -220,16 +226,23 @@ async def funrize_casino(ctx, driver, channel):
         safe_click(driver, login_btn)
         await asyncio.sleep(0.6)
 
-        email = wait_present(driver, By.XPATH,
-            "/html/body/div[1]/div/div[1]/div/div/div/div[1]/div/div[2]/form/label[1]/div[2]/input", 10)
+        email = wait_present(
+            driver, By.XPATH,
+            "/html/body/div[1]/div/div[1]/div/div/div/div[1]/div/div[2]/form/label[1]/div[2]/input", 10
+        )
+        email.clear()
         email.send_keys(username)
         await asyncio.sleep(0.2)
 
-        pw = wait_present(driver, By.XPATH,
-            "/html/body/div[1]/div/div[1]/div/div/div/div[1]/div/div[2]/form/label[2]/div[2]/input", 10)
+        pw = wait_present(
+            driver, By.XPATH,
+            "/html/body/div[1]/div/div[1]/div/div/div/div[1]/div/div[2]/form/label[2]/div[2]/input", 10
+        )
+        pw.clear()
         pw.send_keys(password, Keys.ENTER)
 
         await asyncio.sleep(2.5)
+        # After login, go straight back to the modal-first flow
         await funrize_flow(ctx, driver, channel)
 
     except TimeoutException:
@@ -237,25 +250,26 @@ async def funrize_casino(ctx, driver, channel):
         await send_screenshot(channel, driver, "funrize_login_error.png")
 
 # ───────────────────────────────────────────────────────────
-# Standalone countdown reader
+# Standalone countdown reader (kept for parity with your other modules)
 # ───────────────────────────────────────────────────────────
 async def check_funrize_countdown(ctx, driver, channel):
     driver.get(STORE_URL)
     await asyncio.sleep(2)
-    cd = read_funrize_page_countdown(driver)
-    if cd:
-        await channel.send(f"Next Funrize Bonus Available in: {cd}")
+    # Prefer modal countdown (it’s where Collect lives)
+    try:
+        card = wait_clickable(driver, By.CLASS_NAME, CLAIM_CARD_CLASS, timeout=5)
+        safe_click(driver, card)
+        await asyncio.sleep(0.6)
+        modal_cd = read_funrize_modal_countdown(driver)
+        if modal_cd:
+            await channel.send(f"Next Funrize Bonus Available in: {modal_cd}")
+            return
+    except TimeoutException:
+        pass
+
+    page_cd = read_funrize_page_countdown(driver)
+    if page_cd:
+        await channel.send(f"Next Funrize Bonus Available in: {page_cd}")
     else:
-        # Open modal and try modal timer as a backup
-        try:
-            card = wait_clickable(driver, By.CLASS_NAME, CLAIM_CARD_CLASS, timeout=5)
-            safe_click(driver, card)
-            await asyncio.sleep(0.6)
-            modal_cd = read_funrize_modal_countdown(driver)
-            if modal_cd:
-                await channel.send(f"Next Funrize Bonus Available in: {modal_cd}")
-                return
-        except TimeoutException:
-            pass
         await channel.send("Funrize: No countdown found.")
         await send_screenshot(channel, driver)
