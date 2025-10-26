@@ -10,7 +10,7 @@ import time
 import asyncio
 import tempfile
 import traceback
-
+import discord
 from dotenv import load_dotenv
 
 # ── PyAutoGUI / OpenCV ──────────────────────────────────────
@@ -293,7 +293,7 @@ async def _login_six_tries(driver, username: str, password: str) -> bool:
     return False
 
 # ── Main flow ───────────────────────────────────────────────
-async def rolling_riches_casino(ctx, driver, channel=None):
+async def rolling_riches_casino(ctx, driver, channel):
     try:
         creds = os.getenv("ROLLING_RICHES")
         if not creds or ":" not in creds:
