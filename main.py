@@ -504,7 +504,8 @@ async def luckybird_cmd(ctx):
 @bot.command(name="zula")
 async def zula_cmd(ctx):
     await ctx.send("Checking Zula Casino for bonus…")
-    await zula_casino(ctx, driver, channel := bot.get_channel(DISCORD_CHANNEL))
+    channel = bot.get_channel(DISCORD_CHANNEL)
+    await zula_uc(ctx, channel)
 
 @bot.command(name="sportzino")
 async def sportzino_cmd(ctx):
