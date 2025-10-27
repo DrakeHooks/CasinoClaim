@@ -42,7 +42,7 @@ AUTH_STATE_PATH = os.path.join(STATE_DIR, "modo_auth_state.json")
 
 # Auth freshness knobs
 AUTH_MAX_AGE_HOURS = int(os.getenv("MODO_AUTH_MAX_AGE_HOURS", "72"))
-AUTH_REFRESH_EVERY_HOURS = int(os.getenv("MODO_REFRESH_EVERY_HOURS", "3"))
+AUTH_REFRESH_EVERY_HOURS = int(os.getenv("MODO_REFRESH_EVERY_HOURS", "12"))
 
 # Elements
 EMAIL_SELECTORS = [

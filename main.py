@@ -343,7 +343,7 @@ async def stop_main_loop() -> bool:
 # ───────────────────────────────────────────────────────────
 # Modo auth maintenance (only when loop is STOPPED)
 # ───────────────────────────────────────────────────────────
-REFRESH_CHECK_MINUTES = int(os.getenv("MODO_REFRESH_CHECK_MINUTES", "10"))
+REFRESH_CHECK_MINUTES = int(os.getenv("MODO_REFRESH_CHECK_MINUTES", "60"))
 modo_auth_lock = asyncio.Lock()  # serialize all modo auth attempts
 
 async def run_modo_auth(channel):

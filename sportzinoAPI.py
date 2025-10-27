@@ -95,7 +95,7 @@ async def Sportzino(ctx, driver, channel: discord.abc.Messageable):
         return
 
     username, password = SPORTZINO_CRED.split(":", 1)
-
+    await channel.send("Launching **Sportzino** (UC)…")
     try:
         with SB(uc=True, headed=True) as sb:
             # 1) Login
