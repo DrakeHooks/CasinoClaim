@@ -152,6 +152,8 @@ async def Sportzino(ctx, driver, channel: discord.abc.Messageable):
             )
             if not opened_rewards:
                 print("[Sportzino] Rewards/Coins section not found.")
+                await _send_post_claim(sb, channel, "sportzino_error.png")
+
                 return
 
             sb.wait(10)  # give modal time to render
