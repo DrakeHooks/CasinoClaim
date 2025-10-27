@@ -3,6 +3,7 @@
 # Rolling Riches — 6-try auth + post-submit screenshot + DOM→OpenCV fallback
 # Update: never stop early; attempt claim even if confirm miss; robust countdown probe
 # Final: rr_final_claim.png stage; countdown XPath updated; print-only logging (no Discord sends)
+# Add: Discord sends w/ screenshots on success or unavailable
 
 import os
 import re
@@ -88,6 +89,19 @@ async def _pyauto_shot(caption=""):
     except Exception as e:
         await _log(f"⚠️ _pyauto_shot error: {e}")
         return ""
+
+async def _send_one_shot(channel: discord.abc.Messageable, text: str, image_path: str):
+    """Send one Discord message with an attached screenshot, then clean up."""
+    if not image_path or not os.path.exists(image_path):
+        await channel.send(text)
+        return
+    try:
+        await channel.send(text, file=discord.File(image_path))
+    finally:
+        try:
+            os.remove(image_path)
+        except Exception:
+            pass
 
 def _ensure_viewport(driver):
     try:
@@ -374,20 +388,28 @@ async def rolling_riches_casino(ctx, driver, channel):
                 await asyncio.sleep(1.0)
                 await _log("✅ Final confirm clicked (template).")
 
-        # ── Outcome ──
+        # ── Outcome (now with Discord sends + screenshots) ──
         if claimed:
-            await _log("🎉 Rolling Riches Daily Bonus Claimed!")
+            # Success screenshot + message
+            shot = await _driver_shot(driver, "✅ Claimed — final state")
+            await _send_one_shot(channel, "Rolling Riches Daily Bonus Claimed!", shot)
+
+            # Optional follow-up text-only countdown
             cd = _read_rr_countdown(driver)
             if cd:
-                await _log(f"🕒 Next bonus in: {cd}")
+                await _log(f"🕒 Next bonus in: {cd}")  # keep as print-only to avoid spam
         else:
+            # Unavailable screenshot + message (with countdown if found)
             cd = _read_rr_countdown(driver)
+            shot = await _driver_shot(driver, "ℹ️ Bonus unavailable — current state")
             if cd:
-                await _log(f"ℹ️ Couldn’t complete claim. Next bonus available in: {cd}")
+                await _send_one_shot(channel, f"Rolling Riches: Bonus unavailable. Next bonus in: {cd}", shot)
             else:
-                await _log("ℹ️ Could not complete claim and no countdown detected.")
+                await _send_one_shot(channel, "Rolling Riches: Bonus unavailable.", shot)
 
     except Exception as e:
         tb = "".join(traceback.format_exception_only(type(e), e)).strip()
         await _log(f"💥 Error: {tb}")
-        await _driver_shot(driver, "💥 Failure point")
+        shot = await _driver_shot(driver, "💥 Failure point")
+        # Send failure screenshot to help debugging (optional; keep or remove)
+        await _send_one_shot(channel, f"Rolling Riches: Error — {tb}", shot)
