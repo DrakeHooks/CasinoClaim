@@ -548,7 +548,8 @@ async def modo_cmd(ctx):
 @bot.command(name="rollingriches")
 async def rollingriches_cmd(ctx):
     await ctx.send("Checking Rolling Riches for bonus…")
-    await rolling_riches_casino(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
+    channel = bot.get_channel(DISCORD_CHANNEL)
+    await rolling_riches_casino(ctx, driver, channel)
 
 @bot.command(name="stake")
 async def stake_cmd(ctx):
