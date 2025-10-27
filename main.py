@@ -102,7 +102,6 @@ def _clean_chrome_locks(root: str, profile: str) -> None:
                     os.remove(p)
                 except Exception:
                     pass
-        # Sometimes a stale DevToolsActivePort file shows up in the profile root
         for p in ("DevToolsActivePort",):
             fp = os.path.join(prof_path, p)
             if os.path.exists(fp):
@@ -244,10 +243,13 @@ async def _run_funrize(channel):        await funrize_flow(None, driver, channel
 async def _run_globalpoker(channel):    await global_poker(None, driver, channel)
 async def _run_jefebet(channel):        await jefebet_casino(None, driver, channel)
 async def _run_crowncoins(channel):     await crowncoins_casino(driver, bot, None, channel)
+
+# Modo runner used by loop (claim → countdown)
 async def _run_modo(channel):
     ok = await claim_modo_bonus(driver, bot, None, channel)
     if not ok:
         await check_modo_countdown(driver, bot, None, channel)
+
 async def _run_rollingriches(channel):  await rolling_riches_casino(None, driver, channel)
 async def _run_stake(channel):          await stake_claim(driver, bot, None, channel)
 async def _run_fortunewheelz(channel):  await fortunewheelz_flow(None, driver, channel)
@@ -262,14 +264,12 @@ casino_loop_entries: List[CasinoLoopEntry] = [
     CasinoLoopEntry("spinquest",     "SpinQuest",         _run_spinquest,       120),
     CasinoLoopEntry("fortunewheelz", "Fortune Wheelz",    _run_fortunewheelz,   120),
     CasinoLoopEntry("nolimitcoins",  "NoLimitCoins",      _run_nlc,             120),
-   
-    # These sites have broken and need maintenance.
+
+    # Enable when you want Modo and Stake in the loop cadence:
     # CasinoLoopEntry("modo",          "Modo",              _run_modo,            120),
     # CasinoLoopEntry("stake",         "Stake",             _run_stake,           120),
-    
-    # These sites below do not provide a countdown or are problematic, 
-    # so we run them every 24hr by default
-    # change these values with !config
+
+    # 24h cadence group (no countdown/problematic)
     CasinoLoopEntry("rollingriches", "Rolling Riches",    _run_rollingriches,   1440),
     CasinoLoopEntry("fortunecoins",  "Fortune Coins",     _run_fortunecoins,    1440),
     CasinoLoopEntry("zula",          "Zula Casino",       _run_zula,            1440),
@@ -341,6 +341,29 @@ async def stop_main_loop() -> bool:
     return True
 
 # ───────────────────────────────────────────────────────────
+# Modo auth refresher (background; never blocks the loop)
+# ───────────────────────────────────────────────────────────
+REFRESH_CHECK_MINUTES = int(os.getenv("MODO_REFRESH_CHECK_MINUTES", "10"))
+
+async def modo_auth_maintenance():
+    """Runs forever in the background. If refresh is due, kicks off UC auth in its own session.
+    This does not use the shared Selenium driver and will not block the loop."""
+    await bot.wait_until_ready()
+    channel = bot.get_channel(DISCORD_CHANNEL)
+    while not bot.is_closed():
+        try:
+            if 'modo_auth_needs_refresh' in globals() and modo_auth_needs_refresh():
+                if channel:
+                    await channel.send("♻️ Background: refreshing Modo auth…")
+                try:
+                    await authenticate_modo(driver, bot, None, channel)
+                except Exception as e:
+                    print(f"[Modo Auth Maintenance] error: {e}")
+        except Exception as e:
+            print(f"[Modo Auth Maintenance] outer error: {e}")
+        await asyncio.sleep(REFRESH_CHECK_MINUTES * 60)
+
+# ───────────────────────────────────────────────────────────
 # Commands
 # ───────────────────────────────────────────────────────────
 @bot.event
@@ -352,6 +375,8 @@ async def on_ready():
         await asyncio.sleep(10)
         if await start_main_loop(channel):
             await channel.send("🎰 Casino loop started with current configuration.")
+        # Kick off the background Modo refresher AFTER the loop is running
+        asyncio.create_task(modo_auth_maintenance())
     else:
         print("Invalid DISCORD_CHANNEL")
 
@@ -397,13 +422,14 @@ def format_loop_config() -> str:
               "Use `!config order <casino1> <casino2> ...>` to set a new run order."]
     return "\n".join(lines)
 
-@commands.group(name="config", invoke_without_command=True)
-async def _config(ctx: commands.Context):
+from discord.ext import commands as dcommands
+@dcommands.group(name="config", invoke_without_command=True)
+async def _config(ctx: dcommands.Context):
     await ctx.send(format_loop_config())
 bot.add_command(_config)
 
 @_config.command(name="interval")
-async def config_interval(ctx: commands.Context, casino: str, minutes: float):
+async def config_interval(ctx: dcommands.Context, casino: str, minutes: float):
     target = next((e for e in casino_loop_entries if e.key.lower() == casino.lower()), None)
     if not target:
         await ctx.send(f"Casino `{casino}` is not part of the automated loop.")
@@ -416,7 +442,7 @@ async def config_interval(ctx: commands.Context, casino: str, minutes: float):
     await ctx.send(f"Updated {target.display_name} to run every {minutes:.1f} minutes.")
 
 @_config.command(name="order")
-async def config_order(ctx: commands.Context, *casinos: str):
+async def config_order(ctx: dcommands.Context, *casinos: str):
     if not casinos:
         await ctx.send("Provide the complete list of casino keys in the desired order.")
         return
@@ -431,8 +457,7 @@ async def config_order(ctx: commands.Context, *casinos: str):
     await ctx.send("Casino loop order updated.\n" + format_loop_config())
 
 @bot.command(name="ping")
-async def ping(ctx):
-    await ctx.send("Pong")
+async def ping(ctx): await ctx.send("Pong")
 
 @bot.command(name="about")
 async def about(ctx):
@@ -455,87 +480,7 @@ async def restart(ctx):
     await bot.close()
     os._exit(0)
 
-@bot.command(name="cleardatadir")
-async def clear_data_dir(ctx: commands.Context):
-    """
-    Interactively clear the persistent Chrome user-data directory.
-    This will stop the loop, quit Chrome, delete the directory, and restart the bot.
-    """
-    root = instance_dir or os.getenv("CHROME_USER_DATA_DIR", "").strip()
-    if not root:
-        await ctx.send("⚠️ No CHROME_INSTANCE_DIR or CHROME_USER_DATA_DIR configured — nothing to clear.")
-        return
-
-    # Confirm with the invoking user
-    await ctx.send(
-        "🧹 **Clear Chrome data directory?**\n"
-        f"This will stop the loop, quit Chrome, delete:\n```{root}```\n"
-        "and restart the bot.\n\n"
-        "Type **YES** within 20 seconds to confirm, or anything else to cancel."
-    )
-
-    def _check(m: discord.Message) -> bool:
-        return m.channel.id == ctx.channel.id and m.author.id == ctx.author.id
-
-    try:
-        reply: discord.Message = await bot.wait_for("message", timeout=20, check=_check)
-    except asyncio.TimeoutError:
-        await ctx.send("❎ Timed out — cancelled.")
-        return
-
-    if reply.content.strip().upper() != "YES":
-        await ctx.send("❎ Cancelled.")
-        return
-
-    # Proceed
-    await ctx.send("⏳ Stopping the loop and shutting down Chrome…")
-
-    # Stop the automated loop if needed
-    try:
-        if is_main_loop_running():
-            await stop_main_loop()
-    except Exception:
-        pass
-
-    # Quit Chrome to release locks
-    try:
-        driver.quit()
-    except Exception:
-        pass
-
-    # Extra safeguard: kill any stray chrome that might still be alive
-    try:
-        import signal, psutil  # psutil is optional; ignore if not available
-        for p in psutil.process_iter(attrs=["name", "cmdline"]):
-            name = (p.info.get("name") or "").lower()
-            cmd  = " ".join(p.info.get("cmdline") or [])
-            if "chrome" in name or "--user-data-dir=" in cmd:
-                try:
-                    p.send_signal(signal.SIGKILL)
-                except Exception:
-                    pass
-    except Exception:
-        pass
-
-    # Delete directory
-    try:
-        import shutil
-        shutil.rmtree(root, ignore_errors=True)
-        await ctx.send("✅ Chrome user data directory cleared. Restarting bot…")
-    except Exception as e:
-        await ctx.send(f"⚠️ Failed to clear Chrome data directory: `{e}`")
-        return
-
-    # Restart the bot process (entrypoint will relaunch and recreate a fresh profile)
-    try:
-        await bot.close()
-    finally:
-        os._exit(0)
-
-
-# ───────────────────────────────────────────────────────────
-# Manual casino commands
-# ───────────────────────────────────────────────────────────
+# Manual casino commands (unchanged)
 @bot.command(name="luckybird")
 async def luckybird_cmd(ctx):
     await ctx.send("Checking LuckyBird for bonus…")
@@ -651,23 +596,17 @@ async def dingdingding_cmd(ctx):
     if not claimed:
         await check_dingdingding_countdown(driver, bot, ctx, channel)
 
-
 # ───────────────────────────────────────────────────────────
-# Auth router
+# AUTH ROUTER (restores !auth commands, including !auth modo)
 # ───────────────────────────────────────────────────────────
 @bot.command(name="auth")
 async def authenticate_command(ctx: commands.Context, site: str, method: str = None):
     """
     Examples:
       !auth google
-      !auth nolimitcoins google
-      !auth nolimitcoins env
-      !auth luckybird
-      !auth crowncoins google
-      !auth crowncoins env
       !auth modo
-      !auth dingdingding
-      !auth stake
+      !auth nolimitcoins google
+      !auth crowncoins env
     """
     channel = bot.get_channel(DISCORD_CHANNEL)
     norm_site = re.sub(r"\s+", "", site.lower())
@@ -694,7 +633,21 @@ async def authenticate_command(ctx: commands.Context, site: str, method: str = N
                 except Exception: pass
         return
 
-    # 2) CrownCoins with method
+    # 2) Modo
+    if norm_site == "modo":
+        await ctx.send("Authenticating Modo…")
+        ok = await authenticate_modo(driver, bot, ctx, channel)
+        if not ok:
+            snap = "modo_auth_failed.png"
+            try:
+                driver.save_screenshot(snap)
+                await ctx.send("Modo authentication failed.", file=discord.File(snap))
+            finally:
+                try: os.remove(snap)
+                except Exception: pass
+        return
+
+    # 3) CrownCoins
     if norm_site == "crowncoins":
         if method is None:
             await ctx.send("Usage: `!auth crowncoins google` or `!auth crowncoins env`")
@@ -708,7 +661,6 @@ async def authenticate_command(ctx: commands.Context, site: str, method: str = N
         else:
             await ctx.send("Invalid method. Use `google` or `env`.")
             return
-
         if not ok:
             snap = f"crowncoins_{method.lower()}_auth_failed.png"
             try:
@@ -719,7 +671,7 @@ async def authenticate_command(ctx: commands.Context, site: str, method: str = N
                 except Exception: pass
         return
 
-    # 3) DingDingDing
+    # 4) DingDingDing
     if norm_site == "dingdingding":
         await ctx.send("Authenticating DingDingDing…")
         ok = await authenticate_dingdingding(driver, bot, ctx, channel)
@@ -728,20 +680,6 @@ async def authenticate_command(ctx: commands.Context, site: str, method: str = N
             try:
                 driver.save_screenshot(snap)
                 await ctx.send("Authentication failed.", file=discord.File(snap))
-            finally:
-                try: os.remove(snap)
-                except Exception: pass
-        return
-
-    # 4) Modo
-    if norm_site == "modo":
-        await ctx.send("Authenticating Modo…")
-        ok = await authenticate_modo(driver, bot, ctx, channel)
-        if not ok:
-            snap = "modo_auth_failed.png"
-            try:
-                driver.save_screenshot(snap)
-                await ctx.send("Modo authentication failed.", file=discord.File(snap))
             finally:
                 try: os.remove(snap)
                 except Exception: pass
@@ -775,8 +713,8 @@ async def authenticate_command(ctx: commands.Context, site: str, method: str = N
                 except Exception: pass
         return
 
-    # 7) NoLimitCoins (aliases)
-    if norm_site in {"nolimitcoins", "nlc", "nolimit", "nolimitcoin", "nolimitco"}:
+    # 7) NoLimitCoins
+    if norm_site in {"nolimitcoins", "nlc", "nolimit", "nolimitcoins", "no limit coins"}:
         if method is None:
             await ctx.send("Usage: `!auth nolimitcoins google` or `!auth nolimitcoins env`")
             return
@@ -800,35 +738,30 @@ async def authenticate_command(ctx: commands.Context, site: str, method: str = N
                 except Exception: pass
         return
 
-    # Unknown site for !auth
     await ctx.send(f"❓ Authentication for `{site}` is not implemented. Run `!help` for supported sites.")
 
+# Handy shortcut specifically for Modo
+@bot.command(name="authmodo")
+async def authmodo_cmd(ctx):
+    await ctx.send("Authenticating Modo…")
+    await authenticate_modo(driver, bot, ctx, bot.get_channel(DISCORD_CHANNEL))
 
 # ───────────────────────────────────────────────────────────
 # Invalid command handler
 # ───────────────────────────────────────────────────────────
-from discord.ext import commands
-
 @bot.event
 async def on_command_error(ctx: commands.Context, error: Exception):
-    # Command not found → guide user to !help
     if isinstance(error, commands.CommandNotFound):
         await ctx.send("❌ Invalid command. Run `!help` to see valid commands.")
         return
-
-    # Let subcommand errors for groups fall through nicely
     if isinstance(error, commands.BadArgument):
         await ctx.send(f"⚠️ {error}")
         return
-
-    # Anything else: log + show a lightweight notice
     try:
         print(f"[on_command_error] {type(error).__name__}: {error}")
     except Exception:
         pass
     await ctx.send("⚠️ An error occurred while handling that command.")
-
-
 
 # ───────────────────────────────────────────────────────────
 # Help Command
@@ -843,13 +776,16 @@ async def help_cmd(ctx):
 !fortunecoins, !nolimitcoins, !fortunewheelz, !stake, !dingdingding
 
 ---------------------------------------  
-⚙️ **General Commands:**  
-!ping, !restart, !help, !start, !stop, !about, !config
-
----------------------------------------  
 ✅ **Auth Commands:**  
 !auth google  
-!auth <site> <method>  (e.g. `!auth crowncoins google`, `!auth nolimitcoins env`)
+!auth modo  
+!auth crowncoins google | !auth crowncoins env  
+!auth nolimitcoins google | !auth nolimitcoins env  
+!authmodo  (shortcut)
+
+---------------------------------------  
+⚙️ **General:**  
+!ping, !restart, !help, !start, !stop, !about, !config
 """)
 
 # ───────────────────────────────────────────────────────────
