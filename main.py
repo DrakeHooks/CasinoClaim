@@ -258,7 +258,6 @@ async def _run_fortunecoins(channel):   await fortunecoins_uc(None, channel)  # 
 
 casino_loop_entries: List[CasinoLoopEntry] = [
     CasinoLoopEntry("luckybird",     "LuckyBird",         _run_luckybird,       120),
-    CasinoLoopEntry("funrize",       "Funrize",           _run_funrize,         120),
     CasinoLoopEntry("globalpoker",   "GlobalPoker",       _run_globalpoker,     120),
     CasinoLoopEntry("jefebet",       "JefeBet",           _run_jefebet,         120),
     CasinoLoopEntry("spinquest",     "SpinQuest",         _run_spinquest,       120),
@@ -270,6 +269,7 @@ casino_loop_entries: List[CasinoLoopEntry] = [
     # CasinoLoopEntry("stake",         "Stake",             _run_stake,           120),
 
     # 24h cadence group (no countdown/problematic)
+    CasinoLoopEntry("funrize",       "Funrize",           _run_funrize,         1440),
     CasinoLoopEntry("rollingriches", "Rolling Riches",    _run_rollingriches,   1440),
     CasinoLoopEntry("fortunecoins",  "Fortune Coins",     _run_fortunecoins,    1440),
     CasinoLoopEntry("zula",          "Zula Casino",       _run_zula,            1440),
