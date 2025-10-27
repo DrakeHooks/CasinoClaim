@@ -236,7 +236,7 @@ PER_CASINO_TIMEOUT_SEC = int(os.getenv("CASINO_TIMEOUT_SECONDS", "500"))  # hard
 MAIN_TICK_SLEEP = 5
 
 async def _run_luckybird(channel):      await luckybird_entry(None, driver, bot, channel)
-async def _run_zula(channel):           await zula_casino(None, driver, channel)
+async def _run_zula(channel):           await zula_uc(None, channel)
 async def _run_sportzino(channel):      await Sportzino(None, driver, channel)
 async def _run_nlc(channel):            await nolimitcoins_flow(None, driver, channel)
 async def _run_funrize(channel):        await funrize_flow(None, driver, channel)
@@ -443,7 +443,7 @@ async def clear_data_dir(ctx: commands.Context):
     await ctx.send(
         "🧹 **Clear Chrome data directory?**\n"
         f"This will stop the loop, quit Chrome, delete:\n```{root}```\n"
-        "and restart the bot.\n\n"
+        "and restart the bot. You will want to run !auth <casino site> after for every site needing google auth\n\n"
         "Type **YES** within 20 seconds to confirm, or anything else to cancel."
     )
 
