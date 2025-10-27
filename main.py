@@ -341,24 +341,38 @@ async def stop_main_loop() -> bool:
     return True
 
 # ───────────────────────────────────────────────────────────
-# Modo auth refresher (background; never blocks the loop)
+# Modo auth maintenance (only when loop is STOPPED)
 # ───────────────────────────────────────────────────────────
 REFRESH_CHECK_MINUTES = int(os.getenv("MODO_REFRESH_CHECK_MINUTES", "10"))
+modo_auth_lock = asyncio.Lock()  # serialize all modo auth attempts
+
+async def run_modo_auth(channel):
+    """Serialize calls to modoAPI.authenticate_modo to avoid concurrent UC sessions."""
+    async with modo_auth_lock:
+        try:
+            await authenticate_modo(driver, bot, None, channel)
+        except Exception as e:
+            print(f"[Modo Auth] error: {e}")
 
 async def modo_auth_maintenance():
-    """Runs forever in the background. If refresh is due, kicks off UC auth in its own session.
-    This does not use the shared Selenium driver and will not block the loop."""
+    """
+    Runs in the background, but only refreshes when:
+      - the main loop is NOT running, and
+      - the lock is free, and
+      - refresh is due.
+    This ensures manual !auth modo is responsive after !stop, and nothing collides.
+    """
     await bot.wait_until_ready()
     channel = bot.get_channel(DISCORD_CHANNEL)
     while not bot.is_closed():
         try:
-            if 'modo_auth_needs_refresh' in globals() and modo_auth_needs_refresh():
+            if (not is_main_loop_running()
+                and 'modo_auth_needs_refresh' in globals()
+                and modo_auth_needs_refresh()
+                and not modo_auth_lock.locked()):
                 if channel:
                     await channel.send("♻️ Background: refreshing Modo auth…")
-                try:
-                    await authenticate_modo(driver, bot, None, channel)
-                except Exception as e:
-                    print(f"[Modo Auth Maintenance] error: {e}")
+                await run_modo_auth(channel)
         except Exception as e:
             print(f"[Modo Auth Maintenance] outer error: {e}")
         await asyncio.sleep(REFRESH_CHECK_MINUTES * 60)
@@ -375,7 +389,7 @@ async def on_ready():
         await asyncio.sleep(10)
         if await start_main_loop(channel):
             await channel.send("🎰 Casino loop started with current configuration.")
-        # Kick off the background Modo refresher AFTER the loop is running
+        # Start the background Modo refresher; it will only act when the loop is stopped.
         asyncio.create_task(modo_auth_maintenance())
     else:
         print("Invalid DISCORD_CHANNEL")
@@ -480,7 +494,7 @@ async def restart(ctx):
     await bot.close()
     os._exit(0)
 
-# Manual casino commands (unchanged)
+# Manual casino commands
 @bot.command(name="luckybird")
 async def luckybird_cmd(ctx):
     await ctx.send("Checking LuckyBird for bonus…")
@@ -636,15 +650,7 @@ async def authenticate_command(ctx: commands.Context, site: str, method: str = N
     # 2) Modo
     if norm_site == "modo":
         await ctx.send("Authenticating Modo…")
-        ok = await authenticate_modo(driver, bot, ctx, channel)
-        if not ok:
-            snap = "modo_auth_failed.png"
-            try:
-                driver.save_screenshot(snap)
-                await ctx.send("Modo authentication failed.", file=discord.File(snap))
-            finally:
-                try: os.remove(snap)
-                except Exception: pass
+        await run_modo_auth(channel)  # serialized + safe against background task
         return
 
     # 3) CrownCoins
@@ -744,7 +750,7 @@ async def authenticate_command(ctx: commands.Context, site: str, method: str = N
 @bot.command(name="authmodo")
 async def authmodo_cmd(ctx):
     await ctx.send("Authenticating Modo…")
-    await authenticate_modo(driver, bot, ctx, bot.get_channel(DISCORD_CHANNEL))
+    await run_modo_auth(bot.get_channel(DISCORD_CHANNEL))
 
 # ───────────────────────────────────────────────────────────
 # Invalid command handler

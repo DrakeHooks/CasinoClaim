@@ -1,6 +1,6 @@
 # Drake Hooks + WaterTrooper
-# Casino Claim 2
-# Modo API — UC/CDP auth + claim-or-countdown in SAME session
+# Casino Claim
+# Modo — UC/CDP auth + claim-or-countdown in SAME session
 # Output rules:
 #   - Countdown success => ONLY text "Next Modo Bonus Available in: HH:MM:SS" (no screenshot)
 #   - Claim success     => text + ONE screenshot (post-login)
