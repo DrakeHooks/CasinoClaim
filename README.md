@@ -89,4 +89,6 @@ Gambling can become addicting, if you start feeling addicted, please get help be
 
 <a href="https://www.ncpgambling.org/help-treatment/"><img src="https://www.ncpgambling.org/wp-content/themes/magneti/assets/build/images/800gamb-logo-header.svg"/></a>
 
-# Star Tracker
+# Star Tracker ⭐
+
+[![Star History Chart](https://api.star-history.com/svg?repos=DrakeHooks/CasinoClaim&type=Date)](https://star-history.com/#DrakeHooks/CasinoClaim&Date)
