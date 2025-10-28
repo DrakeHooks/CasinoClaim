@@ -1,6 +1,6 @@
 # Drake Hooks + WaterTrooper
 # Casino Claim 2
-# Sportzino API (SeleniumBase UC) 
+# Sportzino API (SeleniumBase UC) — ALWAYS post a final screenshot (success or failure)
 
 import os
 import discord
@@ -10,13 +10,18 @@ from seleniumbase import SB
 load_dotenv()
 
 # Expect "email:password" in SPORTZINO
-SPORTZINO_CRED = os.getenv("SPORTZINO")
+SPORTZINO_CRED = os.getenv("SPORTZINO", "")
 
 # ───────────────────────────────────────────────────────────
 # Helpers
 # ───────────────────────────────────────────────────────────
-async def _send_post_claim(sb: SB, channel: discord.abc.Messageable, path: str, caption: str):
-    """Only used on successful claim to avoid screenshot spam."""
+async def _send_screenshot(
+    sb: SB,
+    channel: discord.abc.Messageable,
+    path: str,
+    caption: str,
+):
+    """Save -> send -> cleanup. Used for both success and failure paths."""
     try:
         sb.save_screenshot(path)
         await channel.send(caption, file=discord.File(path))
@@ -63,13 +68,16 @@ def _try_click_any(sb: SB, xpaths, timeout_each=10) -> bool:
 
 
 def _close_popups_before_rewards(sb: SB):
-    # Close known Sportzino popups BEFORE Rewards only.
+    """Close known Sportzino popups BEFORE opening Rewards."""
     popup_xpaths = [
         "/html/body/div[3]/div/div[1]/div/div/div/div[1]/div[2]/button",
         "/html/body/div[3]/div/div[1]/div/div/button",
         "/html/body/div[4]/div/div[1]/div/div/button",
         "/html/body/div[5]/div/div[1]/div/div/button",
         "/html/body/div[6]/div/div[1]/div/div/div/div[2]/button",
+        "//button[contains(.,'Close') or contains(.,'Dismiss') or contains(.,'Got it')]",
+        "//div[contains(@class,'modal')]//button[@aria-label='Close']",
+        "//div[contains(@class,'modal')]//button[contains(@class,'close')]",
     ]
     if _try_click_any(sb, popup_xpaths, timeout_each=6):
         print("[Sportzino] Closed a popup.")
@@ -83,19 +91,22 @@ def _close_popups_before_rewards(sb: SB):
 # Main UC-based flow
 # ───────────────────────────────────────────────────────────
 async def Sportzino(ctx, driver, channel: discord.abc.Messageable):
-    
-    # Sportzino via SeleniumBase (uc=True).
-    # Sends **only** a post-claim screenshot if the claim succeeds.
-    # Otherwise prints concise logs/errors (no Discord text).
-    
+    """
+    Sportzino via SeleniumBase (uc=True).
+    ALWAYS sends a screenshot to Discord at the end with a single-line caption:
+      - Success: "Sportzino Daily Bonus Claimed!"
+      - Unavailable: "Sportzino: no claim available (likely already claimed)."
+      - Rewards missing: "Sportzino: Rewards/Coins section not found."
+      - Login fail / exception: Single-line reason.
+    """
+
+    # Basic env sanity
     if ":" not in SPORTZINO_CRED:
         await channel.send("[Sportzino][ERROR] Missing SPORTZINO 'email:password' in .env")
-        print("[Sportzino][ERROR] Missing SPORTZINO 'email:password' in .env")
-
         return
 
     username, password = SPORTZINO_CRED.split(":", 1)
-    await channel.send("Launching **Sportzino** (UC)…")
+
     try:
         with SB(uc=True, headed=True) as sb:
             # 1) Login
@@ -103,32 +114,66 @@ async def Sportzino(ctx, driver, channel: discord.abc.Messageable):
             sb.wait_for_ready_state_complete()
             print("[Sportzino] Login page loaded.")
 
+            # Type creds
             try:
-                sb.type("input[id='emailAddress']", username)
-                sb.type("input[id='password']", password)
+                # Try common selectors first
+                typed = False
+                for sel in [
+                    "input#emailAddress", "input[id='emailAddress']",
+                    "input[name='email']", "input[type='email']",
+                ]:
+                    try:
+                        sb.type(sel, username)
+                        typed = True
+                        break
+                    except Exception:
+                        continue
+                if not typed:
+                    raise Exception("Email field not found")
+
+                typed = False
+                for sel in [
+                    "input#password", "input[id='password']",
+                    "input[name='password']", "input[type='password']",
+                ]:
+                    try:
+                        sb.type(sel, password)
+                        typed = True
+                        pwd_sel = sel
+                        break
+                    except Exception:
+                        continue
+                if not typed:
+                    raise Exception("Password field not found")
+
+                # Attempt GUI captcha click if present (best effort)
                 try:
                     sb.uc_gui_click_captcha()
                 except Exception:
                     pass
+
             except Exception as e:
-                print(f"[Sportzino][ERROR] Login fields not found: {e}")
+                print(f"[Sportzino][ERROR] Login fields/captcha error: {e}")
+                await _send_screenshot(sb, channel, "sportzino_login_error.png",
+                                       "Sportzino: login fields not found / captcha gating.")
                 return
 
-            # Submit
+            # Submit (Enter on password first; fallback to explicit button)
             submitted = False
             try:
-                sb.press_keys("input[id='password']", "\n")
+                sb.press_keys(pwd_sel, "\n")
                 submitted = True
             except Exception:
                 pass
             if not submitted:
                 submitted = _try_click_any(
                     sb,
-                    ["//button[@type='submit']", "//button[contains(.,'Log in')]"],
+                    ["//button[@type='submit']", "//button[contains(.,'Log in') or contains(.,'Sign in')]"],
                     timeout_each=10,
                 )
             if not submitted:
-                print("[Sportzino][ERROR] Could not submit login.")
+                await _send_screenshot(sb, channel, "sportzino_submit_fail.png",
+                                       "Sportzino: could not submit login.")
                 return
 
             # Post-login settle
@@ -140,29 +185,35 @@ async def Sportzino(ctx, driver, channel: discord.abc.Messageable):
             # 2) Close popups BEFORE Rewards
             _close_popups_before_rewards(sb)
 
-            # 3) Open Rewards / Free Coins
+            # 3) Open Rewards / Free Coins / Get Coins
             opened_rewards = _try_click_any(
                 sb,
                 [
+                    # Known header locations (try a few)
                     "/html/body/div[1]/div/nav/div/div[4]/div[1]/button",
                     "/html/body/div[1]/div[1]/div/nav/div/div[4]/div[1]/button",
+                    # Text-based fallbacks
                     "//button[contains(.,'Free Coins') or contains(.,'Rewards') or contains(.,'Get Coins')]",
+                    "//a[contains(.,'Free Coins') or contains(.,'Rewards') or contains(.,'Get Coins')]",
+                    # Heuristic: header area with a span text
+                    "//div[contains(@class,'header')]//button[.//span[contains(.,'Coins') or contains(.,'Rewards')]]",
                 ],
                 timeout_each=12,
             )
             if not opened_rewards:
                 print("[Sportzino] Rewards/Coins section not found.")
-                await _send_post_claim(sb, channel, "sportzino_error.png")
-
+                await _send_screenshot(sb, channel, "sportzino_rewards_missing.png",
+                                       "Sportzino: Rewards/Coins section not found.")
                 return
 
-            sb.wait(10)  # give modal time to render
-            print("[Sportzino] Rewards modal should be open (proceeding).")
+            sb.wait(10)  # Give rewards UI time to render
+            print("[Sportzino] Rewards UI should be open (proceeding).")
 
-            # 4) Click Collect (do NOT close popups anymore)
+            # 4) Click Collect (only if enabled)
             collected = _try_click_any(
                 sb,
                 [
+                    # Common modal/button guesses
                     "/html/body/div[5]/div/div[1]/div/div/div[2]/div[2]/div[2]/div[1]/div/div[3]/div/div[1]/button",
                     "/html/body/div[4]/div/div[1]/div/div/div[2]/div[2]/div[2]/div[1]/div/div[3]/div/div[1]/button",
                     "//button[contains(.,'Collect') and not(@disabled)]",
@@ -174,10 +225,22 @@ async def Sportzino(ctx, driver, channel: discord.abc.Messageable):
 
             if collected:
                 sb.wait(3)
-                await _send_post_claim(sb, channel, "sportzino_claimed.png", "Sportzino Daily Bonus Claimed!")
+                await _send_screenshot(sb, channel, "sportzino_claimed.png",
+                                       "Sportzino Daily Bonus Claimed!")
                 print("[Sportzino] Claimed successfully.")
+                return
             else:
                 print("[Sportzino] No claim available (likely already claimed).")
+                await _send_screenshot(sb, channel, "sportzino_unavailable.png",
+                                       "Sportzino: no claim available (likely already claimed).")
+                return
 
     except Exception as e:
-        print(f"[Sportzino][ERROR] Exception during automation: {e}")
+        # Last-resort screenshot; try to capture whatever state exists
+        try:
+            with SB(uc=True, headed=True) as sb_fallback:
+                await _send_screenshot(sb_fallback, channel, "sportzino_exception.png",
+                                       f"Sportzino: exception during automation — {e}")
+        except Exception:
+            # If even fallback browser fails, at least send text.
+            await channel.send(f"[Sportzino][ERROR] Exception during automation: {e}")

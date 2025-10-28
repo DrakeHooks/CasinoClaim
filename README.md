@@ -69,7 +69,7 @@ The bot is designed to check most casinos automatically in 2-hour intervals, wit
 | Modo           | ✗          | ✗               | No                          | $0.30-$1.00 bonus/day | Yes     |
 | Stake          | ✗          | ✗               | Yes                         | $1.00 bonus/day -  Auto Claim in development | Yes     |
 | Goldnluck      | ✗          | ✗               | No                          | $2.00 bonus/day     | No      |
-| Luckyland      | ✗          | ✗               | No                          | $0.30-$1.00  bonus/day | Yes     |
+| Luckyland      | ✗          | ✗               | No                          | $0.30-$1.00  Daily | Yes     |
 | Chumba         | IN DEVELOPMENT          | IN DEVELOPMENT               | No                          | $.25-$3.00 Daily     | Yes     |
 | Chanced        | ✗          | ✗               | No                          | Varies between $0.30-$1.00 bonus/day    | Yes     |
 | iCasino        | IN DEVELOPMENT         | IN DEVELOPMENT               | IN DEVELOPMENT                          | $1.70 bonus/day | Yes     |
