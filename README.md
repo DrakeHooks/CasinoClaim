@@ -93,7 +93,7 @@ Gambling can become addicting, if you start feeling addicted, please get help be
 
 
   <a href="https://star-history.com/#DrakeHooks/CasinoClaim&Date">
-    <img src="https://api.star-history.com/svg?repos=DrakeHooks/CasinoClaim&type=Date&theme=dark" alt="Star History Chart" width="600">
+    <img src="https://api.star-history.com/svg?repos=DrakeHooks/CasinoClaim&type=Date&theme=dark" alt="Star History Chart">
   </a>
 
 
