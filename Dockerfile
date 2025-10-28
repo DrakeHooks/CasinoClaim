@@ -6,8 +6,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 # … keep what you already have …
 RUN apt-get update && apt-get install -y \
     xvfb x11vnc fluxbox x11-apps x11-utils \
-    wget gnupg2 ca-certificates apt-transport-https \
-    python3 python3-venv python3-pip xdg-utils locales \
+    wget curl gnupg2 ca-certificates apt-transport-https \
+    python3 python3-venv xdg-utils locales \
     # GUI automation deps
     python3-tk python3-dev python3-xlib scrot xclip xsel wmctrl \
     # X11 libs Pillow/ImageGrab relies on
@@ -37,10 +37,11 @@ COPY main.py /app/main.py
 # If you need the crx available to Python, keep this:
 COPY CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx /temp/CAPTCHA-Solver.crx
 
-# 4) Python env
-RUN python3 -m venv /venv && \
-    /venv/bin/pip install --no-cache-dir -r /app/requirements.txt && \
-    /venv/bin/pip install --no-cache-dir brotli
+# 4) Python env (using uv)
+ENV PATH="/root/.local/bin:${PATH}"
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    uv venv /venv && \
+    uv pip install --python /venv/bin/python -r /app/requirements.txt
 
 ENV PATH="/venv/bin:${PATH}"
 
