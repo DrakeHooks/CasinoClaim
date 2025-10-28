@@ -233,7 +233,7 @@ class CasinoLoopEntry:
 
 LOOP_STAGGER_SECONDS = 30
 PER_CASINO_TIMEOUT_SEC = int(os.getenv("CASINO_TIMEOUT_SECONDS", "500"))  # hard cap
-MAIN_TICK_SLEEP = 5
+MAIN_TICK_SLEEP = 10
 
 async def _run_luckybird(channel):      await luckybird_entry(None, driver, bot, channel)
 async def _run_zula(channel):           await zula_uc(None, channel)
@@ -343,39 +343,39 @@ async def stop_main_loop() -> bool:
 # ───────────────────────────────────────────────────────────
 # Modo auth maintenance (only when loop is STOPPED)
 # ───────────────────────────────────────────────────────────
-REFRESH_CHECK_MINUTES = int(os.getenv("MODO_REFRESH_CHECK_MINUTES", "60"))
-modo_auth_lock = asyncio.Lock()  # serialize all modo auth attempts
+# REFRESH_CHECK_MINUTES = int(os.getenv("MODO_REFRESH_CHECK_MINUTES", "60"))
+# modo_auth_lock = asyncio.Lock()  # serialize all modo auth attempts
 
-async def run_modo_auth(channel):
-    """Serialize calls to modoAPI.authenticate_modo to avoid concurrent UC sessions."""
-    async with modo_auth_lock:
-        try:
-            await authenticate_modo(driver, bot, None, channel)
-        except Exception as e:
-            print(f"[Modo Auth] error: {e}")
+# async def run_modo_auth(channel):
+#     """Serialize calls to modoAPI.authenticate_modo to avoid concurrent UC sessions."""
+#     async with modo_auth_lock:
+#         try:
+#             await authenticate_modo(driver, bot, None, channel)
+#         except Exception as e:
+#             print(f"[Modo Auth] error: {e}")
 
-async def modo_auth_maintenance():
-    """
-    Runs in the background, but only refreshes when:
-      - the main loop is NOT running, and
-      - the lock is free, and
-      - refresh is due.
-    This ensures manual !auth modo is responsive after !stop, and nothing collides.
-    """
-    await bot.wait_until_ready()
-    channel = bot.get_channel(DISCORD_CHANNEL)
-    while not bot.is_closed():
-        try:
-            if (not is_main_loop_running()
-                and 'modo_auth_needs_refresh' in globals()
-                and modo_auth_needs_refresh()
-                and not modo_auth_lock.locked()):
-                if channel:
-                    await channel.send("♻️ Background: refreshing Modo auth…")
-                await run_modo_auth(channel)
-        except Exception as e:
-            print(f"[Modo Auth Maintenance] outer error: {e}")
-        await asyncio.sleep(REFRESH_CHECK_MINUTES * 60)
+# async def modo_auth_maintenance():
+#     """
+#     Runs in the background, but only refreshes when:
+#       - the main loop is NOT running, and
+#       - the lock is free, and
+#       - refresh is due.
+#     This ensures manual !auth modo is responsive after !stop, and nothing collides.
+#     """
+#     await bot.wait_until_ready()
+#     channel = bot.get_channel(DISCORD_CHANNEL)
+#     while not bot.is_closed():
+#         try:
+#             if (not is_main_loop_running()
+#                 and 'modo_auth_needs_refresh' in globals()
+#                 and modo_auth_needs_refresh()
+#                 and not modo_auth_lock.locked()):
+#                 if channel:
+#                     await channel.send("♻️ Background: refreshing Modo auth…")
+#                 await run_modo_auth(channel)
+#         except Exception as e:
+#             print(f"[Modo Auth Maintenance] outer error: {e}")
+#         await asyncio.sleep(REFRESH_CHECK_MINUTES * 60)
 
 # ───────────────────────────────────────────────────────────
 # Commands
@@ -390,7 +390,7 @@ async def on_ready():
         if await start_main_loop(channel):
             await channel.send("🎰 Casino loop started with current configuration.")
         # Start the background Modo refresher; it will only act when the loop is stopped.
-        asyncio.create_task(modo_auth_maintenance())
+        # asyncio.create_task(modo_auth_maintenance())
     else:
         print("Invalid DISCORD_CHANNEL")
 
