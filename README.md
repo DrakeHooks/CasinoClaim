@@ -52,31 +52,30 @@ The bot is designed to check most casinos automatically in 2-hour intervals, wit
 
 
 # Supported Casinos ✅
-| Casino         | Auto Claim | Countdown Timer | Backend API | Bonus            | Trusted? (payment proof) |
+| Casino         | Auto Claim | Countdown Timer | Backend API | Bonus (SC)            | Trusted? (payment proof) |
 |----------------|------------|-----------------|-----------------------------|------------------|---------|
-| Global Poker   | ✓          | ✓               | No                          | $0.00-$4.00 bonus/day | Yes     |
-| JefeBet        | ✓          | ✓               | No                          | $0.20 bonus every 6 hours | Yes |
+| Global Poker   | ✓          | ✓               | No                          | $0.00-$4.00 Daily | Yes     |
+| JefeBet        | ✓          | ✓               | No                          | $0.20 every 6 hours | Yes |
 | Rolling Riches | ✓          | ✗               | No                          | $0.20 Daily | Yes     |
-| Spinquest         | ✓          | ✓               | No                          | $1.00 bonus/day     | Yes     |
-| Stake          | ✗          | ✓               | Yes                         | $1.00 bonus/day -  Auto Claim in development | Yes     |
+| Spinquest         | ✓          | ✓               | No                          | $1.00 Daily     | Yes     |
+| Stake          | ✗          | ✓               | Yes                         | $1.00 Daily -  Auto Claim in development | Yes     |
 | Funrize        | ✓          | ✓               | No                          | $.20 Daily     | Yes     |
 | FortuneWheelz  | ✓          | ✗               | No                          | $.20 Daily     | Yes     |
-| Zula           | ✓          | ✓               | No                          | $1.00 bonus/day     | Yes     |
-| Fortune Coins  | ✓          | ✗               | No                          | $0.50-$1.20 bonus/day | Yes     |
-| Sportzino      | ✓          | ✓               | No                          | $0.50-$1.00 bonus/day     | Yes     |
-| Luckybird      | ✓          | ✓               | No                          | $0.25 bonus/day -  Increases with VIP | Yes     |
-| Crown Coins    | ✓          | ✓               | Yes                         | Varies between $0.00-$2.00 bonus/day - Social Auth support in development | Yes     |
-| Modo           | ✗          | ✗               | No                          | $0.30-$1.00 bonus/day | Yes     |
-| Stake          | ✗          | ✗               | Yes                         | $1.00 bonus/day -  Auto Claim in development | Yes     |
-| Goldnluck      | ✗          | ✗               | No                          | $2.00 bonus/day     | No      |
+| Zula           | ✓          | ✓               | No                          | $1.00 Daily     | Yes     |
+| Fortune Coins  | ✓          | ✗               | No                          | $0.50-$1.20 Daily | Yes     |
+| Sportzino      | ✓          | ✓               | No                          | $0.50-$1.00 Daily     | Yes     |
+| Luckybird      | ✓          | ✓               | No                          | $0.25 Daily -  Increases with VIP | Yes     |
+| Crown Coins    | ✓          | ✓               | Yes                         | Varies between $0.00-$2.00 Daily - Social Auth support in development | Yes     |
+| Modo           | ✗          | ✗               | No                          | $0.30-$1.00 Daily | Yes     |
+| Goldnluck      | ✗          | ✗               | No                          | $2.00 Daily     | No      |
 | Luckyland      | ✗          | ✗               | No                          | $0.30-$1.00  Daily | Yes     |
 | Chumba         | IN DEVELOPMENT          | IN DEVELOPMENT               | No                          | $.25-$3.00 Daily     | Yes     |
 | Chanced        | ✗          | ✗               | No                          | Varies between $0.30-$1.00 bonus/day    | Yes     |
 | iCasino        | IN DEVELOPMENT         | IN DEVELOPMENT               | IN DEVELOPMENT                          | $1.70 bonus/day | Yes     |
-| RealPrize      | IN DEVELOPMENT          | IN DEVELOPMENT               | IN DEVELOPMENT                          | $1.20 bonus/day | Yes     |
-| Spin Pals      | IN DEVELOPMENT          | IN DEVELOPMENT               | IN DEVELOPMENT                          | $1.00  bonus/day | Yes     |
-| Dara Casino    | IN DEVELOPMENT  | IN DEVELOPMENT               | IN DEVELOPMENT                          | $1.00  bonus/day | Yes     |
-| Pulsz          | IN DEVELOPMENT | IN DEVELOPMENT | IN DEVELOPMENT            | Varies between $0.20-$3 bonus/day | Yes      |
+| RealPrize      | IN DEVELOPMENT          | IN DEVELOPMENT               | IN DEVELOPMENT                          | $.30 Daily | Yes     |
+| Spin Pals      | IN DEVELOPMENT          | IN DEVELOPMENT               | IN DEVELOPMENT                          | $1.00  Daily | Yes     |
+| Dara Casino    | IN DEVELOPMENT  | IN DEVELOPMENT               | IN DEVELOPMENT                          | $1.00  Daily | Yes     |
+| Pulsz          | IN DEVELOPMENT | IN DEVELOPMENT | IN DEVELOPMENT            | $0.20-$3 Daily | Yes      |
 
 
 # Support 🔮 
