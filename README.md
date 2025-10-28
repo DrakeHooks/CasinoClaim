@@ -55,8 +55,15 @@ The bot is designed to check most casinos automatically in 2-hour intervals, wit
 | Casino         | Auto Claim | Countdown Timer | Backend API | Bonus            | Trusted? (payment proof) |
 |----------------|------------|-----------------|-----------------------------|------------------|---------|
 | Global Poker   | ✓          | ✓               | No                          | $0.00-$4.00 bonus/day | Yes     |
+<<<<<<< HEAD
 | Rolling Riches | ✓          | ✓               | No                          | $0.20 Daily | Yes     |
 | JefeBet        | ✓          | ✓               | No                          | $0.20 bonus every 6 hours | Yes |
+=======
+| Rolling Riches | ✓          | ✗               | No                          | $0.20 Daily | Yes     |
+| JefeBet        | ✓          | ✓               | No                          | $0.20 bonus every 6 hours | No 🤢 |
+| Chumba         | ✓          | ✓               | No                          | $1.00 bonus/day     | Yes     |
+| Stake          | ✗          | ✓               | Yes                         | $1.00 bonus/day -  Auto Claim in development | Yes     |
+>>>>>>> 0497bf9fa1443ce84bbef4fcbed731409f3fb667
 | Zula           | ✓          | ✓               | No                          | $1.00 bonus/day     | Yes     |
 | Fortune Coins  | ✓          | ✗               | No                          | $0.50-$1.20 bonus/day | Yes     |
 | Sportzino      | ✓          | ✓               | No                          | $0.50-$1.00 bonus/day     | Yes     |
