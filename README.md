@@ -80,7 +80,13 @@ The bot is designed to check most casinos automatically in 2-hour intervals, wit
 
 
 # Support 🔮 
-Casino Claim is the only free and open source social casino claim bot. If you get value from this project and or want to see it grow, consider sponsoring or donating via ko-fi. A free way to support the project is by using this 'referrals' page.  I will do my best to push updates quickly for changes in website structure as well as overall efficiency of the bot. If you identify a fix, feel free to submit a pull request and I will review it.
+Casino Claim is the only free and open source social casino claim bot.  
+If you get value from this project and want to see it grow, consider sponsoring or donating via Ko-fi.  
+A free way to support the project is by using these [**referrals**](https://drakehooks.github.io/referrals/).  
+
+I will do my best to push updates quickly for changes in website structure as well as overall efficiency of the bot.  
+If you identify a fix, feel free to submit a pull request and I will review it.
+
 
 
 
@@ -89,7 +95,7 @@ Gambling can become addicting, if you start feeling addicted, please get help be
 
 <a href="https://www.ncpgambling.org/help-treatment/"><img src="https://www.ncpgambling.org/wp-content/themes/magneti/assets/build/images/800gamb-logo-header.svg"/></a>
 
-# Star Tracker ⭐
+# Stars
 
   <a href="https://star-history.com/#DrakeHooks/CasinoClaim&Date">
     <img src="https://api.star-history.com/svg?repos=DrakeHooks/CasinoClaim&type=Date&theme=dark" alt="Star History Chart">
