@@ -57,7 +57,7 @@ The bot is designed to check most casinos automatically in 2-hour intervals, wit
 | Global Poker   | ✓          | ✓               | No                          | $0.00-$4.00 bonus/day | Yes     |
 | JefeBet        | ✓          | ✓               | No                          | $0.20 bonus every 6 hours | Yes |
 | Rolling Riches | ✓          | ✗               | No                          | $0.20 Daily | Yes     |
-| Chumba         | ✓          | ✓               | No                          | $1.00 bonus/day     | Yes     |
+| Spinquest         | ✓          | ✓               | No                          | $1.00 bonus/day     | Yes     |
 | Stake          | ✗          | ✓               | Yes                         | $1.00 bonus/day -  Auto Claim in development | Yes     |
 | Funrize        | ✓          | ✓               | No                          | $.20 Daily     | Yes     |
 | FortuneWheelz  | ✓          | ✗               | No                          | $.20 Daily     | Yes     |
@@ -89,10 +89,6 @@ If you identify a fix, feel free to submit a pull request and I will review it.
 
 
 
-
-# Problem Gambling 🎲
-Gambling can become addicting, if you start feeling addicted, please get help before it affects your life negatively. Always remember, you are not alone!
-
 <a href="https://www.ncpgambling.org/help-treatment/"><img src="https://www.ncpgambling.org/wp-content/themes/magneti/assets/build/images/800gamb-logo-header.svg"/></a>
 
 # Stars
@@ -102,3 +98,5 @@ Gambling can become addicting, if you start feeling addicted, please get help be
   </a>
 
 
+# Problem Gambling 🎲
+Gambling can become addicting, if you start feeling addicted, please get help before it affects your life negatively. Always remember, you are not alone!
