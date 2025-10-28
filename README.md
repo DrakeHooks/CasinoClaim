@@ -59,6 +59,8 @@ The bot is designed to check most casinos automatically in 2-hour intervals, wit
 | Rolling Riches | ✓          | ✗               | No                          | $0.20 Daily | Yes     |
 | Chumba         | ✓          | ✓               | No                          | $1.00 bonus/day     | Yes     |
 | Stake          | ✗          | ✓               | Yes                         | $1.00 bonus/day -  Auto Claim in development | Yes     |
+| Funrize        | ✓          | ✓               | No                          | $.20 Daily     | Yes     |
+| FortuneWheelz  | ✓          | ✗               | No                          | $.20 Daily     | Yes     |
 | Zula           | ✓          | ✓               | No                          | $1.00 bonus/day     | Yes     |
 | Fortune Coins  | ✓          | ✗               | No                          | $0.50-$1.20 bonus/day | Yes     |
 | Sportzino      | ✓          | ✓               | No                          | $0.50-$1.00 bonus/day     | Yes     |
