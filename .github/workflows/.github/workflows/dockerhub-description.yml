@@ -1,0 +1,17 @@
+name: Update Docker Hub Description
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - README.md
+      - .github/workflows/dockerhub-description.yml
+
+jobs:
+  call-dockerhub-action:
+    uses: NelsonDane/Custom-GitHub-Actions/.github/workflows/dockerhub-description.yml@e64ec758b6758d58955cab25a0e330f9bab380dd
+    with:
+      dockerhub_repo_name: casinoclaim
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
