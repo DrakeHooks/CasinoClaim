@@ -56,6 +56,7 @@ api_modules = [
     "luckybirdAPI",
     "sportzinoAPI",
     "nolimitcoinsAPI",
+    "smilescasinoAPI",
 ]
 for module_name in api_modules:
     try:
@@ -243,6 +244,7 @@ async def _run_funrize(channel):        await funrize_flow(None, driver, channel
 async def _run_globalpoker(channel):    await global_poker(None, driver, channel)
 async def _run_jefebet(channel):        await jefebet_casino(None, driver, channel)
 async def _run_crowncoins(channel):     await crowncoins_casino(driver, bot, None, channel)
+async def _run_smilescasino(channel):   await smilescasino_casino(None, driver, channel)
 
 # Modo runner used by loop (claim → countdown)
 async def _run_modo(channel):
@@ -274,6 +276,7 @@ casino_loop_entries: List[CasinoLoopEntry] = [
     CasinoLoopEntry("fortunecoins",  "Fortune Coins",     _run_fortunecoins,    1440),
     CasinoLoopEntry("zula",          "Zula Casino",       _run_zula,            1440),
     CasinoLoopEntry("sportzino",     "Sportzino",         _run_sportzino,       1440),
+    CasinoLoopEntry("smilescasino",  "Smiles Casino",     _run_smilescasino,    1440),
 ]
 
 def reset_loop_schedule():
@@ -397,7 +400,8 @@ async def on_ready():
 MANUAL_CASINO_COMMANDS = {
     "chumba","rollingriches","jefebet","spinpals","spinquest","funrize",
     "fortunewheelz","stake","chanced","luckybird","globalpoker","crowncoins",
-    "dingdingding","modo","zula","sportzino","nolimitcoins","fortunecoins"
+    "dingdingding","modo","zula","sportzino","nolimitcoins","fortunecoins",
+    "smilescasino"
 }
 
 @bot.check
@@ -609,6 +613,11 @@ async def globalpoker_cmd(ctx):
 async def jefebet_cmd(ctx):
     await ctx.send("Checking JefeBet for bonus…")
     await jefebet_casino(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
+
+@bot.command(name="smilescasino")
+async def smilescasino_cmd(ctx):
+    await ctx.send("Checking Smiles Casino for bonus...")
+    await smilescasino_casino(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
 
 @bot.command(name="crowncoins")
 async def crowncoins_cmd(ctx):
@@ -859,7 +868,8 @@ async def help_cmd(ctx):
 🎰 **Casino Commands:**  
 !chanced, !luckybird, !globalpoker, !crowncoins, !chumba, !modo, !zula,  
 !rollingriches, !jefebet, !spinpals, !spinquest, !funrize, !sportzino,  
-!fortunecoins, !nolimitcoins, !fortunewheelz, !stake, !dingdingding
+!fortunecoins, !nolimitcoins, !fortunewheelz, !stake, !dingdingding,
+!smilescasino
 
 ---------------------------------------  
 ✅ **Auth Commands:**  
