@@ -604,7 +604,7 @@ async def funrize_cmd(ctx):
     await ctx.send("Checking Funrize for bonus…")
     await funrize_flow(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
 
-@bot.command(name="globalpoker" aliases=["gp", "global poker"])
+@bot.command(name="globalpoker", aliases=["gp", "global poker"])
 async def globalpoker_cmd(ctx):
     await ctx.send("Checking GlobalPoker for bonus…")
     await global_poker(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
