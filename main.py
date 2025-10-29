@@ -594,7 +594,7 @@ async def sportzino_cmd(ctx):
     await ctx.send("Checking Sportzino for bonus…")
     await Sportzino(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
 
-@bot.command(name="nolimitcoins", aliases=["nlc"])
+@bot.command(name="nolimitcoins", aliases=["nlc", "no limit", "no limit coins"])
 async def nolimitcoins_cmd(ctx):
     await ctx.send("Checking NoLimitCoins for bonus…")
     await nolimitcoins_flow(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
@@ -604,17 +604,17 @@ async def funrize_cmd(ctx):
     await ctx.send("Checking Funrize for bonus…")
     await funrize_flow(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
 
-@bot.command(name="globalpoker")
+@bot.command(name="globalpoker" aliases=["gp", "global poker"])
 async def globalpoker_cmd(ctx):
     await ctx.send("Checking GlobalPoker for bonus…")
     await global_poker(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
 
-@bot.command(name="jefebet")
+@bot.command(name="jefebet", aliases=["jefe", "jefebet casino"])
 async def jefebet_cmd(ctx):
     await ctx.send("Checking JefeBet for bonus…")
     await jefebet_casino(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
 
-@bot.command(name="smilescasino")
+@bot.command(name="smilescasino", aliases=["smiles", "smiles casino"])
 async def smilescasino_cmd(ctx):
     await ctx.send("Checking Smiles Casino for bonus...")
     await smilescasino_casino(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
@@ -632,7 +632,7 @@ async def modo_cmd(ctx):
     if not ok:
         await check_modo_countdown(driver, bot, ctx, channel)
 
-@bot.command(name="rollingriches")
+@bot.command(name="rollingriches", aliases=["rr", "rolling riches"])
 async def rollingriches_cmd(ctx):
     await ctx.send("Checking Rolling Riches for bonus…")
     channel = bot.get_channel(DISCORD_CHANNEL)
@@ -648,7 +648,7 @@ async def fortunewheelz_cmd(ctx):
     await ctx.send("Checking Fortune Wheelz for bonus…")
     await fortunewheelz_flow(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
 
-@bot.command(name="fortunecoins")
+@bot.command(name="fortunecoins", aliases=["fortune coins", "fc"])
 async def fortunecoins_cmd(ctx):
     await ctx.send("Checking Fortune Coins for bonus…")
     channel = bot.get_channel(DISCORD_CHANNEL)
