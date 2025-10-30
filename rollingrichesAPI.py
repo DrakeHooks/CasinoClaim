@@ -4,6 +4,7 @@
 # Update: never stop early; attempt claim even if confirm miss; robust countdown probe
 # Final: rr_final_claim.png stage; countdown XPath updated; print-only logging (no Discord sends)
 # Add: Discord sends w/ screenshots on success or unavailable
+# New: Background popup closer for /html/body/div[2]/div/div[2]/div/div/a
 
 import os
 import re
@@ -34,7 +35,12 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.common.exceptions import (
+    TimeoutException,
+    NoSuchElementException,
+    StaleElementReferenceException,
+    ElementClickInterceptedException,
+)
 
 load_dotenv()
 # ───────────────────────────────────────────────────────────
@@ -51,12 +57,10 @@ XPATH_DAILY_BONUS_MENU = (
     "[.//div[contains(@class,'menu-title') and normalize-space()='Daily Bonus']]"
 )
 
-
 XPATH_PANEL_READY = (
     "//div[contains(.,'Available in') or "
     ".//button[contains(translate(.,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'claim')]]"
 )
-
 
 XPATH_CLAIM_BTN = (
     "//button[(contains(@class,'btn') and contains(@class,'red')) or "
@@ -125,7 +129,43 @@ def _ensure_viewport(driver):
     except Exception:
         pass
 
+# ───────────────────────────────────────────────────────────
+# Dynamic popup closer
+# ───────────────────────────────────────────────────────────
+async def _popup_closer_task(driver, stop_event: asyncio.Event,
+                             xpath: str = POPUP_CLOSE_XPATH,
+                             interval: float = 0.6):
+    """
+    Background task: every `interval` seconds, if the popup close button is present/visible,
+    click it via JS (fallback to .click()). Quietly ignores errors.
+    """
+    while not stop_event.is_set():
+        try:
+            # find_elements avoids raising if not present
+            buttons = driver.find_elements(By.XPATH, xpath)
+            for btn in buttons:
+                try:
+                    if btn.is_displayed():
+                        try:
+                            driver.execute_script("arguments[0].click();", btn)
+                        except Exception:
+                            try:
+                                btn.click()
+                            except Exception:
+                                pass
+                        # small settle; break to re-check next tick
+                        await asyncio.sleep(0.15)
+                        # no logging spam—silent cleaner
+                        break
+                except (StaleElementReferenceException, ElementClickInterceptedException, NoSuchElementException):
+                    continue
+        except Exception:
+            # driver likely navigating; ignore
+            pass
+        await asyncio.sleep(interval)
+
 async def _close_popup(driver):
+    """One-shot attempt (kept from your original) to close the specific popup."""
     try:
         btn = WebDriverWait(driver, 2).until(EC.element_to_be_clickable((By.XPATH, POPUP_CLOSE_XPATH)))
         driver.execute_script("arguments[0].click();", btn)
@@ -133,6 +173,7 @@ async def _close_popup(driver):
         await _log("🧹 Popup closed (if present).")
     except Exception:
         pass
+
 # ───────────────────────────────────────────────────────────
 # ── OpenCV helpers ─────────────────────────────────────────
 # ───────────────────────────────────────────────────────────
@@ -232,6 +273,7 @@ def _click_template_with_retries(template_path: str, tries: int = 3, delay: floa
             return True, last_conf, last_dbg
         time.sleep(delay)
     return False, last_conf, last_dbg
+
 # ───────────────────────────────────────────────────────────
 # ── Countdown helpers ──────────────────────────────────────
 # ───────────────────────────────────────────────────────────
@@ -317,12 +359,16 @@ async def _login_six_tries(driver, username: str, password: str) -> bool:
 
     await _log("⛔ All 6 login attempts failed.")
     await _driver_shot(driver, "⛔ Final login state")
-    return 
+    return
 
 # ───────────────────────────────────────────────────────────
 # ── Main flow ──────────────────────────────────────────────
 # ───────────────────────────────────────────────────────────
 async def rolling_riches_casino(ctx, driver, channel):
+    # Start background popup-closer (shuts down in finally)
+    stop_popup = asyncio.Event()
+    popup_task = asyncio.create_task(_popup_closer_task(driver, stop_popup))
+
     try:
         creds = os.getenv("ROLLING_RICHES")
         if not creds or ":" not in creds:
@@ -428,3 +474,11 @@ async def rolling_riches_casino(ctx, driver, channel):
         shot = await _driver_shot(driver, "💥 Failure point")
         # Send failure screenshot to help debugging (optional; keep or remove)
         await _send_one_shot(channel, f"Rolling Riches: Error — {tb}", shot)
+
+    finally:
+        # Stop the background popup closer
+        try:
+            stop_popup.set()
+            await popup_task
+        except Exception:
+            pass
