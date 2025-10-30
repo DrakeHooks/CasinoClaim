@@ -17,6 +17,12 @@ pick_display() {
 DNUM="$(pick_display)"
 export DISPLAY=":${DNUM}"
 
+# --- NEW: Xauthority shim ---
+export XAUTHORITY="/root/.Xauthority"
+: > "$XAUTHORITY"
+chmod 600 "$XAUTHORITY" || true
+# ----------------------------
+
 rm -f "/tmp/.X${DNUM}-lock" "/tmp/.X11-unix/X${DNUM}" || true
 mkdir -p /tmp/.X11-unix
 chmod 1777 /tmp/.X11-unix || true
@@ -29,7 +35,6 @@ done
 
 fluxbox >/dev/null 2>&1 &
 x11vnc -nopw -display "${DISPLAY}" -forever -shared -repeat -rfbport 5900 >/dev/null 2>&1 &
-
 
 # ============================================================
 #  PERSISTENT CHROME PROFILE SETUP
@@ -50,19 +55,13 @@ fi
 mkdir -p "${CHROME_INSTANCE_DIR}/${CHROME_PROFILE_DIR}" || true
 chown -R "$(id -u)":"$(id -g)" "${CHROME_INSTANCE_DIR}" || true
 
-# Kill any stray Chrome (from previous crash/restart)
 pkill -9 -f "chrome.*--user-data-dir=${CHROME_INSTANCE_DIR}" || true
 pkill -9 -f "chrome" || true
 
-# Remove leftover Chrome locks / sockets in the profile
 find "${CHROME_INSTANCE_DIR}" -maxdepth 2 -type f -name 'Singleton*' -delete || true
 rm -f "${CHROME_INSTANCE_DIR}/${CHROME_PROFILE_DIR}/DevToolsActivePort" || true
-
-# 🔥 IMPORTANT: remove Chrome’s stale tmp sockets
-# Chrome puts the actual domain socket under /tmp/.org.chromium.*; if it persists,
-# Chrome thinks the profile is already in use.
 rm -rf /tmp/.org.chromium.* || true
-rm -rf /tmp/SingletonSocket || true  # some builds use this direct tmp path
+rm -rf /tmp/SingletonSocket || true
 
 # ============================================================
 #  OPTIONAL: SeleniumBase/UC FortuneCoins profile (if you enable it)
