@@ -4,6 +4,7 @@
 # Exposes: async def zula_uc(ctx, channel)
 
 import os
+import tempfile
 import discord
 from dotenv import load_dotenv
 from seleniumbase import SB
@@ -25,6 +26,29 @@ async def _send_post_claim(sb: SB, channel: discord.abc.Messageable, path: str, 
         try:
             if os.path.exists(path):
                 os.remove(path)
+        except Exception:
+            pass
+
+async def _send_status_shot(sb: SB, channel: discord.abc.Messageable, caption: str, prefix: str):
+    """
+    One-off screenshot for 'unavailable' or 'error' states.
+    Creates a temp file, attaches it, and cleans up.
+    """
+    fd, tmp_path = tempfile.mkstemp(prefix=f"{prefix}_", suffix=".png", dir="/tmp")
+    os.close(fd)
+    try:
+        sb.save_screenshot(tmp_path)
+        await channel.send(caption, file=discord.File(tmp_path))
+    except Exception:
+        # Fallback to text-only if screenshot fails
+        try:
+            await channel.send(caption)
+        except Exception:
+            pass
+    finally:
+        try:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
         except Exception:
             pass
 
@@ -140,7 +164,7 @@ async def zula_uc(ctx, channel: discord.abc.Messageable):
                     pass
             except Exception as e:
                 print(f"[Zula][ERROR] Login fields not found: {e}")
-                await channel.send("Zula: countdown not available (or auth failed).")
+                await _send_status_shot(sb, channel, "Zula: countdown not available (or auth failed).", "zula_unavailable")  # need new screenshot here
                 return
 
             # Submit login
@@ -158,7 +182,7 @@ async def zula_uc(ctx, channel: discord.abc.Messageable):
                 )
             if not submitted:
                 print("[Zula][ERROR] Could not submit login.")
-                await channel.send("Zula: countdown not available (or auth failed).")
+                await _send_status_shot(sb, channel, "Zula: countdown not available (or auth failed).", "zula_unavailable")  # need new screenshot here
                 return
 
             # 2) Post-login settle and refresh into lobby
@@ -185,7 +209,8 @@ async def zula_uc(ctx, channel: discord.abc.Messageable):
             )
             if not opened_rewards:
                 print("[Zula] Rewards/Free Coins button not found.")
-                await channel.send("Zula: countdown not available (or auth failed).")
+                # need new screenshot here
+                await _send_status_shot(sb, channel, "Zula: countdown not available (or auth failed).", "zula_unavailable")
                 return
 
             sb.wait(10)  # allow the rewards modal to render fully
@@ -209,8 +234,15 @@ async def zula_uc(ctx, channel: discord.abc.Messageable):
                 print("[Zula] Claimed successfully.")
             else:
                 print("[Zula] No claim available (likely already claimed).")
-                await channel.send("Zula: countdown not available (or auth failed).")
+                await _send_status_shot(sb, channel, "Zula: countdown not available (or auth failed).", "zula_unavailable")
 
     except Exception as e:
         print(f"[Zula][ERROR] Exception during automation: {e}")
-        await channel.send("Zula: countdown not available (or auth failed).")
+        # need new screenshot here as well
+        try:
+            # Best effort to grab a screenshot even on exceptions outside 'with SB'
+            with SB(uc=True, headed=True) as sb_fallback:
+                await _send_status_shot(sb_fallback, channel, "Zula: countdown not available (or auth failed).", "zula_error")
+        except Exception:
+            # If even fallback SB fails, send text-only
+            await channel.send("Zula: countdown not available (or auth failed).")
