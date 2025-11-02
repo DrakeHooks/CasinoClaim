@@ -3,7 +3,7 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# … keep what you already have …
+# 1) Base deps (kept from yours)
 RUN apt-get update && apt-get install -y \
     xvfb x11vnc fluxbox x11-apps x11-utils \
     wget curl gnupg2 ca-certificates apt-transport-https \
@@ -18,8 +18,6 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
-
-
 # 2) Google Chrome
 RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-linux-signing-keyring.gpg && \
     echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-linux-signing-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
@@ -29,6 +27,17 @@ RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearm
 
 # (Optional) remove enterprise policies
 RUN rm -rf /etc/opt/chrome/policies /etc/chromium/policies || true
+
+# 2.5) Install Docker CLI + Compose v2 plugin (so !reset can call docker compose)
+#     We only need the CLI and compose plugin, NOT the daemon.
+RUN install -m 0755 -d /etc/apt/keyrings && \
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && \
+    chmod a+r /etc/apt/keyrings/docker.gpg && \
+    echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu jammy stable" \
+      > /etc/apt/sources.list.d/docker.list && \
+    apt-get update && apt-get install -y --no-install-recommends \
+      docker-ce-cli docker-compose-plugin && \
+    rm -rf /var/lib/apt/lists/*
 
 # 3) App files
 WORKDIR /app

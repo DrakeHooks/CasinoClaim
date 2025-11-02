@@ -5,17 +5,20 @@ services:
     ports:
       - "5900:5900"
     environment:
-      - CHROME_INSTANCE_DIR=/data/chrome     # ← use the branch main.py prefers
+      - CHROME_INSTANCE_DIR=/data/chrome
       - CHROME_PROFILE_DIR=Default
       - PYTHONPATH=/app:/app/apis:/app/app
-      # Optional: persist Fortune Coins SB/UC profile too:
-      - FC_USER_DATA_DIR=/data/fortunecoins  # ← optional
+      - FC_USER_DATA_DIR=/data/fortunecoins
+      # Tell the !reset command where the compose project & file are:
+      - COMPOSE_DIR=/app
+      - COMPOSE_FILE=/app/docker-compose.yml
     volumes:
       - ./:/app
-      - chrome-profile:/data/chrome          # ← persistent named volume for main Selenium
-      # Optional: a separate FC profile directory inside the same named volume
-      - chrome-profile:/data/fortunecoins    # ← reuse the same volume namespace
+      - chrome-profile:/data/chrome
+      - chrome-profile:/data/fortunecoins
       - ./CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx:/temp/CAPTCHA-Solver.crx
+      # 👇 allow docker CLI inside the container to talk to host daemon
+      - /var/run/docker.sock:/var/run/docker.sock
     env_file:
       - .env
     shm_size: "2g"
