@@ -643,17 +643,160 @@ def _detect_user_data_dir() -> Optional[str]:
             return val
     return None
 
+# ───────────────────────────────────────────────────────────
+# !reset — clear profile, rebuild, and re-compose (with "nocache")
+# Adds fallback: if "name is already in use", rm -f the conflicting
+# containers (casino-bot, watchtower) and retry `up -d`.
+# ───────────────────────────────────────────────────────────
+import os
+import shutil
+import asyncio
+import subprocess
+from asyncio.subprocess import PIPE
+from typing import List, Optional
+
+try:
+    import psutil
+except Exception:
+    psutil = None
+try:
+    import signal
+except Exception:
+    signal = None
+
+def _has_callable(name: str) -> bool:
+    return name in globals() and callable(globals()[name])
+
+def _maybe_is_main_loop_running() -> bool:
+    try:
+        if _has_callable("is_main_loop_running"):
+            return bool(globals()["is_main_loop_running"]())
+    except Exception:
+        pass
+    return False
+
+async def _maybe_stop_main_loop() -> None:
+    try:
+        if _has_callable("stop_main_loop"):
+            await globals()["stop_main_loop"]()
+    except Exception:
+        pass
+
+def _maybe_quit_driver() -> None:
+    for key in ("driver", "sb", "browser", "web_driver"):
+        if key in globals():
+            try:
+                obj = globals()[key]
+                if obj:
+                    getattr(obj, "quit", lambda: None)()
+            except Exception:
+                pass
+
+def _docker_compose_cmd() -> List[str]:
+    if shutil.which("docker"):
+        try:
+            out = subprocess.run(
+                ["docker", "compose", "version"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=5,
+            )
+            if out.returncode == 0:
+                return ["docker", "compose"]
+        except Exception:
+            pass
+    if shutil.which("docker-compose"):
+        return ["docker-compose"]
+    return []
+
+async def _stream_proc_to_discord(ctx, proc: asyncio.subprocess.Process, prefix: str) -> int:
+    buf = ""
+    async def flush():
+        nonlocal buf
+        if not buf:
+            return
+        chunks = [buf[i:i+1800] for i in range(0, len(buf), 1800)]
+        for c in chunks:
+            try:
+                await ctx.send(f"{prefix}```\n{c}\n```")
+            except Exception:
+                pass
+        buf = ""
+
+    if proc.stdout:
+        while True:
+            line = await proc.stdout.readline()
+            if not line:
+                break
+            buf += line.decode(errors="ignore")
+            if len(buf) >= 1600:
+                await flush()
+    await flush()
+    await proc.wait()
+
+    if proc.returncode != 0 and proc.stderr:
+        err = (await proc.stderr.read()).decode(errors="ignore")
+        if err.strip():
+            for i in range(0, len(err), 1800):
+                try:
+                    await ctx.send(f"{prefix}(stderr)```\n{err[i:i+1800]}\n```")
+                except Exception:
+                    pass
+            # Bubble the stderr back to caller for decisioning
+            proc._captured_stderr = err  # attach attribute for caller
+    return proc.returncode
+
+def _detect_user_data_dir() -> Optional[str]:
+    if "instance_dir" in globals():
+        val = str(globals()["instance_dir"]) or ""
+        if val.strip():
+            return val.strip()
+    for env_key in ("CHROME_INSTANCE_DIR", "CHROME_USER_DATA_DIR", "SB_USER_DATA_DIR"):
+        val = os.getenv(env_key, "").strip()
+        if val:
+            return val
+    return None
+
+async def _compose_run(ctx, args: List[str], compose_dir: str) -> tuple[int, str]:
+    """Run a compose subcommand and return (rc, stderr_text)."""
+    proc = await asyncio.create_subprocess_exec(
+        *args, cwd=compose_dir, stdout=PIPE, stderr=PIPE
+    )
+    rc = await _stream_proc_to_discord(ctx, proc, prefix=f"{args[-2] if len(args)>=2 else 'compose'} ")
+    stderr_text = getattr(proc, "_captured_stderr", "")
+    return rc, (stderr_text or "")
+
+async def _rm_conflicting_containers(ctx, names: List[str]) -> None:
+    compose_bin = _docker_compose_cmd()
+    docker_bin = ["docker"] if shutil.which("docker") else None
+    if not docker_bin:
+        await ctx.send("⚠️ Docker CLI not found; cannot remove conflicting containers automatically.")
+        return
+    for name in names:
+        try:
+            await ctx.send(f"🗑️ Removing conflicting container `{name}` (if present)…")
+            proc = await asyncio.create_subprocess_exec(
+                *docker_bin, "rm", "-f", name,
+                stdout=PIPE, stderr=PIPE
+            )
+            # stream briefly (we don't expect much output)
+            await _stream_proc_to_discord(ctx, proc, prefix=f"rm {name} ")
+        except Exception as e:
+            await ctx.send(f"⚠️ Could not remove `{name}`: `{e}`")
+
 @bot.command(name="reset")
 async def reset_cmd(ctx, mode: str = ""):
     """
     Clear Chrome user-data, rebuild & re-compose the Docker stack, then exit this bot process.
     Optional: 'nocache' -> build with --no-cache
+    Fallback: if name-conflict occurs, rm -f offending containers and retry `up -d`.
     """
     compose_dir  = os.getenv("COMPOSE_DIR", os.getcwd()).strip()
     compose_file = os.getenv("COMPOSE_FILE", "").strip()
     user_data    = _detect_user_data_dir()
+    nocache      = "nocache" in (mode or "").lower()
 
-    nocache = "nocache" in (mode or "").lower()
     compose_bin = _docker_compose_cmd()
     if not compose_bin:
         await ctx.send("❌ Could not find `docker compose` nor `docker-compose` in PATH inside this container.")
@@ -681,7 +824,7 @@ async def reset_cmd(ctx, mode: str = ""):
         await ctx.send("❎ Cancelled.")
         return
 
-    # 1) Stop your loop and close any browser instances
+    # 1) Stop main loop & close browser
     await ctx.send("⏹️ Stopping loop and shutting down Chrome…")
     try:
         if _maybe_is_main_loop_running():
@@ -690,7 +833,7 @@ async def reset_cmd(ctx, mode: str = ""):
         pass
     _maybe_quit_driver()
 
-    # 2) Kill any straggler Chrome/Chromium processes using the same user-data-dir
+    # 2) Kill straggler Chrome using same profile
     if psutil and signal:
         try:
             killed = 0
@@ -709,7 +852,7 @@ async def reset_cmd(ctx, mode: str = ""):
         except Exception:
             pass
 
-    # 3) Clear the profile directory
+    # 3) Clear profile dir
     if user_data:
         await ctx.send(f"🧽 Clearing Chrome user-data at:\n```{user_data}```")
         try:
@@ -718,41 +861,49 @@ async def reset_cmd(ctx, mode: str = ""):
         except Exception as e:
             await ctx.send(f"⚠️ Failed to clear profile dir: `{e}` (continuing)")
 
-    # 4) docker compose build (with or without --no-cache)
+    # 4) Build (maybe --no-cache)
     await ctx.send(f"🏗️ Building images {'(no cache)…' if nocache else '…'}")
     build_cmd = compose_bin + (["-f", compose_file] if compose_file else []) + ["build"]
     if nocache:
         build_cmd.append("--no-cache")
-
-    try:
-        proc = await asyncio.create_subprocess_exec(*build_cmd, cwd=compose_dir, stdout=PIPE, stderr=PIPE)
-        rc = await _stream_proc_to_discord(ctx, proc, prefix="build ")
-    except Exception as e:
-        await ctx.send(f"❌ Failed to start build: `{e}`")
-        return
+    rc, _ = await _compose_run(ctx, build_cmd, compose_dir)
     if rc != 0:
         await ctx.send(f"❌ Build failed with exit code {rc}. Aborting reset.")
         return
     await ctx.send("✅ Build finished.")
 
-    # 5) docker compose up -d
+    # 5) Up -d (first try)
     await ctx.send("🚀 Re-composing (up -d)…")
     up_cmd = compose_bin + (["-f", compose_file] if compose_file else []) + ["up", "-d", "--remove-orphans"]
-    try:
-        proc = await asyncio.create_subprocess_exec(*up_cmd, cwd=compose_dir, stdout=PIPE, stderr=PIPE)
-        rc = await _stream_proc_to_discord(ctx, proc, prefix="up ")
-    except Exception as e:
-        await ctx.send(f"❌ Failed to start compose up: `{e}`")
-        return
-    if rc != 0:
-        await ctx.send(f"❌ Compose up failed with exit code {rc}.")
+    rc, stderr_text = await _compose_run(ctx, up_cmd, compose_dir)
+    if rc == 0:
+        await ctx.send("✅ Compose finished. Exiting current bot process so the refreshed stack can take over…")
+        try:
+            await bot.close()
+        finally:
+            os._exit(0)
         return
 
-    await ctx.send("✅ Compose finished. Exiting current bot process so the refreshed stack can take over…")
-    try:
-        await bot.close()
-    finally:
-        os._exit(0)
+    # 6) If name-in-use conflict, remove the old containers and retry once
+    conflict_markers = ("is already in use by container", "name is already in use")
+    if any(m in stderr_text for m in conflict_markers):
+        await ctx.send("⚠️ Name conflict detected. Removing old containers and retrying once…")
+        await _rm_conflicting_containers(ctx, ["casino-bot", "watchtower"])
+        # retry up -d
+        rc2, _ = await _compose_run(ctx, up_cmd, compose_dir)
+        if rc2 == 0:
+            await ctx.send("✅ Compose finished after conflict resolution. Exiting current bot process so the refreshed stack can take over…")
+            try:
+                await bot.close()
+            finally:
+                os._exit(0)
+            return
+        else:
+            await ctx.send(f"❌ Compose up failed again (exit {rc2}). You may need to run `docker rm -f casino-bot watchtower` manually.")
+            return
+
+    # generic failure
+    await ctx.send(f"❌ Compose up failed with exit code {rc}.")
 
 
 def format_loop_config() -> str:
