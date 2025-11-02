@@ -149,6 +149,7 @@ async def Sportzino(ctx, driver, channel: discord.abc.Messageable):
                 # Attempt GUI captcha click if present (best effort)
                 try:
                     sb.uc_gui_click_captcha()
+                    sb.wait(10)
                 except Exception:
                     pass
 

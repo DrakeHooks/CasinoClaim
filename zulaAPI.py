@@ -159,6 +159,7 @@ async def zula_uc(ctx, channel: discord.abc.Messageable):
                 sb.type("input[id='emailAddress']", username)
                 sb.type("input[id='password']", password)
                 try:
+                    sb.wait(10)
                     sb.uc_gui_click_captcha()
                 except Exception:
                     pass

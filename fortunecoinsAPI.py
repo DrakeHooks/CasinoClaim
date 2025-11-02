@@ -78,6 +78,7 @@ async def fortunecoins_uc(ctx, channel: discord.abc.Messageable):
             sb.type("input[id='password']", FC_PASSWORD)
             try:
                 sb.uc_gui_click_captcha()
+                sb.wait(10)
             except Exception:
                 pass
             _force_click_xpath(sb, "/html/body/div[1]/div[5]/div/div/div/div[2]/form/div[4]/button", timeout=12)
