@@ -509,6 +509,252 @@ async def clear_data_dir(ctx: commands.Context):
     finally:
         os._exit(0)
 
+
+# ───────────────────────────────────────────────────────────
+# !reset — clear profile, rebuild, and re-compose (supports "nocache")
+# Usage:
+#   !reset           -> docker compose build
+#   !reset nocache   -> docker compose build --no-cache
+# ───────────────────────────────────────────────────────────
+import os
+import shutil
+import asyncio
+import subprocess
+from asyncio.subprocess import PIPE
+from typing import List, Optional
+
+try:
+    import psutil  # optional; used to kill straggler chrome
+except Exception:
+    psutil = None
+
+try:
+    import signal
+except Exception:
+    signal = None
+
+# If your code defines these, we'll call them. Otherwise we noop.
+def _has_callable(name: str) -> bool:
+    return name in globals() and callable(globals()[name])
+
+def _maybe_is_main_loop_running() -> bool:
+    try:
+        if _has_callable("is_main_loop_running"):
+            return bool(globals()["is_main_loop_running"]())
+    except Exception:
+        pass
+    return False
+
+async def _maybe_stop_main_loop() -> None:
+    try:
+        if _has_callable("stop_main_loop"):
+            await globals()["stop_main_loop"]()
+    except Exception:
+        pass
+
+def _maybe_quit_driver() -> None:
+    # Works if you keep a global `driver`/`sb` around; otherwise it’s a no-op.
+    for key in ("driver", "sb", "browser", "web_driver"):
+        if key in globals():
+            try:
+                obj = globals()[key]
+                if obj:
+                    # selenium webdriver has .quit(); SeleniumBase SB has .quit()
+                    getattr(obj, "quit", lambda: None)()
+            except Exception:
+                pass
+
+def _docker_compose_cmd() -> List[str]:
+    """
+    Prefer modern 'docker compose', fallback to legacy 'docker-compose'.
+    Returns [] if neither is available in PATH.
+    """
+    if shutil.which("docker"):
+        try:
+            out = subprocess.run(
+                ["docker", "compose", "version"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=5,
+            )
+            if out.returncode == 0:
+                return ["docker", "compose"]
+        except Exception:
+            pass
+    if shutil.which("docker-compose"):
+        return ["docker-compose"]
+    return []
+
+async def _stream_proc_to_discord(ctx, proc: asyncio.subprocess.Process, prefix: str) -> int:
+    """
+    Stream a running process's stdout/stderr to Discord in safe 1.8k chunks.
+    """
+    buf = ""
+
+    async def flush():
+        nonlocal buf
+        if not buf:
+            return
+        chunks = [buf[i:i+1800] for i in range(0, len(buf), 1800)]
+        for c in chunks:
+            try:
+                await ctx.send(f"{prefix}```\n{c}\n```")
+            except Exception:
+                pass
+        buf = ""
+
+    if proc.stdout:
+        while True:
+            line = await proc.stdout.readline()
+            if not line:
+                break
+            buf += line.decode(errors="ignore")
+            if len(buf) >= 1600:
+                await flush()
+    await flush()
+    await proc.wait()
+
+    if proc.returncode != 0 and proc.stderr:
+        err = (await proc.stderr.read()).decode(errors="ignore")
+        if err.strip():
+            for i in range(0, len(err), 1800):
+                try:
+                    await ctx.send(f"{prefix}(stderr)```\n{err[i:i+1800]}\n```")
+                except Exception:
+                    pass
+
+    return proc.returncode
+
+def _detect_user_data_dir() -> Optional[str]:
+    """
+    Tries a few common envs/variables you've used across modules.
+    """
+    # If your code sets `instance_dir` globally, prefer it.
+    if "instance_dir" in globals():
+        val = str(globals()["instance_dir"]) or ""
+        if val.strip():
+            return val.strip()
+
+    # Common envs you've used in past conversations:
+    for env_key in ("CHROME_INSTANCE_DIR", "CHROME_USER_DATA_DIR", "SB_USER_DATA_DIR"):
+        val = os.getenv(env_key, "").strip()
+        if val:
+            return val
+    return None
+
+@bot.command(name="reset")
+async def reset_cmd(ctx, mode: str = ""):
+    """
+    Clear Chrome user-data, rebuild & re-compose the Docker stack, then exit this bot process.
+    Optional: 'nocache' -> build with --no-cache
+    """
+    compose_dir  = os.getenv("COMPOSE_DIR", os.getcwd()).strip()
+    compose_file = os.getenv("COMPOSE_FILE", "").strip()
+    user_data    = _detect_user_data_dir()
+
+    nocache = "nocache" in (mode or "").lower()
+    compose_bin = _docker_compose_cmd()
+    if not compose_bin:
+        await ctx.send("❌ Could not find `docker compose` nor `docker-compose` in PATH inside this container.")
+        await ctx.send("Tip: mount the Docker socket & CLI (e.g., `-v /var/run/docker.sock:/var/run/docker.sock`).")
+        return
+
+    await ctx.send(
+        "🧹 **Reset requested**\n"
+        f"• Compose dir: `{compose_dir}`\n"
+        f"• Compose file: `{compose_file or '(default resolution)'}`\n"
+        f"• Chrome profile: `{user_data or '(none configured)'}`\n"
+        f"• Build mode: `{'--no-cache' if nocache else '(cached)'}`\n\n"
+        "Type **YES** within 20 seconds to proceed. Anything else cancels."
+    )
+
+    def _check(m: discord.Message) -> bool:
+        return m.channel.id == ctx.channel.id and m.author.id == ctx.author.id
+
+    try:
+        reply: discord.Message = await bot.wait_for("message", timeout=20, check=_check)
+    except asyncio.TimeoutError:
+        await ctx.send("❎ Timed out — cancelled.")
+        return
+    if reply.content.strip().upper() != "YES":
+        await ctx.send("❎ Cancelled.")
+        return
+
+    # 1) Stop your loop and close any browser instances
+    await ctx.send("⏹️ Stopping loop and shutting down Chrome…")
+    try:
+        if _maybe_is_main_loop_running():
+            await _maybe_stop_main_loop()
+    except Exception:
+        pass
+    _maybe_quit_driver()
+
+    # 2) Kill any straggler Chrome/Chromium processes using the same user-data-dir
+    if psutil and signal:
+        try:
+            killed = 0
+            for p in psutil.process_iter(attrs=["name", "cmdline"]):
+                nm = (p.info.get("name") or "").lower()
+                cmd = " ".join(p.info.get("cmdline") or [])
+                if "chrome" in nm or "chromium" in nm:
+                    if (not user_data) or (f"--user-data-dir={user_data}" in cmd):
+                        try:
+                            p.send_signal(signal.SIGKILL)
+                            killed += 1
+                        except Exception:
+                            pass
+            if killed:
+                await ctx.send(f"🔪 Killed {killed} stray Chrome processes.")
+        except Exception:
+            pass
+
+    # 3) Clear the profile directory
+    if user_data:
+        await ctx.send(f"🧽 Clearing Chrome user-data at:\n```{user_data}```")
+        try:
+            shutil.rmtree(user_data, ignore_errors=True)
+            await ctx.send("✅ Chrome user-data cleared.")
+        except Exception as e:
+            await ctx.send(f"⚠️ Failed to clear profile dir: `{e}` (continuing)")
+
+    # 4) docker compose build (with or without --no-cache)
+    await ctx.send(f"🏗️ Building images {'(no cache)…' if nocache else '…'}")
+    build_cmd = compose_bin + (["-f", compose_file] if compose_file else []) + ["build"]
+    if nocache:
+        build_cmd.append("--no-cache")
+
+    try:
+        proc = await asyncio.create_subprocess_exec(*build_cmd, cwd=compose_dir, stdout=PIPE, stderr=PIPE)
+        rc = await _stream_proc_to_discord(ctx, proc, prefix="build ")
+    except Exception as e:
+        await ctx.send(f"❌ Failed to start build: `{e}`")
+        return
+    if rc != 0:
+        await ctx.send(f"❌ Build failed with exit code {rc}. Aborting reset.")
+        return
+    await ctx.send("✅ Build finished.")
+
+    # 5) docker compose up -d
+    await ctx.send("🚀 Re-composing (up -d)…")
+    up_cmd = compose_bin + (["-f", compose_file] if compose_file else []) + ["up", "-d", "--remove-orphans"]
+    try:
+        proc = await asyncio.create_subprocess_exec(*up_cmd, cwd=compose_dir, stdout=PIPE, stderr=PIPE)
+        rc = await _stream_proc_to_discord(ctx, proc, prefix="up ")
+    except Exception as e:
+        await ctx.send(f"❌ Failed to start compose up: `{e}`")
+        return
+    if rc != 0:
+        await ctx.send(f"❌ Compose up failed with exit code {rc}.")
+        return
+
+    await ctx.send("✅ Compose finished. Exiting current bot process so the refreshed stack can take over…")
+    try:
+        await bot.close()
+    finally:
+        os._exit(0)
+
+
 def format_loop_config() -> str:
     status = "running" if is_main_loop_running() else "stopped"
     lines = ["🎛️ **Casino loop configuration**", f"Status: **{status}**", "Order and intervals:"]
@@ -881,7 +1127,7 @@ async def help_cmd(ctx):
 
 ---------------------------------------  
 ⚙️ **General:**  
-!ping, !restart, !help, !start, !stop, !about, !config
+!ping, !restart, !help, !start, !stop, !about, !config, !reset
 """)
 
 # ───────────────────────────────────────────────────────────
