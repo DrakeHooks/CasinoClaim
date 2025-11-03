@@ -77,8 +77,10 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
     try:
         with SB(uc=True, headed=True) as sb:
             # Open login
-            sb.uc_open_with_reconnect(LOGIN_URL, 4)
+            sb.uc_open_with_reconnect(LOGIN_URL, 8)
             sb.wait_for_ready_state_complete()
+            await _send_shot(sb, channel, "americanluck_login.png",
+                                 " American Luck: Login page ")
 
             # Try to type only into these two fields
             typed = False
