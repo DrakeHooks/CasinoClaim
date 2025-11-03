@@ -185,7 +185,7 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
                     if collected:
                         sb.wait(2)
                         await _send_shot(sb, channel, "americanluck_claimed.png",
-                                         "🎉 American Luck Daily Bonus Claimed!")
+                                         "American Luck Daily Bonus Claimed!")
                 # If not opened or not collected, stay quiet (test mode)
             else:
                 # Send login **failure** screenshot
