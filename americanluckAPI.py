@@ -103,6 +103,7 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
             # Solve captcha if visible (ok to no-op)
             if typed:
                 try:
+                    sb.wait(5)
                     sb.uc_gui_click_captcha()
                     sb.wait(10)
                 except Exception:
