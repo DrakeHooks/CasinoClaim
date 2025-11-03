@@ -644,21 +644,17 @@ def _detect_user_data_dir() -> Optional[str]:
     return None
 
 # ───────────────────────────────────────────────────────────
-# !reset — helper-container handoff (keeps watchtower up)
+# !reset — helper-container handoff with reliable fallback
 #   !reset           -> build cached; recreate TARGET_SERVICE only
 #   !reset nocache   -> build --no-cache; recreate TARGET_SERVICE only
-# Requires:
-#   - /var/run/docker.sock mounted
-#   - env RESET_HELPER_IMAGE (e.g., "docker:27-cli")
-#   - env COMPOSE_DIR, COMPOSE_FILE
-#   - optional: TARGET_SERVICE (default "casino-bot"), COMPOSE_PROJECT_NAME
+# Keeps watchtower running the whole time.
 # ───────────────────────────────────────────────────────────
 import os
 import asyncio
 import shutil
 import subprocess
 from asyncio.subprocess import PIPE
-from typing import List, Optional
+from typing import Optional
 
 try:
     import psutil, signal
@@ -694,38 +690,6 @@ def _maybe_quit_driver() -> None:
             except Exception:
                 pass
 
-async def _stream_proc(ctx, proc: asyncio.subprocess.Process, prefix: str) -> int:
-    buf = ""
-    async def flush():
-        nonlocal buf
-        if not buf:
-            return
-        for i in range(0, len(buf), 1800):
-            try:
-                await ctx.send(f"{prefix}```\n{buf[i:i+1800]}\n```")
-            except Exception:
-                pass
-        buf = ""
-    if proc.stdout:
-        while True:
-            line = await proc.stdout.readline()
-            if not line:
-                break
-            buf += line.decode(errors="ignore")
-            if len(buf) >= 1600:
-                await flush()
-    await flush()
-    await proc.wait()
-    if proc.returncode != 0 and proc.stderr:
-        err = (await proc.stderr.read()).decode(errors="ignore")
-        if err.strip():
-            for i in range(0, len(err), 1800):
-                try:
-                    await ctx.send(f"{prefix}(stderr)```\n{err[i:i+1800]}\n```")
-                except Exception:
-                    pass
-    return proc.returncode
-
 def _detect_user_data_dir() -> Optional[str]:
     if "instance_dir" in globals():
         v = str(globals()["instance_dir"]) or ""
@@ -737,26 +701,37 @@ def _detect_user_data_dir() -> Optional[str]:
             return v
     return None
 
-def _shlex_quote(s: str) -> str:
+def _q(s: str) -> str:
     return "'" + s.replace("'", "'\"'\"'") + "'"
+
+async def _run(ctx, args, cwd=None, prefix=""):
+    """Run a short command and stream a little output to Discord."""
+    proc = await asyncio.create_subprocess_exec(*args, cwd=cwd, stdout=PIPE, stderr=PIPE)
+    out = (await proc.stdout.read()).decode(errors="ignore")
+    err = (await proc.stderr.read()).decode(errors="ignore")
+    rc = await proc.wait()
+    if out.strip():
+        await ctx.send(f"{prefix}```\n{out[-1700:]}\n```")
+    if rc != 0 and err.strip():
+        await ctx.send(f"{prefix}(stderr)```\n{err[-1700:]}\n```")
+    return rc, out, err
 
 @bot.command(name="reset")
 async def reset_cmd(ctx, mode: str = ""):
-    # Inputs / env
     compose_dir   = os.getenv("COMPOSE_DIR", os.getcwd()).strip()
     compose_file  = os.getenv("COMPOSE_FILE", "").strip() or os.path.join(compose_dir, "docker-compose.yml")
-    helper_image  = os.getenv("RESET_HELPER_IMAGE", "docker:27-cli").strip()
+    helper_image  = os.getenv("RESET_HELPER_IMAGE", "drakehooks/casinoclaim:testing").strip()
     project_name  = os.getenv("COMPOSE_PROJECT_NAME", "").strip()     # optional
-    target_svc    = os.getenv("TARGET_SERVICE", "casino-bot").strip() # only rebuild/recreate this service
+    target_svc    = os.getenv("TARGET_SERVICE", "casino-bot").strip()
     nocache       = "nocache" in (mode or "").lower()
     user_data     = _detect_user_data_dir()
 
-    # Sanity checks
+    # sanity
     if not shutil.which("docker"):
         await ctx.send("❌ Docker CLI not found in PATH. Install docker-cli in this container.")
         return
     if not os.path.exists(compose_file):
-        await ctx.send(f"❌ Compose file not found at `{compose_file}`. Set COMPOSE_FILE correctly.")
+        await ctx.send(f"❌ Compose file not found at `{compose_file}`.")
         return
 
     await ctx.send(
@@ -782,8 +757,8 @@ async def reset_cmd(ctx, mode: str = ""):
         await ctx.send("❎ Cancelled.")
         return
 
-    # 1) Stop your loop & close browser
-    await ctx.send("⏹️ Stopping loop and shutting down Chrome…")
+    # 1) Stop loop & close browser
+    await ctx.send("🛑 Stopping loop & shutting down Chrome…")
     try:
         if _maybe_is_main_loop_running():
             await _maybe_stop_main_loop()
@@ -809,7 +784,7 @@ async def reset_cmd(ctx, mode: str = ""):
         except Exception:
             pass
 
-    # 3) Clear the profile dir
+    # 3) Clear profile
     if user_data:
         await ctx.send(f"🧽 Clearing Chrome user-data at:\n```{user_data}```")
         try:
@@ -818,25 +793,25 @@ async def reset_cmd(ctx, mode: str = ""):
         except Exception as e:
             await ctx.send(f"⚠️ Failed to clear profile dir: `{e}` (continuing)")
 
-    # 4) Launch a detached helper that ONLY rebuilds/recreates the target service.
-    await ctx.send("🛠️ Launching reset helper (will rebuild & recreate target service only)…")
+    # 4) Try helper container first (best path)
+    await ctx.send("🛠️ Launching reset helper (rebuild & recreate target service only)…")
 
-    pn_flag = f" --project-name {_shlex_quote(project_name)}" if project_name else ""
-    cf_flag = f" -f {_shlex_quote(compose_file)}"
-    build_nc = " --no-cache" if nocache else ""
-
-    # Keep watchtower running:
-    #  - forcibly remove any old container with the same name as target service
-    #  - build just the target service
-    #  - bring up only the target service (no-deps to avoid touching watchtower)
-    helper_script = (
-        "set -euo pipefail; "
-        f"docker rm -f {_shlex_quote(target_svc)} || true; "
-        f"docker compose{pn_flag}{cf_flag} build{build_nc} {_shlex_quote(target_svc)}; "
-        f"docker compose{pn_flag}{cf_flag} up -d --no-deps --remove-orphans {_shlex_quote(target_svc)}"
-    )
+    pn = f" --project-name {_q(project_name)}" if project_name else ""
+    cf = f" -f {_q(compose_file)}"
+    nc = " --no-cache" if nocache else ""
 
     helper_name = "casino-reset-helper"
+    helper_script = (
+        "set -euo pipefail; "
+        f"docker rm -f {_q(target_svc)} || true; "
+        # pull to ensure the helper image (if using same) has latest compose plugin/clis
+        f"docker compose{pn}{cf} build{nc} {_q(target_svc)}; "
+        f"docker compose{pn}{cf} up -d --no-deps --remove-orphans {_q(target_svc)}"
+    )
+
+    # Pull helper image (nice to have)
+    await _run(ctx, ["docker", "pull", helper_image], prefix="pull ")
+
     run_cmd = [
         "docker","run","-d","--rm",
         "--name", helper_name,
@@ -846,32 +821,53 @@ async def reset_cmd(ctx, mode: str = ""):
         helper_image,
         "sh","-lc", helper_script
     ]
+    rc, out, err = await _run(ctx, run_cmd, prefix="run ")
 
-    try:
-        proc = await asyncio.create_subprocess_exec(*run_cmd, stdout=PIPE, stderr=PIPE)
-        out = (await proc.stdout.read()).decode(errors="ignore").strip()
-        err = (await proc.stderr.read()).decode(errors="ignore").strip()
-        if proc.returncode != 0:
-            await ctx.send(f"❌ Failed to start helper container.\n```\n{err or out}\n```")
-            return
-        helper_id = out[:12] if out else helper_name
+    if rc == 0 and out.strip():
+        helper_id = out.strip()[:12]
         await ctx.send(
-            "✅ Helper started.\n"
-            f"• Name/ID: `{helper_id}`\n"
-            f"• Actions: `docker rm -f {target_svc}` → `docker compose build{build_nc} {target_svc}` → "
-            f"`docker compose up -d --no-deps --remove-orphans {target_svc}`\n"
-            "• Watchtower remains running."
+            f"✅ Helper started as `{helper_id}`.\n"
+            f"It will rebuild & up **{target_svc}** only. Watchtower stays running.\n"
+            f"To watch progress from host: `docker logs -f {helper_name}`"
         )
-    except Exception as e:
-        await ctx.send(f"❌ Could not launch helper container: `{e}`")
+        await ctx.send("👋 Exiting current bot container so the helper can replace it.")
+        try:
+            await bot.close()
+        finally:
+            os._exit(0)
         return
 
-    # 5) Exit this bot so the helper can recreate it cleanly
-    await ctx.send("👋 Exiting current bot container now. It will come back online when the helper finishes.")
-    try:
-        await bot.close()
-    finally:
-        os._exit(0)
+    # 5) Fallback: background a host-side nohup reset (no helper container)
+    await ctx.send("⚠️ Helper failed to start. Falling back to host-side background reset…")
+    bg_log = "/tmp/reset-fallback.log"
+    script = (
+        f"set -euo pipefail; "
+        f"docker rm -f { _q(target_svc) } || true; "
+        f"docker compose{pn}{cf} build{nc} { _q(target_svc) }; "
+        f"docker compose{pn}{cf} up -d --no-deps --remove-orphans { _q(target_svc) }"
+    )
+    # Spawn in background so this container can exit
+    bg_cmd = ["sh","-lc", f"nohup sh -lc { _q(script) } > {bg_log} 2>&1 & echo $!"]
+    rc2, out2, err2 = await _run(ctx, bg_cmd, cwd=compose_dir, prefix="fallback ")
+
+    if rc2 == 0:
+        pid = out2.strip()
+        await ctx.send(
+            f"✅ Background reset launched (PID {pid}).\n"
+            f"Logs: `{bg_log}` inside this container (until it exits). "
+            "From the host you can also run:\n"
+            f"```bash\ndocker compose -f {compose_file} ps\n"
+            f"docker logs -f {target_svc}\n```"
+        )
+        await ctx.send("👋 Exiting current bot container now.")
+        try:
+            await bot.close()
+        finally:
+            os._exit(0)
+        return
+
+    # 6) If we got here, both helper and fallback failed; keep the bot alive and show errors
+    await ctx.send("❌ Reset helper and fallback both failed. Check the stderr above and your Docker setup.")
 
 
 
