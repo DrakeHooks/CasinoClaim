@@ -85,10 +85,13 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
             # Try to type only into these two fields
             typed = False
             try:
-                sb.wait_for_element_visible("input#emailAddress", timeout=4)
-                sb.wait_for_element_visible("input#password", timeout=4)
-                sb.type("input#emailAddress", username)
-                sb.type("input#password", password)
+                sb.type("input[id='emailAddress']", username)
+                sb.type("input[id='password']", password)
+                sb.uc_gui_click_captcha()
+                sb.wait(10)
+                await _send_shot(sb, channel, "americanluck_login1.png",
+                                 " American Luck: Login page creds entered ")
+                pass
                 typed = True
             except Exception:
                     await _send_shot(sb, channel, "americanluck_login_failed.png",
