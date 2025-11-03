@@ -89,8 +89,11 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
                 sb.type("input#password", password)
                 typed = True
             except Exception:
+                    await _send_shot(sb, channel, "americanluck_login_failed.png",
+                    "🟥 American Luck: Login failed (Get Coins not visible).")
+
                 # If the form isn't present, we might already be authed — continue.
-                pass
+                
 
             # Optional: try GUI captcha assist
             if typed:

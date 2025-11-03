@@ -992,7 +992,7 @@ async def crowncoins_cmd(ctx):
     await ctx.send("Checking Crown Coins Casino for bonus…")
     await crowncoins_casino(driver, bot, ctx, bot.get_channel(DISCORD_CHANNEL))
 
-@bot.command(name="americanluck", aliases=["aluck","a-luck","american luck"])
+@bot.command(name="americanluck", aliases=["aluck", "a-luck", "american luck"])
 async def americanluck_cmd(ctx):
     await ctx.send("Checking American Luck for bonus…")
     channel = bot.get_channel(DISCORD_CHANNEL)
