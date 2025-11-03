@@ -14,10 +14,13 @@ LOGIN_URL = "https://americanluck.com/login"
 LOBBY_URL = "https://americanluck.com/lobby"
 
 # Provided xpaths
-POPUP_CLOSE_XP   = "/html/body/div[5]/div/button"
-GET_COINS_BTN_XP = "/html/body/div[1]/div[2]/header/div[2]/button"
-COLLECT_BTN_XP   = "/html/body/div[7]/div/div/section[1]/div/div/div/div/div[3]/button[1]/div[1]"
+POPUP_CLOSE_XP     = "/html/body/div[5]/div/button"
+GET_COINS_BTN_XP   = "/html/body/div[1]/div[2]/header/div[2]/button"
+COLLECT_BTN_XP     = "/html/body/div[7]/div/div/section[1]/div/div/div/div/div[3]/button[1]/div[1]"
+LOGIN_BUTTON_XP    = "/html/body/div[1]/div[2]/main/div/div/div/div[2]/form/div[4]/button"
 
+# (Optional) cookie modal (from your screenshot)
+COOKIE_ACCEPT_BTN  = "//button[contains(., 'ACCEPT ALL')]"
 
 async def _send_shot(sb: SB, channel: discord.abc.Messageable, path: str, caption: str):
     """Save a screenshot, send to Discord, and clean up the file."""
@@ -35,7 +38,6 @@ async def _send_shot(sb: SB, channel: discord.abc.Messageable, path: str, captio
                 os.remove(path)
         except Exception:
             pass
-
 
 def _force_click_xpath(sb: SB, xpath: str, timeout: float = 12) -> bool:
     """Click a stubborn XPath with multiple strategies."""
@@ -63,7 +65,6 @@ def _force_click_xpath(sb: SB, xpath: str, timeout: float = 12) -> bool:
             continue
     return False
 
-
 async def americanluck_uc(ctx, channel: discord.abc.Messageable):
     await channel.send("Launching **American Luck** (UC)…")
 
@@ -79,40 +80,59 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
             # Open login
             sb.uc_open_with_reconnect(LOGIN_URL, 8)
             sb.wait_for_ready_state_complete()
-            await _send_shot(sb, channel, "americanluck_login.png",
-                                 " American Luck: Login page ")
 
-            # Try to type only into these two fields
+            # Dismiss cookie modal if present (non-fatal)
+            try:
+                sb.wait_for_element_visible(COOKIE_ACCEPT_BTN, timeout=2)
+                sb.click(COOKIE_ACCEPT_BTN)
+            except Exception:
+                pass
+
+            # Type the two fields
             typed = False
             try:
-                sb.type("input[id='emailAddress']", username)
-                sb.type("input[id='password']", password)
-                sb.uc_gui_click_captcha()
-                sb.wait(10)
-                await _send_shot(sb, channel, "americanluck_login1.png",
-                                 " American Luck: Login page creds entered ")
-                pass
+                sb.wait_for_element_visible("input#emailAddress", timeout=6)
+                sb.wait_for_element_visible("input#password", timeout=6)
+                sb.type("input#emailAddress", username)
+                sb.type("input#password", password)
                 typed = True
             except Exception:
-                    await _send_shot(sb, channel, "americanluck_login_failed.png",
-                    "🟥 American Luck: Login failed (Get Coins not visible).")
+                # If the form isn't present, we might already be authed — continue to lobby check.
+                pass
 
-                # If the form isn't present, we might already be authed — continue.
-                
-
-            # Optional: try GUI captcha assist
+            # Solve captcha if visible (ok to no-op)
             if typed:
                 try:
                     sb.uc_gui_click_captcha()
-                    sb.wait(8)
+                    sb.wait(6)
                 except Exception:
                     pass
-                # Submit with Enter on password
+
+                # === Submit Step ===
+                submitted = False
+
+                # 1) Try Enter on password
                 try:
                     sb.press_keys("input#password", "ENTER")
+                    submitted = True
                 except Exception:
+                    submitted = False
+
+                # 2) If still on login after a short wait, try clicking the login button
+                sb.wait(2)
+                try:
+                    # If login button is still visible, click it
+                    if sb.is_element_visible(LOGIN_BUTTON_XP):
+                        if _force_click_xpath(sb, LOGIN_BUTTON_XP, timeout=4):
+                            submitted = True
+                except Exception:
+                    pass
+
+                # 3) As a last resort, try form submit via JS
+                if not submitted:
                     try:
                         sb.execute_script("document.querySelector('form')?.submit?.()")
+                        submitted = True
                     except Exception:
                         pass
 
@@ -129,7 +149,7 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
                 pass
 
             # Close known popup and escape any stray modals
-            _force_click_xpath(sb, POPUP_CLOSE_XP, timeout=5)
+            _force_click_xpath(sb, POPUP_CLOSE_XP, timeout=4)
             try:
                 sb.press_keys("body", "ESCAPE")
             except Exception:
@@ -165,7 +185,7 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
                     if collected:
                         sb.wait(2)
                         await _send_shot(sb, channel, "americanluck_claimed.png",
-                                         "American Luck Daily Bonus Claimed!")
+                                         "🎉 American Luck Daily Bonus Claimed!")
                 # If not opened or not collected, stay quiet (test mode)
             else:
                 # Send login **failure** screenshot
