@@ -89,12 +89,11 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
                 sb.type("input[id='password']", password)
                 sb.uc_gui_click_captcha()
                 sb.wait(10)
-                sb.press_keys("input#password", "ENTER")
+                _force_click_xpath(sb, "/html/body/div[1]/div[2]/main/div/div/div/div[2]/form/div[4]/button", timeout=12)
 
                 await _send_shot(sb, channel, "americanluck_login1.png",
                                  " American Luck: Login page creds entered ")
                 pass
-                typed = True
             except Exception:
                     await _send_shot(sb, channel, "americanluck_login_failed.png",
                     "🟥 American Luck: Login failed (Get Coins not visible).")
