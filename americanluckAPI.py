@@ -91,8 +91,8 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
             # Type the two fields
             typed = False
             try:
-                sb.wait_for_element_visible("input#emailAddress", timeout=6)
-                sb.wait_for_element_visible("input#password", timeout=6)
+                sb.wait_for_element_visible("input#emailAddress", timeout=10)
+                sb.wait_for_element_visible("input#password", timeout=10)
                 sb.type("input#emailAddress", username)
                 sb.type("input#password", password)
                 typed = True
@@ -104,7 +104,7 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
             if typed:
                 try:
                     sb.uc_gui_click_captcha()
-                    sb.wait(6)
+                    sb.wait(10)
                 except Exception:
                     pass
 
