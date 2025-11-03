@@ -4,29 +4,26 @@
 # Exposes: async def americanluck_uc(ctx, channel)
 
 import os
+import discord
 from dotenv import load_dotenv
 from seleniumbase import SB
-import discord
 
 load_dotenv()
 
 LOGIN_URL = "https://americanluck.com/login"
 LOBBY_URL = "https://americanluck.com/lobby"
 
-# ── Provided by you ──────────────────────────────────────────────
+# Provided xpaths
 POPUP_CLOSE_XP   = "/html/body/div[5]/div/button"
 GET_COINS_BTN_XP = "/html/body/div[1]/div[2]/header/div[2]/button"
 COLLECT_BTN_XP   = "/html/body/div[7]/div/div/section[1]/div/div/div/div/div[3]/button[1]/div[1]"
 
 
-# ───────────────────────────────────────────────────────────────
-# Screenshot helpers
-# ───────────────────────────────────────────────────────────────
-async def _send_status_shot(sb: SB, channel, filename: str, caption: str):
-    """Always send a screenshot (success or failure)."""
+async def _send_shot(sb: SB, channel: discord.abc.Messageable, path: str, caption: str):
+    """Save a screenshot, send to Discord, and clean up the file."""
     try:
-        sb.save_screenshot(filename)
-        await channel.send(caption, file=discord.File(filename))
+        sb.save_screenshot(path)
+        await channel.send(caption, file=discord.File(path))
     except Exception:
         try:
             await channel.send(caption)
@@ -34,14 +31,14 @@ async def _send_status_shot(sb: SB, channel, filename: str, caption: str):
             pass
     finally:
         try:
-            if os.path.exists(filename):
-                os.remove(filename)
+            if os.path.exists(path):
+                os.remove(path)
         except Exception:
             pass
 
 
 def _force_click_xpath(sb: SB, xpath: str, timeout: float = 12) -> bool:
-    """Robust click chain for stubborn elements."""
+    """Click a stubborn XPath with multiple strategies."""
     try:
         sb.wait_for_element_visible(xpath, timeout=timeout)
     except Exception:
@@ -67,123 +64,113 @@ def _force_click_xpath(sb: SB, xpath: str, timeout: float = 12) -> bool:
     return False
 
 
-def _try_click_any(sb: SB, xpaths, timeout_each=10) -> bool:
-    for xp in xpaths:
-        if _force_click_xpath(sb, xp, timeout=timeout_each):
-            return True
-    return False
-
-
-def _try_type_any(sb: SB, selectors, text: str, clear_first=False) -> bool:
-    for sel in selectors:
-        try:
-            sb.wait_for_element_visible(sel, timeout=3)
-            if clear_first:
-                try:
-                    sb.clear(sel)
-                except Exception:
-                    pass
-            sb.type(sel, text)
-            return True
-        except Exception:
-            continue
-    return False
-
-
-# ───────────────────────────────────────────────────────────────
-# Main UC logic
-# ───────────────────────────────────────────────────────────────
 async def americanluck_uc(ctx, channel: discord.abc.Messageable):
-    """American Luck via SeleniumBase (uc=True)."""
     await channel.send("Launching **American Luck** (UC)…")
 
     creds = os.getenv("AMERICANLUCK")
     if not creds or ":" not in creds:
         await channel.send("⚠️ AMERICANLUCK not set (email:pass) in .env")
         return
-
     username, password = creds.split(":", 1)
 
+    sb = None
     try:
         with SB(uc=True, headed=True) as sb:
+            # Open login
             sb.uc_open_with_reconnect(LOGIN_URL, 4)
             sb.wait_for_ready_state_complete()
 
-            # ── Attempt login if form visible ─────────────────────────────
-            email_selectors = [
-                "input[type='email']", "input[name='email']", "input#email",
-                "//input[contains(translate(@id,'EMAIL','email'),'email')]",
-                "//input[contains(translate(@name,'EMAIL','email'),'email')]",
-                "//input[contains(translate(@placeholder,'EMAIL','email'),'email')]",
-            ]
-            pass_selectors = [
-                "input[type='password']", "input[name='password']", "input#password",
-                "//input[contains(translate(@id,'PASSWORD','password'),'password')]",
-                "//input[contains(translate(@name,'PASSWORD','password'),'password')]",
-                "//input[contains(translate(@placeholder,'PASSWORD','password'),'password')]",
-            ]
+            # Try to type only into these two fields
+            typed = False
+            try:
+                sb.wait_for_element_visible("input#emailAddress", timeout=4)
+                sb.wait_for_element_visible("input#password", timeout=4)
+                sb.type("input#emailAddress", username)
+                sb.type("input#password", password)
+                typed = True
+            except Exception:
+                # If the form isn't present, we might already be authed — continue.
+                pass
 
-            typed_email = _try_type_any(sb, email_selectors, username, clear_first=True)
-            typed_pass  = _try_type_any(sb, pass_selectors, password, clear_first=True)
-
-            if typed_email and typed_pass:
-                try:
-                    sb.press_keys(pass_selectors[0], "ENTER")
-                except Exception:
-                    try:
-                        sb.execute_script("document.querySelector('form')?.submit?.()")
-                    except Exception:
-                        pass
+            # Optional: try GUI captcha assist
+            if typed:
                 try:
                     sb.uc_gui_click_captcha()
                     sb.wait(8)
                 except Exception:
                     pass
+                # Submit with Enter on password
+                try:
+                    sb.press_keys("input#password", "ENTER")
+                except Exception:
+                    try:
+                        sb.execute_script("document.querySelector('form')?.submit?.()")
+                    except Exception:
+                        pass
 
+            # Let auth redirects settle
             sb.wait(6)
             sb.refresh_page()
             sb.wait_for_ready_state_complete()
 
+            # Go to lobby (if not already there)
             try:
                 sb.open(LOBBY_URL)
                 sb.wait_for_ready_state_complete()
             except Exception:
                 pass
 
-            # ── Close popup if exists ────────────────────────────────────
-            _try_click_any(sb, [POPUP_CLOSE_XP], timeout_each=5)
+            # Close known popup and escape any stray modals
+            _force_click_xpath(sb, POPUP_CLOSE_XP, timeout=5)
             try:
                 sb.press_keys("body", "ESCAPE")
             except Exception:
                 pass
 
-            # ── Open rewards / get coins ─────────────────────────────────
-            opened = _try_click_any(sb, [GET_COINS_BTN_XP], timeout_each=10)
-            if not opened:
-                sb.wait(3)
-                _try_click_any(sb, [GET_COINS_BTN_XP], timeout_each=6)
+            # Check login state by presence of Get Coins button
+            login_ok = False
+            try:
+                sb.wait_for_element_visible(GET_COINS_BTN_XP, timeout=8)
+                login_ok = True
+            except Exception:
+                login_ok = False
 
-            sb.wait_for_ready_state_complete()
-            sb.wait(3)
+            if login_ok:
+                # Send login success screenshot
+                await _send_shot(sb, channel, "americanluck_logged_in.png",
+                                 "✅ American Luck: Logged in (post-login state).")
 
-            # ── Collect if available ─────────────────────────────────────
-            collected = _try_click_any(sb, [COLLECT_BTN_XP], timeout_each=8)
-            if not collected:
-                sb.wait(4)
-                collected = _try_click_any(sb, [COLLECT_BTN_XP], timeout_each=5)
+                # ───────── Claim logic (quiet unless success) ─────────
+                opened = _force_click_xpath(sb, GET_COINS_BTN_XP, timeout=8)
+                if not opened:
+                    sb.wait(3)
+                    opened = _force_click_xpath(sb, GET_COINS_BTN_XP, timeout=6)
 
-            if collected:
-                sb.wait(2)
-                await _send_status_shot(sb, channel, "americanluck_success.png",
-                                        "American Luck Daily Bonus Claimed!")
+                if opened:
+                    sb.wait_for_ready_state_complete()
+                    sb.wait(3)
+                    collected = _force_click_xpath(sb, COLLECT_BTN_XP, timeout=8)
+                    if not collected:
+                        sb.wait(4)
+                        collected = _force_click_xpath(sb, COLLECT_BTN_XP, timeout=5)
+
+                    if collected:
+                        sb.wait(2)
+                        await _send_shot(sb, channel, "americanluck_claimed.png",
+                                         "American Luck Daily Bonus Claimed!")
+                # If not opened or not collected, stay quiet (test mode)
             else:
-                await _send_status_shot(sb, channel, "americanluck_fail.png",
-                                        "American Luck: No claim available or flow failed.")
+                # Send login **failure** screenshot
+                await _send_shot(sb, channel, "americanluck_login_failed.png",
+                                 "🟥 American Luck: Login failed (Get Coins not visible).")
 
     except Exception as e:
+        # Try to send an error-state screenshot if the browser exists
         try:
-            with SB(uc=True, headed=True) as sb:
-                await _send_status_shot(sb, channel, "americanluck_error.png",
-                                        f"⚠️ American Luck crashed")
+            if sb is not None:
+                await _send_shot(sb, channel, "americanluck_error.png",
+                                 f"⚠️ American Luck crashed: {e}")
+            else:
+                await channel.send(f"⚠️ American Luck crashed before browser started: {e}")
         except Exception:
-            await channel.send(f"⚠️ American Luck fatal error")
+            pass
