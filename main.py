@@ -38,7 +38,8 @@ import undetected_chromedriver as uc  # noqa: F401
 # ───────────────────────────────────────────────────────────
 api_modules = [
     "fortunewheelzAPI",
-    "fortunecoinsAPI",  # UC flow
+    "fortunecoinsAPI",
+    "americanluckAPI",
     "stakeAPI",
     "modoAPI",
     "googleauthAPI",
@@ -256,7 +257,10 @@ async def _run_rollingriches(channel):  await rolling_riches_casino(None, driver
 async def _run_stake(channel):          await stake_claim(driver, bot, None, channel)
 async def _run_fortunewheelz(channel):  await fortunewheelz_flow(None, driver, channel)
 async def _run_spinquest(channel):      await spinquest_flow(None, driver, channel)
+async def _run_americanluck(channel):   await americanluck_uc(None, channel)
 async def _run_fortunecoins(channel):   await fortunecoins_uc(None, channel)  # <- UC flow, 24h interval
+
+
 
 casino_loop_entries: List[CasinoLoopEntry] = [
     CasinoLoopEntry("luckybird",     "LuckyBird",         _run_luckybird,       120),
@@ -273,10 +277,12 @@ casino_loop_entries: List[CasinoLoopEntry] = [
     # 24h cadence group (no countdown/problematic)
     CasinoLoopEntry("funrize",       "Funrize",           _run_funrize,         1440),
     CasinoLoopEntry("rollingriches", "Rolling Riches",    _run_rollingriches,   1440),
+    CasinoLoopEntry("americanluck",  "American Luck",      _run_americanluck,    1440),
     CasinoLoopEntry("fortunecoins",  "Fortune Coins",     _run_fortunecoins,    1440),
     CasinoLoopEntry("zula",          "Zula Casino",       _run_zula,            1440),
     CasinoLoopEntry("sportzino",     "Sportzino",         _run_sportzino,       1440),
     CasinoLoopEntry("smilescasino",  "Smiles Casino",     _run_smilescasino,    1440),
+
 ]
 
 def reset_loop_schedule():
@@ -401,7 +407,7 @@ MANUAL_CASINO_COMMANDS = {
     "chumba","rollingriches","jefebet","spinpals","spinquest","funrize",
     "fortunewheelz","stake","chanced","luckybird","globalpoker","crowncoins",
     "dingdingding","modo","zula","sportzino","nolimitcoins","fortunecoins",
-    "smilescasino"
+    "smilescasino","americanluck"
 }
 
 @bot.check
@@ -985,6 +991,13 @@ async def smilescasino_cmd(ctx):
 async def crowncoins_cmd(ctx):
     await ctx.send("Checking Crown Coins Casino for bonus…")
     await crowncoins_casino(driver, bot, ctx, bot.get_channel(DISCORD_CHANNEL))
+
+@bot.command(name="americanluck", aliases=["aluck","a-luck","american luck"])
+async def americanluck_cmd(ctx):
+    await ctx.send("Checking American Luck for bonus…")
+    channel = bot.get_channel(DISCORD_CHANNEL)
+    await americanluck_uc(ctx, channel)
+
 
 @bot.command(name="modo")
 async def modo_cmd(ctx):
