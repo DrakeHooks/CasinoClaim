@@ -79,8 +79,8 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
             # Open login
             sb.uc_open_with_reconnect(LOGIN_URL, 8)
             sb.wait_for_ready_state_complete()
-            await _send_shot(sb, channel, "americanluck_login.png",
-                                 " American Luck: Login page ")
+            # await _send_shot(sb, channel, "americanluck_login.png",
+            #                      " American Luck: Login page ")
 
             # Try to type only into these two fields
             typed = False
@@ -91,8 +91,8 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
                 sb.wait(10)
                 _force_click_xpath(sb, "/html/body/div[1]/div[2]/main/div/div/div/div[2]/form/div[4]/button", timeout=12)
 
-                await _send_shot(sb, channel, "americanluck_login1.png",
-                                 " American Luck: Login page creds entered ")
+                # await _send_shot(sb, channel, "americanluck_login1.png",
+                #                  " American Luck: Login page creds entered ")
                 pass
             except Exception:
                     await _send_shot(sb, channel, "americanluck_login_failed.png",
@@ -128,8 +128,8 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
 
             if login_ok:
                 # Send login success screenshot
-                await _send_shot(sb, channel, "americanluck_logged_in.png",
-                                 "✅ American Luck: Logged in (post-login state).")
+                # await _send_shot(sb, channel, "americanluck_logged_in.png",
+                #                  "✅ American Luck: Logged in (post-login state).")
 
                 # ───────── Claim logic (quiet unless success) ─────────
                 opened = _force_click_xpath(sb, GET_COINS_BTN_XP, timeout=8)
