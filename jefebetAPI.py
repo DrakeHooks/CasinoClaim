@@ -21,7 +21,7 @@ import discord
 load_dotenv()
 
 # ────────────────────────────────────────────────────────────
-# JefeBet Helpers
+# JefeBet Helpers and Popup handling
 # ────────────────────────────────────────────────────────────
 def _present(driver, by, value, timeout=8):
     return WebDriverWait(driver, timeout).until(EC.presence_of_element_located((by, value)))
