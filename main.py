@@ -233,8 +233,10 @@ class CasinoLoopEntry:
     def schedule_next(self):
         self.next_run = dt.datetime.now(dt.timezone.utc) + dt.timedelta(minutes=self.interval_minutes)
 
+
+# constants for main loop. change as you see fit or run !config in discord.
 LOOP_STAGGER_SECONDS = 30
-PER_CASINO_TIMEOUT_SEC = int(os.getenv("CASINO_TIMEOUT_SECONDS", "500"))  # hard cap
+PER_CASINO_TIMEOUT_SEC = int(os.getenv("CASINO_TIMEOUT_SECONDS", "500"))  
 MAIN_TICK_SLEEP = 10
 
 async def _run_luckybird(channel):      await luckybird_entry(None, driver, bot, channel)
