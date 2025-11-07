@@ -221,6 +221,7 @@ async def zula_uc(ctx, channel: discord.abc.Messageable):
             collected = _try_click_any(
                 sb,
                 [
+                    "/html/body/div[6]/div/div[1]/div/div/div[2]/div[1]/div[2]/div[1]/div/button",
                     "/html/body/div[4]/div/div[1]/div/div/div[2]/div[1]/div[2]/div[1]/div/button",
                     "//button[contains(.,'Collect') and not(@disabled)]",
                     "//button[.//span[contains(.,'Collect')] and not(@disabled)]",
@@ -243,7 +244,7 @@ async def zula_uc(ctx, channel: discord.abc.Messageable):
         try:
             # Best effort to grab a screenshot even on exceptions outside 'with SB'
             with SB(uc=True, headed=True) as sb_fallback:
-                await _send_status_shot(sb_fallback, channel, "Zula: countdown not available (or auth failed).", "zula_error")
+                await _send_status_shot(sb_fallback, channel, "Zula: bonus not available (or auth failed).", "zula_error")
         except Exception:
             # If even fallback SB fails, send text-only
             await channel.send("Zula: countdown not available (or auth failed).")

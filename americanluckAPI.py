@@ -85,7 +85,9 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
             # Try to type only into these two fields
             typed = False
             try:
+                sb.wait(5)
                 sb.type("input[id='emailAddress']", username)
+                sb.wait(5)
                 sb.type("input[id='password']", password)
                 sb.uc_gui_click_captcha()
                 sb.wait(10)
@@ -96,7 +98,7 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
                 pass
             except Exception:
                     await _send_shot(sb, channel, "americanluck_login_failed.png",
-                    "🟥 American Luck: Login failed (Get Coins not visible).")
+                    "American Luck: Login failed (Get Coins not visible).")
 
 
             # Let auth redirects settle
@@ -127,9 +129,6 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
                 login_ok = False
 
             if login_ok:
-                # Send login success screenshot
-                # await _send_shot(sb, channel, "americanluck_logged_in.png",
-                #                  "✅ American Luck: Logged in (post-login state).")
 
                 # ───────── Claim logic (quiet unless success) ─────────
                 opened = _force_click_xpath(sb, GET_COINS_BTN_XP, timeout=8)
@@ -153,7 +152,7 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
             else:
                 # Send login **failure** screenshot
                 await _send_shot(sb, channel, "americanluck_login_failed.png",
-                                 "🟥 American Luck: Login failed (Get Coins not visible).")
+                                 "American Luck: Login failed or bonus unavailable.")
 
     except Exception as e:
         # Try to send an error-state screenshot if the browser exists

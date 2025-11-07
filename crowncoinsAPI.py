@@ -1,5 +1,5 @@
 # Drake Hooks
-# Casino Claim
+# Casino Claim 2
 # CrownCoinsCasino API
 
 
@@ -19,7 +19,13 @@ from selenium.common.exceptions import TimeoutException
 # Load environment variables from the .env file
 load_dotenv()
 
-# Function to authenticate into Crown Coins via google. Run !googleauth before running this function.
+
+
+
+# ───────────────────────────────────────────────────────────
+# Auth helpers Google + .env
+# ───────────────────────────────────────────────────────────
+
 async def auth_crown_google(driver, bot, ctx, channel):
     try:
         web = "https://crowncoinscasino.com/"
@@ -33,16 +39,16 @@ async def auth_crown_google(driver, bot, ctx, channel):
             login_btn.click()
 
             google_btn = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, "/html/body/div[2]/div[2]/div[2]/div/div/div[1]/div[2]/div[1]/button"))
+                EC.element_to_be_clickable((By.XPATH, "/html/body/div[2]/div[3]/div[2]/div/div/div[1]/div[2]/div[1]/div[1]/button"))
             )
             google_btn.click()
 
             await asyncio.sleep(5)
             await channel.send("Authenticated into Crown Coins Casino!")
         except:
-            await channel.send("Crown Coins login with google failed. Perhaps you need to run !googleauth.")
+            await channel.send("Crown Coins login with google failed. Perhaps you need to run !auth google.")
     except:
-        print("Error in authenticate_crowncoins")
+        print("[Crown Coins] Error in authenticate_crown_google")
         return
 
 # Function to authenticate into Crown Coins via .env creds.
@@ -88,11 +94,12 @@ async def auth_crown_env(driver, bot, ctx, channel):
         except:
             await channel.send("Crown Coins login button not found.")
     except:
-        print("Error in authenticate_crowncoins")
+        print("[Crown Coins] Error in authenticate_crowncoins")
         return
 
-
-# Function to get the countdown timer
+# ───────────────────────────────────────────────────────────
+# Standalone countdown timer
+# ───────────────────────────────────────────────────────────
 async def get_countdown(driver, bot, ctx, channel):
     try:
         # Enable network logging via CDP
@@ -135,33 +142,36 @@ async def get_countdown(driver, bot, ctx, channel):
                 time_until_next_bonus = str(timedelta(milliseconds=time_until_next_bonus_ms)).split(".")[0]
                 await channel.send(f"Next Crown Coins Bonus Available in: {time_until_next_bonus}")
             else:
-                print("Key 'timeUntilNextBonusMS' not found in response.")
+                print("[Crown Coins] Key 'timeUntilNextBonusMS' not found in response.")
         except Exception as e:
-            print(f"Failed to retrieve Daily-Bonus response body: {e}")
+            print(f"[Crown Coins] Failed to retrieve Daily-Bonus response body: {e}")
     except Exception as e:
         await channel.send(f"Could not retrieve Crown Coins countdown.")
 
-
-# Function to claim the daily bonus
+# ───────────────────────────────────────────────────────────
+# Standalone claim function 
+# ───────────────────────────────────────────────────────────
 async def claim_crown_bonus(driver, bot, ctx, channel):
     try:
-        day1_btn_xpath = "/html/body/div[2]/div[5]/div[2]/div/div[3]/div"
+        day1_btn_xpath = "/html/body/div[2]/div[6]/div[2]/div/div[3]/div"
         WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, day1_btn_xpath))).click()
         await asyncio.sleep(2)
         await channel.send("Crown Coins Daily Bonus Claimed!")
         return True
     except:
         try:
-            day7_btn_xpath = "/html/body/div[2]/div[5]/div[2]/div/div[3]/div[7]"
+            day7_btn_xpath = "/html/body/div[2]/div[6]/div[2]/div/div[3]/div[7]"
             WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, day7_btn_xpath))).click()
             await asyncio.sleep(2)
             await channel.send("Crown Coins Daily Bonus Claimed!")
             return True
         except:
-            print("Failed to click bonus buttons.")
+            print("[Crown Coins] Failed to click bonus buttons.")
             return False
 
-# Main function for CrownCoinsCasino bonus claiming
+# ───────────────────────────────────────────────────────────
+# Main function
+# ───────────────────────────────────────────────────────────
 async def crowncoins_casino(driver, bot, ctx, channel):
     try:
         # Navigate to the website
@@ -175,4 +185,4 @@ async def crowncoins_casino(driver, bot, ctx, channel):
         if not bonus_claimed:
             await get_countdown(driver, bot, ctx, channel)
     except Exception as e:
-        await channel.send(f"An error occurred: {e}")
+        await channel.send(f"[Crown Coins] An error occurred: {e}")

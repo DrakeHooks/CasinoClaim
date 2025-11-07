@@ -5,6 +5,8 @@
 # Final: rr_final_claim.png stage; countdown XPath updated; print-only logging (no Discord sends)
 # Add: Discord sends w/ screenshots on success or unavailable
 # New: Background popup closer for /html/body/div[2]/div/div[2]/div/div/a
+# NEW: OpenCV popup handler — detect rr_popup1.png and click rr_popup1close.png; refresh fallback
+# NEW (11/07): Do two page refreshes on the lobby BEFORE opening "Your Riches"
 
 import os
 import re
@@ -14,7 +16,6 @@ import tempfile
 import traceback
 import discord
 from dotenv import load_dotenv
-
 
 # ───────────────────────────────────────────────────────────
 # ── PyAutoGUI / OpenCV ──────────────────────────────────────
@@ -43,6 +44,7 @@ from selenium.common.exceptions import (
 )
 
 load_dotenv()
+
 # ───────────────────────────────────────────────────────────
 # Config and Constants
 # ───────────────────────────────────────────────────────────
@@ -69,10 +71,16 @@ XPATH_CLAIM_BTN = (
 
 COUNTDOWN_XPATH = "/html/body/div/div[3]/div/div[1]/div[3]/div[3]/div[1]/div/div[3]/div/div/div[2]"
 
-DAILY_BONUS_ICON   = os.environ.get("DAILY_BONUS_ICON",   "daily_bonus_icon.png")
-RR_CLAIM_TEMPLATE  = os.environ.get("RR_CLAIM_TEMPLATE",  "rr_claim_btn.png")
-RR_FINAL_TEMPLATE  = os.environ.get("RR_FINAL_TEMPLATE",  "rr_final_claim.png")
-TEMPLATE_THRESHOLD = float(os.environ.get("DAILY_BONUS_THRESHOLD", "0.85"))
+DAILY_BONUS_ICON     = os.environ.get("DAILY_BONUS_ICON",     "daily_bonus_icon.png")
+RR_CLAIM_TEMPLATE    = os.environ.get("RR_CLAIM_TEMPLATE",    "rr_claim_btn.png")
+RR_FINAL_TEMPLATE    = os.environ.get("RR_FINAL_TEMPLATE",    "rr_final_claim.png")
+TEMPLATE_THRESHOLD   = float(os.environ.get("DAILY_BONUS_THRESHOLD", "0.85"))
+
+# NEW: Popup templates + thresholds
+RR_POPUP_TEMPLATE      = os.environ.get("RR_POPUP_TEMPLATE",      "rr_popup1.png")
+RR_POPUPCLOSE_TEMPLATE = os.environ.get("RR_POPUPCLOSE_TEMPLATE", "rr_popup1close.png")
+POPUP_DETECT_THRESHOLD = float(os.environ.get("POPUP_DETECT_THRESHOLD", "0.80"))
+POPUP_CLOSE_THRESHOLD  = float(os.environ.get("POPUP_CLOSE_THRESHOLD",  "0.80"))
 
 # ───────────────────────────────────────────────────────────
 # ── Print-only helpers ─────────────────────────────────────
@@ -130,7 +138,7 @@ def _ensure_viewport(driver):
         pass
 
 # ───────────────────────────────────────────────────────────
-# Dynamic popup closer
+# Dynamic popup closer (DOM; silent background)
 # ───────────────────────────────────────────────────────────
 async def _popup_closer_task(driver, stop_event: asyncio.Event,
                              xpath: str = POPUP_CLOSE_XPATH,
@@ -141,7 +149,6 @@ async def _popup_closer_task(driver, stop_event: asyncio.Event,
     """
     while not stop_event.is_set():
         try:
-            # find_elements avoids raising if not present
             buttons = driver.find_elements(By.XPATH, xpath)
             for btn in buttons:
                 try:
@@ -153,14 +160,11 @@ async def _popup_closer_task(driver, stop_event: asyncio.Event,
                                 btn.click()
                             except Exception:
                                 pass
-                        # small settle; break to re-check next tick
                         await asyncio.sleep(0.15)
-                        # no logging spam—silent cleaner
                         break
                 except (StaleElementReferenceException, ElementClickInterceptedException, NoSuchElementException):
                     continue
         except Exception:
-            # driver likely navigating; ignore
             pass
         await asyncio.sleep(interval)
 
@@ -217,10 +221,9 @@ def _match_template_multiscale(screen_bgr: np.ndarray, templ_bgr: np.ndarray,
             continue
         res = cv2.matchTemplate(screen_gray, tmpl, method)
         _, max_val, _, max_loc = cv2.minMaxLoc(res)
-        score, loc = (max_val, max_loc)
-        if score > best_score:
-            best_score = score
-            best_rect = (loc[0], loc[1], w, h)
+        if max_val > best_score:
+            best_score = max_val
+            best_rect = (max_loc[0], max_loc[1], w, h)
             best_scale = s
     return best_score, best_rect, best_scale
 
@@ -260,12 +263,13 @@ def click_daily_bonus_by_template(template_path: str,
 
     return False, score, dbg_path
 
-def _click_template_with_retries(template_path: str, tries: int = 3, delay: float = 0.8):
+def _click_template_with_retries(template_path: str, tries: int = 3, delay: float = 0.8, threshold: float | None = None):
     """Retry a template click a few times (UI can animate)."""
     last_dbg = ""
     last_conf = -1.0
-    for i in range(max(1, tries)):
-        ok, conf, dbg = click_daily_bonus_by_template(template_path, threshold=TEMPLATE_THRESHOLD)
+    thr = TEMPLATE_THRESHOLD if threshold is None else threshold
+    for _ in range(max(1, tries)):
+        ok, conf, dbg = click_daily_bonus_by_template(template_path, threshold=thr)
         if dbg:
             last_dbg = dbg
         last_conf = conf
@@ -273,6 +277,52 @@ def _click_template_with_retries(template_path: str, tries: int = 3, delay: floa
             return True, last_conf, last_dbg
         time.sleep(delay)
     return False, last_conf, last_dbg
+
+# ───────────────────────────────────────────────────────────
+# NEW — OpenCV popup detect & close with refresh fallback
+# ───────────────────────────────────────────────────────────
+async def _close_rr_popup_via_cv(driver,
+                                 popup_tmpl: str = RR_POPUP_TEMPLATE,
+                                 close_tmpl: str = RR_POPUPCLOSE_TEMPLATE,
+                                 detect_thr: float = POPUP_DETECT_THRESHOLD,
+                                 close_thr: float = POPUP_CLOSE_THRESHOLD,
+                                 tries: int = 3) -> bool:
+    """
+    Detects the 'Your riches' popup by matching rr_popup1.png and then
+    clicks the close control via rr_popup1close.png. If it cannot close
+    after `tries`, returns False so caller can refresh() as fallback.
+
+    Returns True if we believe the popup was closed; False otherwise.
+    """
+    if not os.path.exists(popup_tmpl) or not os.path.exists(close_tmpl):
+        # If assets are missing, don't block the flow.
+        await _log("ℹ️ RR popup templates missing; skipping CV close.")
+        return False
+
+    # First confirm popup exists.
+    scr = _screenshot_bgr()
+    pop_bgr = cv2.imread(popup_tmpl, cv2.IMREAD_COLOR)
+    if pop_bgr is None:
+        return False
+    pop_score, pop_rect, pop_scale = _match_template_multiscale(scr, pop_bgr)
+    if not pop_rect or pop_score < detect_thr:
+        # No popup – totally fine.
+        await _log(f"ℹ️ CV popup not detected (score={pop_score:.3f}).")
+        return False
+
+    # Try to click the close control a few times.
+    for i in range(tries):
+        ok, conf, dbg = _click_template_with_retries(close_tmpl, tries=1, delay=0.3, threshold=close_thr)
+        if dbg:
+            await _log(f"🧪 RR popup close match (try {i+1}/{tries}) conf={conf:.3f}, debug={dbg}")
+        if ok:
+            await asyncio.sleep(0.5)
+            await _log("✅ RR popup closed via OpenCV.")
+            return True
+        time.sleep(0.3)
+
+    await _log("⚠️ RR popup CV close failed after retries.")
+    return False
 
 # ───────────────────────────────────────────────────────────
 # ── Countdown helpers ──────────────────────────────────────
@@ -383,12 +433,20 @@ async def rolling_riches_casino(ctx, driver, channel):
         if not ok:
             return
 
-        # Normalize to /lobby and clear overlays
+        # Normalize to /lobby
         if not driver.current_url.startswith(LOBBY_URL):
             driver.get(LOBBY_URL)
             await asyncio.sleep(2)
-        await _close_popup(driver)
-        await _driver_shot(driver, "📸 Post-auth / Lobby")
+
+        # ─────────────────────────────────────────────
+        # NEW: Two page refreshes BEFORE opening Your Riches
+        # ─────────────────────────────────────────────
+        for n in range(1, 3):
+            await _log(f"🔁 Pre-Riches refresh {n}/2…")
+            driver.refresh()
+            await asyncio.sleep(2.8)
+            await _close_popup(driver)
+        await _driver_shot(driver, "📸 After 2× pre-Riches refresh")
 
         # Open Your Riches
         await _log("💰 Opening Your Riches panel…")
@@ -396,6 +454,28 @@ async def rolling_riches_casino(ctx, driver, channel):
         driver.execute_script("arguments[0].click();", riches_btn)
         await asyncio.sleep(2.5)
         await _driver_shot(driver, "📸 Your Riches panel")
+
+        # NEW: Try OpenCV popup close specifically for the 'Your riches' popup
+        # If it can't close via CV, refresh as fallback.
+        try_cv_close = await _close_rr_popup_via_cv(driver)
+        if not try_cv_close:
+            # either no popup detected or CV close failed — try DOM one-shot
+            await _close_popup(driver)
+
+        if not try_cv_close:
+            # If we *detected* a popup but couldn't close it (CV returns False when detected but failed),
+            # the DOM one-shot above may still fail. As the final fallback, refresh the page once.
+            # To avoid unnecessary refresh, do a quick CV detect again to confirm popup presence.
+            scr = _screenshot_bgr()
+            if os.path.exists(RR_POPUP_TEMPLATE):
+                pop_bgr = cv2.imread(RR_POPUP_TEMPLATE, cv2.IMREAD_COLOR)
+                if pop_bgr is not None:
+                    score, rect, _ = _match_template_multiscale(scr, pop_bgr)
+                    if rect and score >= POPUP_DETECT_THRESHOLD:
+                        await _log("🔁 Refreshing page as popup-close fallback…")
+                        driver.refresh()
+                        await asyncio.sleep(3.5)
+                        await _close_popup(driver)
 
         # ── Open Daily Bonus (DOM-first; fallback to template) ──
         await _log("🎯 Opening Daily Bonus (DOM-first)…")
@@ -451,16 +531,13 @@ async def rolling_riches_casino(ctx, driver, channel):
 
         # ── Outcome (now with Discord sends + screenshots) ──
         if claimed:
-            # Success screenshot + message
             shot = await _driver_shot(driver, "✅ Claimed — final state")
             await _send_one_shot(channel, "Rolling Riches Daily Bonus Claimed!", shot)
 
-            # Optional follow-up text-only countdown
             cd = _read_rr_countdown(driver)
             if cd:
-                await _log(f"🕒 Next bonus in: {cd}")  # keep as print-only to avoid spam
+                await _log(f"🕒 Next bonus in: {cd}")
         else:
-            # Unavailable screenshot + message (with countdown if found)
             cd = _read_rr_countdown(driver)
             shot = await _driver_shot(driver, "ℹ️ Bonus unavailable — current state")
             if cd:
@@ -472,7 +549,6 @@ async def rolling_riches_casino(ctx, driver, channel):
         tb = "".join(traceback.format_exception_only(type(e), e)).strip()
         await _log(f"💥 Error: {tb}")
         shot = await _driver_shot(driver, "💥 Failure point")
-        # Send failure screenshot to help debugging (optional; keep or remove)
         await _send_one_shot(channel, f"Rolling Riches: Error — {tb}", shot)
 
     finally:
