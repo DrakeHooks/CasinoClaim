@@ -35,7 +35,7 @@ async def auth_crown_google(driver, bot, ctx, channel):
 
         try:
             login_btn = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, "/html/body/div[2]/div[2]/div[1]/div[1]/div[2]/button[2]"))
+                EC.element_to_be_clickable((By.XPATH, "/html/body/div[2]/div[2]/div[1]/div[1]/div[2]/button"))
             )
             login_btn.click()
 
@@ -110,7 +110,7 @@ async def get_countdown(driver, bot, ctx, channel):
     try:
         # Enable network logging via CDP
         driver.execute_cdp_cmd("Network.enable", {})
-        await asyncio.sleep(30)  # Allow time for requests to be captured
+        await asyncio.sleep(25)  # Allow time for requests to be captured
 
         # Fetch network logs
         logs = driver.get_log("performance")
