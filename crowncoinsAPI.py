@@ -9,6 +9,7 @@ import os
 import asyncio
 import requests
 import json
+import discord
 from datetime import timedelta
 from dotenv import load_dotenv
 from selenium.webdriver.common.by import By
@@ -43,8 +44,13 @@ async def auth_crown_google(driver, bot, ctx, channel):
             )
             google_btn.click()
 
-            await asyncio.sleep(5)
+            await asyncio.sleep(10)
             await channel.send("Authenticated into Crown Coins Casino!")
+            screenshot = "cc_google_auth_success.png"
+            driver.save_screenshot(screenshot)
+            await channel.send(
+            file=discord.File(screenshot))         
+            os.remove(screenshot)
         except:
             await channel.send("Crown Coins login with google failed. Perhaps you need to run !auth google.")
     except:
@@ -104,7 +110,7 @@ async def get_countdown(driver, bot, ctx, channel):
     try:
         # Enable network logging via CDP
         driver.execute_cdp_cmd("Network.enable", {})
-        await asyncio.sleep(20)  # Allow time for requests to be captured
+        await asyncio.sleep(30)  # Allow time for requests to be captured
 
         # Fetch network logs
         logs = driver.get_log("performance")
