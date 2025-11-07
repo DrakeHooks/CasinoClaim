@@ -35,7 +35,7 @@ async def auth_crown_google(driver, bot, ctx, channel):
 
         try:
             login_btn = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, "/html/body/div[2]/div[2]/div[1]/div[1]/div[2]/button"))
+                EC.element_to_be_clickable((By.XPATH, "/html/body/div[2]/div[2]/div[1]/div[1]/div[2]/button[2]"))
             )
             login_btn.click()
 
