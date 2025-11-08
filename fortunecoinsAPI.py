@@ -75,6 +75,7 @@ async def fortunecoins_uc(ctx, channel: discord.abc.Messageable):
             sb.uc_open_with_reconnect("https://fortunecoins.com/login", 4)
             sb.wait_for_ready_state_complete()
             sb.type("input[id='emailAddress']", FC_EMAIL)
+            sb.wait(2)
             sb.type("input[id='password']", FC_PASSWORD)
             try:
                 sb.uc_gui_click_captcha()

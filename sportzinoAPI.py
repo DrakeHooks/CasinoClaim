@@ -130,7 +130,7 @@ async def Sportzino(ctx, driver, channel: discord.abc.Messageable):
                         continue
                 if not typed:
                     raise Exception("Email field not found")
-
+                sb.wait(10)
                 typed = False
                 for sel in [
                     "input#password", "input[id='password']",
