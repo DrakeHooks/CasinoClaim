@@ -3,7 +3,12 @@
 # Fortune Coins API (SeleniumBase UC)
 # Exposes: async def fortunecoins_uc(ctx, channel)
 
+#NEW hot fix for uc captcha solve blocking loop
+
+
 import os
+import asyncio
+import functools
 from dotenv import load_dotenv
 from seleniumbase import SB
 import discord
@@ -57,6 +62,25 @@ def _try_click_any(sb: SB, xpaths, timeout_each=10) -> bool:
             return True
     return False
 
+async def _nonblocking_uc_gui_click_captcha(sb: SB, timeout: float = 7.0) -> bool:
+    """
+    Calls SeleniumBase's sb.uc_gui_click_captcha() in a worker thread with a hard timeout.
+    Prevents pyautogui/X11 from blocking the asyncio event loop and Discord heartbeats.
+    Returns True if the call completed (no guarantee the captcha solved), False on timeout/error.
+    """
+    loop = asyncio.get_running_loop()
+    func = functools.partial(sb.uc_gui_click_captcha)
+    try:
+        # If uc_gui_click_captcha returns quickly, great. If it wedges on X11, we cancel at 'timeout'.
+        await asyncio.wait_for(loop.run_in_executor(None, func), timeout=timeout)
+        return True
+    except asyncio.TimeoutError:
+        # Timed out – abandon the GUI click to keep the loop healthy.
+        return False
+    except Exception:
+        # Any other error – just continue the flow without crashing.
+        return False
+
 async def fortunecoins_uc(ctx, channel: discord.abc.Messageable):
     """
     Fortune Coins via SeleniumBase (uc=True).
@@ -70,20 +94,21 @@ async def fortunecoins_uc(ctx, channel: discord.abc.Messageable):
         return
 
     try:
+        # headed=True to allow uc_gui_click_captcha() to operate a visible display
         with SB(uc=True, headed=True) as sb:
             # Login
             sb.uc_open_with_reconnect("https://fortunecoins.com/login", 4)
             sb.wait_for_ready_state_complete()
             sb.type("input[id='emailAddress']", FC_EMAIL)
-            sb.wait(2)
+            await asyncio.sleep(2)  # don't block the loop
             sb.type("input[id='password']", FC_PASSWORD)
-            try:
-                sb.uc_gui_click_captcha()
-                sb.wait(10)
-            except Exception:
-                pass
+
+            # >>> Non-blocking wrapper around the GUI mouse-based captcha click <<<
+            await _nonblocking_uc_gui_click_captcha(sb, timeout=7.0)
+            await asyncio.sleep(1.5)
+
             _force_click_xpath(sb, "/html/body/div[1]/div[5]/div/div/div/div[2]/form/div[4]/button", timeout=12)
-            sb.wait(6)
+            await asyncio.sleep(6)
             sb.refresh_page()
             sb.wait_for_ready_state_complete()
 
@@ -113,7 +138,7 @@ async def fortunecoins_uc(ctx, channel: discord.abc.Messageable):
                 timeout_each=10,
             )
             sb.wait_for_ready_state_complete()
-            sb.wait(5)
+            await asyncio.sleep(5)
 
             # Click Collect
             collected = _try_click_any(
@@ -129,7 +154,7 @@ async def fortunecoins_uc(ctx, channel: discord.abc.Messageable):
 
             if not collected:
                 # quick retry (modal often re-renders)
-                sb.wait(5)
+                await asyncio.sleep(5)
                 collected = _try_click_any(
                     sb,
                     [
@@ -140,10 +165,11 @@ async def fortunecoins_uc(ctx, channel: discord.abc.Messageable):
                 )
 
             if collected:
-                sb.wait(3)
+                await asyncio.sleep(3)
                 await _send_post_claim(sb, channel, "fc_uc_claimed.png", "Fortune Coins Daily Bonus Claimed!")
             else:
-                print("Fortune Coins: no claim available (likely already collected).")
+                await channel.send("Fortune Coins: bonus unavailable (likely already collected).")
 
-    except Exception as e:
+    except Exception:
+        # keep error minimal to avoid leaking internals
         await channel.send(f"⚠️ Fortune Coins (UC) error")
