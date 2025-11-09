@@ -49,7 +49,7 @@ api_modules = [
     "spinpalsAPI",
     "spinquestAPI",
     "funrizeAPI",
-    "realprize",
+    "realprizeAPI",
     "globalpokerAPI",
     "dingdingdingAPI",
     "chumbaAPI",
