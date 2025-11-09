@@ -284,7 +284,7 @@ casino_loop_entries: List[CasinoLoopEntry] = [
     # CasinoLoopEntry("stake",         "Stake",             _run_stake,           120),
 
     # 24h cadence group (no countdown/problematic)
-    CasinoLoopEntry("realprize",     "RealPrize",         _run_realprize,       1440),
+    # CasinoLoopEntry("realprize",     "RealPrize",         _run_realprize,       1440),
     CasinoLoopEntry("funrize",       "Funrize",           _run_funrize,         1440),
     CasinoLoopEntry("rollingriches", "Rolling Riches",    _run_rollingriches,   1440),
     CasinoLoopEntry("americanluck",  "American Luck",      _run_americanluck,   1440),
@@ -293,7 +293,7 @@ casino_loop_entries: List[CasinoLoopEntry] = [
     CasinoLoopEntry("sportzino",     "Sportzino",         _run_sportzino,       1440),
     CasinoLoopEntry("yaycasino",     "YayCasino",         _run_yaycasino,       1440),
     CasinoLoopEntry("smilescasino",  "Smiles Casino",     _run_smilescasino,    1440),
-    CasinoLoopEntry("luckyland",     "LuckyLand",         _run_luckyland,       1440),
+    # CasinoLoopEntry("luckyland",     "LuckyLand",         _run_luckyland,       1440),
 
 ]
 
