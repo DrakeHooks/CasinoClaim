@@ -4,7 +4,6 @@
 # Exposes: async def luckyland_uc(ctx, channel)
 
 import os
-import io
 import time
 import tempfile
 from typing import Optional, Tuple, List
@@ -29,16 +28,20 @@ LOGIN_URL = "https://luckylandslots.com/"
 LUCKYLAND_CRED = os.getenv("LUCKYLAND", "")  # "email:password"
 
 # Image filenames (we'll search ./images and CWD)
-LOGIN_BTN_IMG = "luckylandloginbtn.png"
+COOKIES_IMG         = "luckyland_cookies.png"     # NEW: accept cookies
+PRELOGIN_BTN_IMG    = "luckyland_loginbtn0.png"   # NEW: pre-login button
+LOGIN_BTN_IMG       = "luckylandloginbtn.png"     # existing login button
 COLLECT_IMG_CANDIDATES = ["luckyland_collect.png", "luckylandcollect.png"]
 
 # Template match thresholds
-LOGIN_THRESH = 0.80
-COLLECT_THRESH = 0.82
+COOKIES_THRESH  = 0.80
+LOGIN_THRESH    = 0.80
+PRELOGIN_THRESH = 0.80
+COLLECT_THRESH  = 0.82
 
 # Max attempts / timing
-FIND_RETRIES = 10
-FIND_DELAY = 0.9   # seconds between attempts
+FIND_RETRIES     = 10
+FIND_DELAY       = 0.9   # seconds between attempts
 POST_CLICK_PAUSE = 1.2
 AFTER_LOGIN_WAIT = 3.0
 
@@ -130,8 +133,12 @@ async def luckyland_uc(ctx, channel: discord.abc.Messageable):
         return
 
     email, password = LUCKYLAND_CRED.split(":", 1)
-    login_tmpl = _load_template(LOGIN_BTN_IMG)
-    collect_tmpl = None
+
+    # Load templates (cookies + prelogin optional; login + collect required)
+    cookies_tmpl   = _load_template(COOKIES_IMG)          # optional
+    prelogin_tmpl  = _load_template(PRELOGIN_BTN_IMG)     # optional
+    login_tmpl     = _load_template(LOGIN_BTN_IMG)
+    collect_tmpl   = None
     for nm in COLLECT_IMG_CANDIDATES:
         collect_tmpl = _load_template(nm)
         if collect_tmpl is not None:
@@ -145,7 +152,7 @@ async def luckyland_uc(ctx, channel: discord.abc.Messageable):
         return
 
     try:
-        # IMPORTANT: Use SB as a context manager
+        # Use SeleniumBase as a context manager
         with SB(uc=True) as sb:
             # 1920×1080 like the rest
             sb.set_window_size(1920, 1080)
@@ -155,7 +162,19 @@ async def luckyland_uc(ctx, channel: discord.abc.Messageable):
             sb.wait_for_ready_state_complete()
             sb.scroll_to_top()
 
-            # 1) Click Login (OpenCV)
+            # 0) Always try to accept cookies if present (non-fatal if missing)
+            if cookies_tmpl is not None:
+                _try_match_and_click(sb, cookies_tmpl, COOKIES_THRESH, attempts=5, between=0.6)
+                # small pause so any banner collapse animation finishes
+                time.sleep(0.5)
+
+            # 0.5) Try the NEW pre-login button first (non-fatal if missing)
+            # If present, click it to reveal the main login button/modal.
+            if prelogin_tmpl is not None:
+                _try_match_and_click(sb, prelogin_tmpl, PRELOGIN_THRESH, attempts=6, between=0.6)
+                time.sleep(0.6)
+
+            # 1) Click the main Login (required)
             if not _try_match_and_click(sb, login_tmpl, LOGIN_THRESH, attempts=FIND_RETRIES, between=FIND_DELAY):
                 png = _grab_viewport_png(sb)
                 await _send_screenshot(channel, "[LuckyLand][ERROR] Could not find login button.", png)
