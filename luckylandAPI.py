@@ -39,8 +39,8 @@ COLLECT_IMG_CANDIDATES = ["luckyland_collect.png", "luckylandcollect.png"]
 # Template match thresholds
 COOKIES_THRESH  = 0.80
 PRELOGIN_THRESH = 0.80
-LOGIN_THRESH    = 0.80
-COLLECT_THRESH  = 0.82
+LOGIN_THRESH    = 0.60
+COLLECT_THRESH  = 0.60
 
 # Max attempts / timing
 FIND_RETRIES       = 12
