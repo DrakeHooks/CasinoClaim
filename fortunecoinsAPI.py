@@ -119,8 +119,10 @@ async def fortunecoins_uc(ctx, channel: discord.abc.Messageable):
             collected = _try_click_any(
                 sb,
                 [
+                    "/html/body/div[5]/div/div[1]/div/div/div[2]/div/div[1]/div[2]/div[1]/div/div[3]/button[1]",
                     "/html/body/div[4]/div/div[1]/div/div/div[2]/div/div[2]/div[2]/div[1]/div/div[3]/button[1]",
                     "/html/body/div[4]/div/div[1]/div/div/div[2]/div/div[1]/div[2]/div[1]/div/div[3]/button[1]",
+                    "/html/body/div[6]/div/div[1]/div/div/div[2]/div/div[1]/div[2]/div[1]/div/div[3]/button[1]"
                 ],
                 timeout_each=8,
             )
