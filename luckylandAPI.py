@@ -6,7 +6,7 @@
 import os
 import time
 import tempfile
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Iterable
 
 import discord
 from dotenv import load_dotenv
@@ -27,23 +27,30 @@ load_dotenv()
 LOGIN_URL = "https://luckylandslots.com/"
 LUCKYLAND_CRED = os.getenv("LUCKYLAND", "")  # "email:password"
 
+# Optional devicePixelRatio correction if clicks land off (usually 1.0 at 1920x1080)
+DPR = float(os.getenv("LUCKYLAND_DPR", "1.0"))
+
 # Image filenames (we'll search ./images and CWD)
-COOKIES_IMG         = "luckyland_cookies.png"     # NEW: accept cookies
-PRELOGIN_BTN_IMG    = "luckyland_loginbtn0.png"   # NEW: pre-login button
-LOGIN_BTN_IMG       = "luckylandloginbtn.png"     # existing login button
+COOKIES_IMG          = "luckyland_cookies.png"     # accept cookies banner
+PRELOGIN_BTN_IMG     = "luckyland_loginbtn0.png"   # pre-login opener
+LOGIN_BTN_IMG        = "luckylandloginbtn.png"     # the actual "Login" button/modal trigger
 COLLECT_IMG_CANDIDATES = ["luckyland_collect.png", "luckylandcollect.png"]
 
 # Template match thresholds
 COOKIES_THRESH  = 0.80
-LOGIN_THRESH    = 0.80
 PRELOGIN_THRESH = 0.80
+LOGIN_THRESH    = 0.80
 COLLECT_THRESH  = 0.82
 
 # Max attempts / timing
-FIND_RETRIES     = 10
-FIND_DELAY       = 0.9   # seconds between attempts
-POST_CLICK_PAUSE = 1.2
-AFTER_LOGIN_WAIT = 3.0
+FIND_RETRIES       = 12
+FIND_DELAY         = 0.7   # seconds between attempts
+POST_CLICK_PAUSE   = 1.0
+AFTER_LOGIN_WAIT   = 3.0
+POST_MODAL_WAIT    = 1.0
+
+# Multiscale matching scales (to tolerate small draw differences)
+SCALES: Iterable[float] = (1.00, 0.95, 1.05, 0.90, 1.10, 0.85, 1.15)
 
 # ───────────────────────────────────────────────────────────
 # Utilities
@@ -65,20 +72,6 @@ def _load_template(filename: str) -> Optional[np.ndarray]:
                 return img
     return None
 
-def _cv_match_center(bgr_image: np.ndarray, bgr_template: np.ndarray, threshold: float) -> Optional[Tuple[int, int]]:
-    if bgr_image is None or bgr_template is None:
-        return None
-    ih, iw = bgr_image.shape[:2]
-    th, tw = bgr_template.shape[:2]
-    if ih < th or iw < tw:
-        return None
-    res = cv2.matchTemplate(bgr_image, bgr_template, cv2.TM_CCOEFF_NORMED)
-    _, maxVal, _, maxLoc = cv2.minMaxLoc(res)
-    if maxVal >= threshold:
-        x, y = maxLoc
-        return (int(x + tw // 2), int(y + th // 2))
-    return None
-
 def _grab_viewport_png(sb: SB) -> bytes:
     return sb.driver.get_screenshot_as_png()
 
@@ -86,11 +79,42 @@ def _png_to_bgr(png_bytes: bytes) -> np.ndarray:
     data = np.frombuffer(png_bytes, dtype=np.uint8)
     return cv2.imdecode(data, cv2.IMREAD_COLOR)
 
+def _match_center_multiscale(bgr_image: np.ndarray, bgr_template: np.ndarray, threshold: float) -> Optional[Tuple[int,int]]:
+    if bgr_image is None or bgr_template is None:
+        return None
+    ih, iw = bgr_image.shape[:2]
+    th0, tw0 = bgr_template.shape[:2]
+    best = None
+    best_val = -1.0
+
+    for s in SCALES:
+        th = int(th0 * s)
+        tw = int(tw0 * s)
+        if th < 6 or tw < 6:
+            continue
+        tmpl = cv2.resize(bgr_template, (tw, th), interpolation=cv2.INTER_AREA if s < 1.0 else cv2.INTER_CUBIC)
+        if ih < th or iw < tw:
+            continue
+        res = cv2.matchTemplate(bgr_image, tmpl, cv2.TM_CCOEFF_NORMED)
+        minVal, maxVal, minLoc, maxLoc = cv2.minMaxLoc(res)
+        if maxVal > best_val:
+            best_val = maxVal
+            if maxVal >= threshold:
+                x, y = maxLoc
+                cx = x + tw // 2
+                cy = y + th // 2
+                best = (int(cx), int(cy))
+                # we still finish loop to see if an even better match exists
+    return best
+
 def _viewport_click(sb: SB, x: int, y: int, delay_after: float = POST_CLICK_PAUSE) -> None:
+    # Correct for DPR if specified
+    X = x * DPR
+    Y = y * DPR
     sb.driver.execute_cdp_cmd("Input.dispatchMouseEvent",
-                              {"type": "mousePressed", "x": x, "y": y, "button": "left", "clickCount": 1})
+                              {"type": "mousePressed", "x": X, "y": Y, "button": "left", "clickCount": 1})
     sb.driver.execute_cdp_cmd("Input.dispatchMouseEvent",
-                              {"type": "mouseReleased", "x": x, "y": y, "button": "left", "clickCount": 1})
+                              {"type": "mouseReleased", "x": X, "y": Y, "button": "left", "clickCount": 1})
     time.sleep(delay_after)
 
 def _cdp_insert_text(sb: SB, text: str) -> None:
@@ -100,11 +124,13 @@ def _cdp_key(sb: SB, key: str) -> None:
     sb.driver.execute_cdp_cmd("Input.dispatchKeyEvent", {"type": "keyDown", "key": key})
     sb.driver.execute_cdp_cmd("Input.dispatchKeyEvent", {"type": "keyUp", "key": key})
 
-def _try_match_and_click(sb: SB, template: np.ndarray, threshold: float, attempts: int, between: float) -> bool:
+def _try_find_and_click(sb: SB, tmpl: Optional[np.ndarray], threshold: float, attempts: int, between: float, label: str) -> bool:
+    """Repeatedly screenshot, match (multiscale), and click the center if found."""
+    if tmpl is None:
+        return False
     for _ in range(attempts):
-        png = _grab_viewport_png(sb)
-        bgr = _png_to_bgr(png)
-        center = _cv_match_center(bgr, template, threshold)
+        bgr = _png_to_bgr(_grab_viewport_png(sb))
+        center = _match_center_multiscale(bgr, tmpl, threshold)
         if center:
             _viewport_click(sb, center[0], center[1])
             return True
@@ -134,10 +160,10 @@ async def luckyland_uc(ctx, channel: discord.abc.Messageable):
 
     email, password = LUCKYLAND_CRED.split(":", 1)
 
-    # Load templates (cookies + prelogin optional; login + collect required)
+    # Load templates
     cookies_tmpl   = _load_template(COOKIES_IMG)          # optional
     prelogin_tmpl  = _load_template(PRELOGIN_BTN_IMG)     # optional
-    login_tmpl     = _load_template(LOGIN_BTN_IMG)
+    login_tmpl     = _load_template(LOGIN_BTN_IMG)        # required (or we bail)
     collect_tmpl   = None
     for nm in COLLECT_IMG_CANDIDATES:
         collect_tmpl = _load_template(nm)
@@ -152,44 +178,64 @@ async def luckyland_uc(ctx, channel: discord.abc.Messageable):
         return
 
     try:
-        # Use SeleniumBase as a context manager
         with SB(uc=True) as sb:
-            # 1920×1080 like the rest
             sb.set_window_size(1920, 1080)
-
-            # Open in UC mode
             sb.uc_open(LOGIN_URL)
             sb.wait_for_ready_state_complete()
             sb.scroll_to_top()
 
-            # 0) Always try to accept cookies if present (non-fatal if missing)
+            # --- Step A: Accept cookies if present (always attempt; harmless if not there)
             if cookies_tmpl is not None:
-                _try_match_and_click(sb, cookies_tmpl, COOKIES_THRESH, attempts=5, between=0.6)
-                # small pause so any banner collapse animation finishes
-                time.sleep(0.5)
+                _try_find_and_click(sb, cookies_tmpl, COOKIES_THRESH, attempts=6, between=0.5, label="cookies")
+                time.sleep(0.4)
 
-            # 0.5) Try the NEW pre-login button first (non-fatal if missing)
-            # If present, click it to reveal the main login button/modal.
-            if prelogin_tmpl is not None:
-                _try_match_and_click(sb, prelogin_tmpl, PRELOGIN_THRESH, attempts=6, between=0.6)
-                time.sleep(0.6)
+            # We'll do one refresh fallback later if we get stuck.
+            refreshed_once = False
 
-            # 1) Click the main Login (required)
-            if not _try_match_and_click(sb, login_tmpl, LOGIN_THRESH, attempts=FIND_RETRIES, between=FIND_DELAY):
+            # --- Step B: Open login chain
+            # Preferred path: prelogin → login
+            # 1) Try prelogin if available; if not, we still try the main login directly.
+            pre_clicked = _try_find_and_click(sb, prelogin_tmpl, PRELOGIN_THRESH, attempts=6, between=0.6, label="prelogin")
+
+            if pre_clicked:
+                time.sleep(POST_MODAL_WAIT)
+                sb.wait_for_ready_state_complete(timeout=10)
+
+            # 2) Now hunt the main login
+            main_login_ok = _try_find_and_click(sb, login_tmpl, LOGIN_THRESH, attempts=FIND_RETRIES, between=FIND_DELAY, label="login")
+
+            if not main_login_ok:
+                # If we didn’t find the main login:
+                # - Try one quick refresh and repeat cookie → prelogin → login sequence once.
+                if not refreshed_once:
+                    sb.refresh_page()
+                    refreshed_once = True
+                    sb.wait_for_ready_state_complete()
+                    time.sleep(0.8)
+                    sb.scroll_to_top()
+                    # cookies again (non-fatal)
+                    if cookies_tmpl is not None:
+                        _try_find_and_click(sb, cookies_tmpl, COOKIES_THRESH, attempts=4, between=0.5, label="cookies2")
+                    # prelogin again (non-fatal)
+                    _try_find_and_click(sb, prelogin_tmpl, PRELOGIN_THRESH, attempts=5, between=0.6, label="prelogin2")
+                    # main login again (required)
+                    main_login_ok = _try_find_and_click(sb, login_tmpl, LOGIN_THRESH, attempts=FIND_RETRIES, between=FIND_DELAY, label="login2")
+
+            if not main_login_ok:
                 png = _grab_viewport_png(sb)
-                await _send_screenshot(channel, "[LuckyLand][ERROR] Could not find login button.", png)
+                await _send_screenshot(channel, "[LuckyLand][ERROR] Could not find/click the login button.", png)
                 return
 
-            time.sleep(1.0)  # let modal animate / focus first field
+            time.sleep(POST_MODAL_WAIT)  # modal animate / focus field
 
-            # 2) Type email → TAB → password → ENTER
+            # --- Step C: Type credentials (email → TAB → password → ENTER)
             try:
                 _cdp_insert_text(sb, email)
                 _cdp_key(sb, "Tab")
                 _cdp_insert_text(sb, password)
                 _cdp_key(sb, "Enter")
             except Exception:
-                # Fallback: active element keys
+                # Fallback to active element
                 try:
                     ae = sb.driver.switch_to.active_element
                     ae.send_keys(email)
@@ -202,14 +248,14 @@ async def luckyland_uc(ctx, channel: discord.abc.Messageable):
                     await _send_screenshot(channel, "[LuckyLand][ERROR] Unable to type credentials.", png)
                     return
 
-            # 3) Wait for lobby / draw
+            # --- Step D: Wait for lobby / draw
             time.sleep(AFTER_LOGIN_WAIT)
             sb.wait_for_ready_state_complete(timeout=12)
 
-            # 4) Find & click Collect
-            collected = _try_match_and_click(sb, collect_tmpl, COLLECT_THRESH, attempts=FIND_RETRIES, between=FIND_DELAY)
+            # --- Step E: Find & click Collect
+            collected = _try_find_and_click(sb, collect_tmpl, COLLECT_THRESH, attempts=FIND_RETRIES, between=FIND_DELAY, label="collect")
 
-            # 5) Final screenshot either way
+            # --- Final screenshot either way
             final_png = _grab_viewport_png(sb)
             if collected:
                 await _send_screenshot(channel, "LuckyLand: Daily bonus collected! 🎉", final_png)
@@ -217,5 +263,7 @@ async def luckyland_uc(ctx, channel: discord.abc.Messageable):
                 await _send_screenshot(channel, "LuckyLand: Could not detect the Collect button. ❌", final_png)
 
     except Exception as e:
-        # If something exploded outside the context, just report the error
-        await channel.send(f"[LuckyLand][ERROR] Exception: {e}")
+        try:
+            await channel.send(f"[LuckyLand][ERROR] Exception: {e}")
+        except Exception:
+            pass
