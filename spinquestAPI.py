@@ -44,7 +44,7 @@ LOGIN_INPUT = (
 
 # The “Daily Bonus” card you click first
 CLAIM_BUTTON = (
-    "/html/body/div[1]/div[1]/div[2]/div/main/div/div[1]/div/div/div[1]/div[2]/div[3]/button"
+    "/html/body/div[1]/div[1]/div[2]/div/main/div/div[1]/div/div/div[1]/div[2]/div[4]/button"
 )
 
 # XPath for the disabled countdown button

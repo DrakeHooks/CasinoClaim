@@ -27,6 +27,8 @@ LOGIN_SUBMIT    = "/html/body/div[1]/div/div/div[2]/form/div/button"
 
 CLAIM_CARD_CLASS = "promo-daily-login-button"    # "Claim now" card on /promotions
 COLLECT_XPATHS   = [
+    "/html/body/div[4]/div/div[2]/div[3]/button",
+    "/html/body/div[3]/div/div[2]/div[3]/button",
     "/html/body/div[5]/div/div[2]/div[3]/button",
     "/html/body/div[8]/div/div[2]/div[3]/button",
     "/html/body/div[9]/div/div[2]/div[3]/button",

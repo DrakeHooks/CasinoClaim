@@ -1,12 +1,8 @@
 # Drake Hooks + WaterTrooper
 # Casino Claim 2
-# Rolling Riches — 6-try auth + post-submit screenshot + DOM→OpenCV fallback
+# Rolling Riches API
 # Update: never stop early; attempt claim even if confirm miss; robust countdown probe
-# Final: rr_final_claim.png stage; countdown XPath updated; print-only logging (no Discord sends)
-# Add: Discord sends w/ screenshots on success or unavailable
-# New: Background popup closer for /html/body/div[2]/div/div[2]/div/div/a
-# NEW: OpenCV popup handler — detect rr_popup1.png and click rr_popup1close.png; refresh fallback
-# NEW (11/07): Do two page refreshes on the lobby BEFORE opening "Your Riches"
+# NEW (11/08): Hardened Daily Bonus opener that *always* drills into the claim panel
 
 import os
 import re
@@ -54,16 +50,23 @@ LOBBY_URL = "https://rollingriches.com/"
 HEADER_RICHES_BTN = "/html/body/app-root/app-main-header/div/div/div/div/header/div[1]/nav/div[2]/div/div[2]/nav/div/div[2]/button"
 POPUP_CLOSE_XPATH = "/html/body/div[2]/div/div[2]/div/div/a"
 
-XPATH_DAILY_BONUS_MENU = (
-    "//div[contains(@class,'menu-item-content')]"
-    "[.//div[contains(@class,'menu-title') and normalize-space()='Daily Bonus']]"
-)
+# Several candidate hooks to open the Daily Bonus panel
+XPATH_DAILY_BONUS_CANDIDATES = [
+    # Sidebar item with icon + label
+    "//div[contains(@class,'menu-item-content')][.//div[contains(@class,'menu-title') and normalize-space()='Daily Bonus']]",
+    # Any clickable element whose text contains Daily Bonus
+    "//*[self::button or self::a or self::div][contains(translate(normalize-space(.),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'daily bonus')]",
+    # Sometimes entries are rendered as <li> items
+    "//li[.//*[contains(translate(normalize-space(.),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'daily bonus')]]",
+]
 
+# When the Daily Bonus panel is open, one of these should be present
 XPATH_PANEL_READY = (
     "//div[contains(.,'Available in') or "
     ".//button[contains(translate(.,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'claim')]]"
 )
 
+# Primary claim button (DOM first)
 XPATH_CLAIM_BTN = (
     "//button[(contains(@class,'btn') and contains(@class,'red')) or "
     "contains(translate(.,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'claim')]"
@@ -412,6 +415,103 @@ async def _login_six_tries(driver, username: str, password: str) -> bool:
     return
 
 # ───────────────────────────────────────────────────────────
+# ── Daily Bonus opener (hardened) ──────────────────────────
+# ───────────────────────────────────────────────────────────
+async def _open_daily_bonus(driver) -> bool:
+    """
+    Ensure we are *inside* the Daily Bonus panel (not just 'Your Riches').
+    Returns True if we believe the panel is open, else False.
+    """
+    # 1) Try multiple DOM hooks
+    for xp in XPATH_DAILY_BONUS_CANDIDATES:
+        try:
+            el = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.XPATH, xp)))
+            driver.execute_script(
+                "try{arguments[0].scrollIntoView({block:'center'});}catch(e){}; arguments[0].click();", el
+            )
+            await asyncio.sleep(1.5)
+            # panel sanity check
+            try:
+                WebDriverWait(driver, 2.0).until(EC.presence_of_element_located((By.XPATH, XPATH_PANEL_READY)))
+                return True
+            except Exception:
+                # sometimes click didn't register; keep trying
+                pass
+        except Exception:
+            continue
+
+    # 2) JS text-scan (more aggressive)
+    try:
+        js_click = """
+        const txt = 'daily bonus';
+        const all = Array.from(document.querySelectorAll('*')).filter(n=>{
+          if(!n) return false;
+          if(!(n instanceof HTMLElement)) return false;
+          const t=(n.innerText||'').trim().toLowerCase();
+          return t.includes(txt);
+        });
+        for (const n of all){
+          try{
+            n.scrollIntoView({block:'center'});
+            n.click();
+            return true;
+          }catch(e){}
+        }
+        return false;
+        """
+        if driver.execute_script(js_click):
+            await asyncio.sleep(1.6)
+            try:
+                WebDriverWait(driver, 2.0).until(EC.presence_of_element_located((By.XPATH, XPATH_PANEL_READY)))
+                return True
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    # 3) Try scrolling the left menu container specifically and re-run candidate search
+    try:
+        scroll_js = """
+        const menus = document.querySelectorAll('[class*="menu"], [class*="sidebar"]');
+        for (const m of menus) {
+          try {
+            for(let i=0;i<6;i++){ m.scrollBy({top: 300, behavior:'instant'}); }
+          } catch(e){}
+        }
+        """
+        driver.execute_script(scroll_js)
+        await asyncio.sleep(0.6)
+        for xp in XPATH_DAILY_BONUS_CANDIDATES:
+            try:
+                el = WebDriverWait(driver, 3).until(EC.element_to_be_clickable((By.XPATH, xp)))
+                driver.execute_script(
+                    "try{arguments[0].scrollIntoView({block:'center'});}catch(e){}; arguments[0].click();", el
+                )
+                await asyncio.sleep(1.4)
+                try:
+                    WebDriverWait(driver, 2.0).until(EC.presence_of_element_located((By.XPATH, XPATH_PANEL_READY)))
+                    return True
+                except Exception:
+                    pass
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    # 4) Fallback — template click on Daily Bonus icon (OpenCV)
+    ok, conf, debug_path = click_daily_bonus_by_template(
+        DAILY_BONUS_ICON, threshold=TEMPLATE_THRESHOLD, extra_offsets=[(24, 0)]
+    )
+    if debug_path:
+        await _log(f"🧪 Template match (daily bonus icon) conf={conf:.3f}, debug={debug_path}")
+    await asyncio.sleep(2.0)
+    try:
+        WebDriverWait(driver, 2.0).until(EC.presence_of_element_located((By.XPATH, XPATH_PANEL_READY)))
+        return True
+    except Exception:
+        return False
+
+# ───────────────────────────────────────────────────────────
 # ── Main flow ──────────────────────────────────────────────
 # ───────────────────────────────────────────────────────────
 async def rolling_riches_casino(ctx, driver, channel):
@@ -439,7 +539,7 @@ async def rolling_riches_casino(ctx, driver, channel):
             await asyncio.sleep(2)
 
         # ─────────────────────────────────────────────
-        # NEW: Two page refreshes BEFORE opening Your Riches
+        # Two page refreshes BEFORE opening Your Riches
         # ─────────────────────────────────────────────
         for n in range(1, 3):
             await _log(f"🔁 Pre-Riches refresh {n}/2…")
@@ -455,17 +555,12 @@ async def rolling_riches_casino(ctx, driver, channel):
         await asyncio.sleep(2.5)
         await _driver_shot(driver, "📸 Your Riches panel")
 
-        # NEW: Try OpenCV popup close specifically for the 'Your riches' popup
-        # If it can't close via CV, refresh as fallback.
+        # Handle the 'Your Riches' popup
         try_cv_close = await _close_rr_popup_via_cv(driver)
         if not try_cv_close:
-            # either no popup detected or CV close failed — try DOM one-shot
             await _close_popup(driver)
-
         if not try_cv_close:
-            # If we *detected* a popup but couldn't close it (CV returns False when detected but failed),
-            # the DOM one-shot above may still fail. As the final fallback, refresh the page once.
-            # To avoid unnecessary refresh, do a quick CV detect again to confirm popup presence.
+            # Confirm popup presence and hard refresh as last resort
             scr = _screenshot_bgr()
             if os.path.exists(RR_POPUP_TEMPLATE):
                 pop_bgr = cv2.imread(RR_POPUP_TEMPLATE, cv2.IMREAD_COLOR)
@@ -477,29 +572,12 @@ async def rolling_riches_casino(ctx, driver, channel):
                         await asyncio.sleep(3.5)
                         await _close_popup(driver)
 
-        # ── Open Daily Bonus (DOM-first; fallback to template) ──
-        await _log("🎯 Opening Daily Bonus (DOM-first)…")
-        try:
-            el = WebDriverWait(driver, 8).until(EC.element_to_be_clickable((By.XPATH, XPATH_DAILY_BONUS_MENU)))
-            driver.execute_script("arguments[0].scrollIntoView({block:'center'}); arguments[0].click();", el)
-            await asyncio.sleep(1.4)
-        except Exception:
-            await _log("⚠️ DOM click failed; switching to OpenCV template.")
-            await _pyauto_shot("🖥️ Before template click")
-            ok, conf, debug_path = click_daily_bonus_by_template(
-                DAILY_BONUS_ICON, threshold=TEMPLATE_THRESHOLD, extra_offsets=[(24, 0)]
-            )
-            if debug_path:
-                await _log(f"🧪 Template match (daily bonus icon) conf={conf:.3f}, debug={debug_path}")
-            await asyncio.sleep(2.0)  # allow panel animation
-
-        # Try to detect countdown, but DO NOT BAIL if it’s not found
-        cd_probe = _read_rr_countdown(driver)
-        if cd_probe:
-            await _log(f"✅ Daily Bonus section detected (countdown {cd_probe}).")
-        else:
-            await _log("ℹ️ Couldn’t positively confirm panel, attempting claim/countdown anyway.")
+        # ── OPEN DAILY BONUS (new robust opener) ──
+        await _log("🎯 Ensuring we are inside the Daily Bonus panel…")
+        opened = await _open_daily_bonus(driver)
         await _driver_shot(driver, "📸 After Daily Bonus open attempt")
+        if not opened:
+            await _log("⚠️ Could not positively open Daily Bonus panel; continuing to attempt claim anyway.")
 
         # ── Claim step 1: DOM click, else template click (rr_claim_btn) ──
         clicked_primary = False

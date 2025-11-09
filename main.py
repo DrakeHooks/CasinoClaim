@@ -49,6 +49,7 @@ api_modules = [
     "spinpalsAPI",
     "spinquestAPI",
     "funrizeAPI",
+    "realprize",
     "globalpokerAPI",
     "dingdingdingAPI",
     "chumbaAPI",
@@ -59,6 +60,7 @@ api_modules = [
     "nolimitcoinsAPI",
     "smilescasinoAPI",
     "yaycasinoAPI",
+    "luckylandAPI",
 ]
 for module_name in api_modules:
     try:
@@ -250,6 +252,9 @@ async def _run_jefebet(channel):        await jefebet_casino(None, driver, chann
 async def _run_crowncoins(channel):     await crowncoins_casino(driver, bot, None, channel)
 async def _run_smilescasino(channel):   await smilescasino_casino(None, driver, channel)
 async def _run_yaycasino(channel):      await yaycasino_uc(None, channel)
+async def _run_realprize(channel):      await realprize_uc(None, channel)
+async def _run_luckyland(channel):      await luckyland_uc(None, channel)
+
 
 # Modo runner used by loop (claim → countdown)
 async def _run_modo(channel):
@@ -279,14 +284,16 @@ casino_loop_entries: List[CasinoLoopEntry] = [
     # CasinoLoopEntry("stake",         "Stake",             _run_stake,           120),
 
     # 24h cadence group (no countdown/problematic)
+    CasinoLoopEntry("realprize",     "RealPrize",         _run_realprize,       1440),
     CasinoLoopEntry("funrize",       "Funrize",           _run_funrize,         1440),
     CasinoLoopEntry("rollingriches", "Rolling Riches",    _run_rollingriches,   1440),
     CasinoLoopEntry("americanluck",  "American Luck",      _run_americanluck,   1440),
     CasinoLoopEntry("fortunecoins",  "Fortune Coins",     _run_fortunecoins,    1440),
     CasinoLoopEntry("zula",          "Zula Casino",       _run_zula,            1440),
     CasinoLoopEntry("sportzino",     "Sportzino",         _run_sportzino,       1440),
+    CasinoLoopEntry("yaycasino",     "YayCasino",         _run_yaycasino,       1440),
     CasinoLoopEntry("smilescasino",  "Smiles Casino",     _run_smilescasino,    1440),
-    CasinoLoopEntry("yaycasino",     "YayCasino",         _run_yaycasino,       1440),  # ← ADD THIS
+    CasinoLoopEntry("luckyland",     "LuckyLand",         _run_luckyland,       1440),
 
 ]
 
@@ -412,7 +419,7 @@ MANUAL_CASINO_COMMANDS = {
     "chumba","rollingriches","jefebet","spinpals","spinquest","funrize",
     "fortunewheelz","stake","chanced","luckybird","globalpoker","crowncoins",
     "dingdingding","modo","zula","sportzino","nolimitcoins","fortunecoins",
-    "smilescasino","americanluck","yaycasino"
+    "smilescasino","americanluck","yaycasino", "realprize"
 }
 
 @bot.check
@@ -950,13 +957,20 @@ async def restart(ctx):
     os._exit(0)
 
 # Manual casino commands
-@bot.command(name="luckybird")
+@bot.command(name="luckybird", aliases=["lb", "lucky bird"])
 async def luckybird_cmd(ctx):
     await ctx.send("Checking LuckyBird for bonus…")
     channel = bot.get_channel(DISCORD_CHANNEL)
     await luckybird_entry(ctx, driver, bot, channel)
 
-@bot.command(name="zula")
+
+# manual command
+@bot.command(name="realprize", aliases=["real prize", "rp"])
+async def realprize_cmd(ctx):
+    await ctx.send("Checking RealPrize for bonus…")
+    await realprize_uc(ctx, bot.get_channel(DISCORD_CHANNEL))
+
+@bot.command(name="zula", aliases=["zula casino", "zulacasino"])
 async def zula_cmd(ctx):
     await ctx.send("Checking Zula Casino for bonus…")
     channel = bot.get_channel(DISCORD_CHANNEL)
@@ -1025,6 +1039,14 @@ async def rollingriches_cmd(ctx):
     await ctx.send("Checking Rolling Riches for bonus…")
     channel = bot.get_channel(DISCORD_CHANNEL)
     await rolling_riches_casino(ctx, driver, channel)
+
+@bot.command(name="luckyland", aliases=["lucky land"])
+async def luckyland_cmd(ctx):
+    await ctx.send("Checking LuckyLand for bonus…")
+    channel = bot.get_channel(DISCORD_CHANNEL)
+    await luckyland_uc(ctx, channel)
+
+
 
 @bot.command(name="stake")
 async def stake_cmd(ctx):
@@ -1257,7 +1279,7 @@ async def help_cmd(ctx):
 !chanced, !luckybird, !globalpoker, !crowncoins, !chumba, !modo, !zula,  
 !rollingriches, !jefebet, !spinpals, !spinquest, !funrize, !sportzino,  
 !fortunecoins, !nolimitcoins, !fortunewheelz, !stake, !dingdingding,
-!smilescasino, !yaycasino
+!smilescasino, !yaycasino, !realprize, !luckyland
 
 ---------------------------------------  
 ✅ **Auth Commands:**  
