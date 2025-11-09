@@ -154,11 +154,12 @@ async def yaycasino_uc(ctx, channel: discord.abc.Messageable):
 
             try:
                 sb.type(f"input[id='{EMAIL_ID}']", username)
+                sb.wait(5)
                 sb.type(f"input[id='{PASSWORD_ID}']", password)
                 try:
-                    sb.wait(8)
+                    sb.wait(5)
                     sb.uc_gui_click_captcha()
-                    sb.wait(10)
+                    sb.wait(5)
                 except Exception:
                     pass
             except Exception as e:
