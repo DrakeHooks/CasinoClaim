@@ -27,7 +27,7 @@ PASSWORD_ID = "password"
 # Buttons / XPaths
 LOGIN_BTN_XPATH = "/html/body/div[1]/div[2]/div[1]/div[2]/div/div/div[1]/form/div[5]/button"
 COIN_STORE_BTN_XPATH = "/html/body/div[1]/div[2]/main/div[1]/div/nav/div[2]/button"
-COLLECT_BTN_XPATH = "/html/body/div[4]/div/div[1]/div/div/div[2]/div[1]/div[2]/div[1]/div/div[5]/button[1]"
+COLLECT_BTN_XPATH = "/html/body/div[5]/div/div[1]/div/div/div[2]/div[1]/div[2]/div[1]/div/div[5]/button[1]"
 COMMON_POPUP_CLOSE_XPATH = "/html/body/div[1]/div[1]/div/div/div[1]/button"
 
 # ───────────────────────────────────────────────────────────
