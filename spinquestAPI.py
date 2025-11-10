@@ -1,7 +1,8 @@
 # Drake Hooks + WaterTrooper
 # Casino Claim 2
 # SpinQuest API
-# Notes: If the login loop does not succeed. The bot will rerun the login loop.
+# Version 2
+# Notes:
 
 import re
 import os
@@ -20,32 +21,17 @@ from selenium.common.exceptions import TimeoutException
 load_dotenv()
 SPINQUEST_CRED = os.getenv("SPINQUEST")  # format "username:password"
 SITE_URL = "https://spinquest.com"
-STORE_URL = "https://spinquest.com/casino/lobby"
+LOBBY_URL = "https://spinquest.com/casino/lobby"
 
-# The login button XPATH
-LOGIN_BUTTON = (
-    "/html/body/div[1]/div[1]/div[2]/div/nav/div[2]/div/button[1]"
-)
+LOGIN_BUTTON_XPATH = ("/html/body/div[1]/div[1]/div[2]/div/nav/div[2]/div/button[1]")
+EMAIL_INPUT_ID = (":r6:-form-item")
+PASSWORD_INPUT_ID = (":r7:-form-item")
+LOGIN_SUBMIT_ID = (":r8:")
 
-# The email input ID
-EMAIL_INPUT = (
-    ":r6:-form-item"
-)
-
-# The password input ID
-PASSWORD_INPUT = (
-    ":r7:-form-item"
-)
-
-# The login input ID
-LOGIN_INPUT = (
-    ":r8:"
-)
-
-# The “Daily Bonus” card you click first
-CLAIM_BUTTON = (
+CLAIM_BUTTON_XPATHS = [
+    "/html/body/div[1]/div[1]/div[2]/div/main/div/div[1]/div/div/div[1]/div[2]/div[3]/button",
     "/html/body/div[1]/div[1]/div[2]/div/main/div/div[1]/div/div/div[1]/div[2]/div[4]/button"
-)
+]
 
 # XPath for the disabled countdown button
 XPATH_COUNTDOWN = "//button[@disabled and contains(normalize-space(.), ':')]"
@@ -54,27 +40,27 @@ XPATH_COUNTDOWN = "//button[@disabled and contains(normalize-space(.), ':')]"
 # 1) Unified flow: claim → countdown → login & claim
 # ───────────────────────────────────────────────────────────
 async def spinquest_flow(ctx, driver, channel):
-    # 1a) Navigate to site
-    driver.get(STORE_URL)
+    # 1a) Navigate to lobby
+    print("[SpinQuest] Navigating to lobby...")
+    driver.get(LOBBY_URL)
     await asyncio.sleep(10)
 
-    # 1a) Click the “Daily Bonus” card
-    try:
-        claim = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, CLAIM_BUTTON))
-        )
-        claim.click()
-        await channel.send("SpinQuest Daily Bonus Claimed!")
-        await asyncio.sleep(10)
-    except TimeoutException:
-        # might not be logged in yet
-        pass
+    # 1b) Click the “Daily Bonus” card
+    print("[SpinQuest] Attempting to click Claim Now button...")
+    for xp in CLAIM_BUTTON_XPATHS:
+        try:
+            claim = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, xp)))
+            claim.click()
+            await channel.send("SpinQuest Daily Bonus Claimed!")
+            await asyncio.sleep(10)
+        except TimeoutException:
+            # might not be logged in yet
+            pass
 
-    # 1b) If no claim, try to read the countdown
+    # 1c) If no claim, try to read the countdown
+    print("[SpinQuest] Checking for countdown...")
     try:
-        countdown_btn = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.XPATH, XPATH_COUNTDOWN))
-        )
+        countdown_btn = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, XPATH_COUNTDOWN)))
         raw       = countdown_btn.text.strip()               # e.g. "22 : 27 : 06"
         countdown = re.sub(r"\s+", "", raw)           # => "22:27:06"
         await channel.send(f"Next SpinQuest bonus Available in: {countdown}")
@@ -82,7 +68,7 @@ async def spinquest_flow(ctx, driver, channel):
     except TimeoutException:
         pass
 
-    # 1c) Fallback: not logged in (or weird page) → login + claim
+    # 1d) Fallback: not logged in (or weird page) → login + claim
     print("Logging into SpinQuest and claiming…")
     await spinquest_casino(ctx, driver, channel)
 
@@ -97,29 +83,24 @@ async def spinquest_casino(ctx, driver, channel):
     username, password = SPINQUEST_CRED.split(":")
 
     # 2a) Navigate to site
+    print("[SpinQuest] Navigating to site...")
     driver.get("https://spinquest.com")
     await asyncio.sleep(10)
 
     # 2b) Login to site
+    print("[SpinQuest] Attempting to login...")
     try:
-        login_btn = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, LOGIN_BUTTON))
-        )
+        login_btn = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, LOGIN_BUTTON_XPATH)))
         login_btn.click()
-        email = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.ID, EMAIL_INPUT))
-        )
+        email = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, EMAIL_INPUT_ID)))
         email.send_keys(username)
         await asyncio.sleep(5)
-        pw = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.ID, PASSWORD_INPUT))
-        )
+        pw = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, PASSWORD_INPUT_ID)))
         pw.send_keys(password)
         await asyncio.sleep(5)
-        empw_ln_btn = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.ID, LOGIN_INPUT))
-        )
+        empw_ln_btn = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, LOGIN_SUBMIT_ID)))
         empw_ln_btn.click()
+        print("[SpinQuest] Submitted credentials.")
         await asyncio.sleep(10)
 
         # Now that we're logged in, try claiming
@@ -139,19 +120,21 @@ async def spinquest_casino(ctx, driver, channel):
 # 3) After login: click the daily card + claim buttons
 # ───────────────────────────────────────────────────────────
 async def claim_spinquest_bonus(ctx, driver, channel):
-    driver.get(STORE_URL)
+    # 3a) Navigate to lobby
+    print("[SpinQuest] Navigating to lobby...")
+    driver.get(LOBBY_URL)
     await asyncio.sleep(10)
 
-    # 3a) Click the "Claim Now" button
-    try:
-        claim = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, CLAIM_BUTTON))
-        )
-        claim.click()
-        await channel.send("SpinQuest Daily Bonus Claimed!")
-        await asyncio.sleep(10)
-    except TimeoutException:
-        pass
+    # 3b) Click the "Claim Now" button
+    print("[SpinQuest] Attempting to click Claim Now button...")
+    for xp in CLAIM_BUTTON_XPATHS:
+        try:
+            claim = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, xp)))
+            claim.click()
+            await channel.send("SpinQuest Daily Bonus Claimed!")
+            await asyncio.sleep(10)
+        except TimeoutException:
+            pass
 
     # 3b) If no claim, read the countdown
     await spinquest_flow(ctx, driver, channel)
@@ -161,12 +144,11 @@ async def claim_spinquest_bonus(ctx, driver, channel):
 # ───────────────────────────────────────────────────────────
 async def check_spinquest_countdown(ctx, driver, channel):
     # you can call this directly if you ever just want the timer
-    driver.get(STORE_URL)
+    print("[SpinQuest] Checking for countdown...")
+    driver.get(LOBBY_URL)
     await asyncio.sleep(10)
 
-    countdown_btn = WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.XPATH, XPATH_COUNTDOWN))
-    )
+    countdown_btn = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, XPATH_COUNTDOWN)))
     raw       = countdown_btn.text.strip()
     countdown = re.sub(r"\s+", "", raw)
     await channel.send(f"Next SpinQuest Bonus Available in: {countdown}")
