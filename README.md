@@ -95,6 +95,6 @@ If you identify a fix, feel free to submit a pull request and I will review it.
 
 
 # Problem Gambling 🎲
-Gambling can become addicting, if you start feeling addicted, please get help before it affects your life negatively. Always remember, you are not alone!
+Gambling can become addictive. If you start feeling addicted, please seek help before it affects your life negatively. Always remember—you are not alone!
 
 <a href="https://www.ncpgambling.org/help-treatment/"><img src="https://www.ncpgambling.org/wp-content/themes/magneti/assets/build/images/800gamb-logo-header.svg"/></a>
