@@ -33,6 +33,9 @@ from discord.ext import commands
 # (other modules may use these; imports are harmless here)
 import undetected_chromedriver as uc  # noqa: F401
 
+from concurrent.futures import ThreadPoolExecutor
+_executor = ThreadPoolExecutor(max_workers=4)
+
 # ───────────────────────────────────────────────────────────
 # Dynamic API imports (missing modules are OK)
 # ───────────────────────────────────────────────────────────
@@ -267,9 +270,10 @@ async def _run_stake(channel):          await stake_claim(driver, bot, None, cha
 async def _run_fortunewheelz(channel):  await fortunewheelz_flow(None, driver, channel)
 async def _run_spinquest(channel):      await spinquest_flow(None, driver, channel)
 async def _run_americanluck(channel):   await americanluck_uc(None, channel)
-async def _run_fortunecoins(channel):   await fortunecoins_uc(None, channel)  # <- UC flow, 24h interval
-
-
+async def _run_fortunecoins(channel):
+    loop = asyncio.get_running_loop()
+    from fortunecoinsAPI import fortunecoins_uc_blocking
+    await loop.run_in_executor(_executor, fortunecoins_uc_blocking, bot, channel.id, loop)
 
 casino_loop_entries: List[CasinoLoopEntry] = [
     CasinoLoopEntry("luckybird",     "LuckyBird",         _run_luckybird,       120),
@@ -1062,7 +1066,9 @@ async def fortunewheelz_cmd(ctx):
 async def fortunecoins_cmd(ctx):
     await ctx.send("Checking Fortune Coins for bonus…")
     channel = bot.get_channel(DISCORD_CHANNEL)
-    await fortunecoins_uc(ctx, channel)
+    loop = asyncio.get_running_loop()
+    from fortunecoinsAPI import fortunecoins_uc_blocking
+    await loop.run_in_executor(_executor, fortunecoins_uc_blocking, bot, channel.id, loop)
 
 @bot.command(name="spinquest")
 async def spinquest_cmd(ctx):
