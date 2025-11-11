@@ -476,6 +476,8 @@ async def stop_loop_command(ctx: commands.Context):
 
 @bot.command(name="cleardatadir")
 async def clear_data_dir(ctx: commands.Context):
+    global driver  # <-- must be before any use of driver in this function
+
     """
     Hot-clear the persistent Chrome user-data directory without killing the bot.
     Stops the loop, waits for any executor job to finish, quits Chrome,
@@ -485,6 +487,9 @@ async def clear_data_dir(ctx: commands.Context):
     if not root:
         await ctx.send("⚠️ No CHROME_INSTANCE_DIR or CHROME_USER_DATA_DIR configured — nothing to clear.")
         return
+    ...
+    # (everything else the same)
+
 
     await ctx.send(
         "🧹 **Clear Chrome data directory?**\n"
@@ -565,7 +570,6 @@ async def clear_data_dir(ctx: commands.Context):
     try:
         # (re)apply any flags in case code refactors later
         _apply_common_chrome_flags(options)
-        global driver
         driver = _build_driver_with_retry(options)
         await ctx.send("✅ Chrome restarted.")
     except Exception as e:
