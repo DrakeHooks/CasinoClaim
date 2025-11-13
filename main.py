@@ -1063,7 +1063,7 @@ async def globalpoker_cmd(ctx):
     await ctx.send("Checking GlobalPoker for bonus…")
     await global_poker(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
 
-@bot.command(name="jefebet", aliases=["jefe", "jefebet casino"])
+@bot.command(name="jefebet", aliases=["jefe", "jefebet casino", "jefe bet", "jb"])
 async def jefebet_cmd(ctx):
     await ctx.send("Checking JefeBet for bonus…")
     await jefebet_casino(ctx, driver, bot.get_channel(DISCORD_CHANNEL))

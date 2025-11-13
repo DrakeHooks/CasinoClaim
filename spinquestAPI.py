@@ -2,7 +2,8 @@
 # Casino Claim 2
 # SpinQuest API
 # Version 2
-# Notes:
+# Notes: Countdown timer is only available after claim. Make sure to not
+# create a recursive login flow.
 
 import re
 import os
@@ -164,7 +165,7 @@ async def claim_spinquest_bonus(ctx, driver, channel):
         )
         raw = countdown_btn.text.strip()
         countdown = re.sub(r"\s+", "", raw)
-        await channel.send(f"Next SpinQuest bonus Available in: {countdown}")
+        await channel.send(f"Next SpinQuest Bonus Available in: {countdown}")
     except TimeoutException:
         # Nothing to claim and no countdown found; just stop.
         pass
