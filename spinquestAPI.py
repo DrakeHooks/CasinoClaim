@@ -67,7 +67,7 @@ async def spinquest_flow(ctx, driver, channel):
         )
         raw = countdown_btn.text.strip()     # e.g. "22 : 27 : 06"
         countdown = re.sub(r"\s+", "", raw)  # => "22:27:06"
-        await channel.send(f"Next SpinQuest bonus Available in: {countdown}")
+        await channel.send(f"Next SpinQuest Bonus Available in: {countdown}")
         return
     except TimeoutException:
         pass
