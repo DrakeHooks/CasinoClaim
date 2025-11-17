@@ -63,7 +63,7 @@ The bot is designed to check most casinos automatically in 2-hour intervals, wit
 | Modo            | ✗          | ✗              | No                          | $0.30-$1.00 Daily                | Yes     |
 | Stake           | ✗          | ✗              | Yes                         | $1.00 Daily                      | Yes     |
 | Funrize         | ✓          | ✗              | No                          | $0.20 Average Daily              | Yes     |
-| Rolling Riches  | ✗          | ✗              | No                          | $0.20 Daily                      | Yes     |
+| Rolling Riches  | ✓          | ✗              | No                          | $0.20 Daily                      | Yes     |
 | American Luck   | ✓          | ✗              | No                          | $0.60 Average Daily              | Yes     |
 | Fortune Coins   | ✓          | ✗              | No                          | $0.46 Average Daily              | Yes     |
 | Zula            | ✓          | ✓              | No                          | $1.00 Daily                      | Yes     |
