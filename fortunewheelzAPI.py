@@ -150,7 +150,7 @@ async def fortunewheelz_flow(ctx, driver, channel):
     # Step 2: try a countdown read (modal p, store button abs, generic fallback)
     countdown = _read_countdown(driver)
     if countdown:
-        await channel.send(f"Next Fortune Wheelz bonus Available in: {countdown}")
+        await channel.send(f"Next Fortune Wheelz Bonus Available in: {countdown}")
         return
 
     # Step 3: login once, then attempt one claim pass

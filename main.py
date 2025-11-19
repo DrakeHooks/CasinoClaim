@@ -316,7 +316,7 @@ casino_loop_entries: List[CasinoLoopEntry] = [
     CasinoLoopEntry("zula",          "Zula Casino",       _run_zula,            1440),
     CasinoLoopEntry("sportzino",     "Sportzino",         _run_sportzino,       1440),
     CasinoLoopEntry("yaycasino",     "YayCasino",         _run_yaycasino,       1440),
-    CasinoLoopEntry("smilescasino",  "Smiles Casino",     _run_smilescasino,    1440),
+    # CasinoLoopEntry("smilescasino",  "Smiles Casino",     _run_smilescasino,    1440),
     # CasinoLoopEntry("luckyland",     "LuckyLand",         _run_luckyland,       1440),
 
 ]

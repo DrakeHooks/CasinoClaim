@@ -213,7 +213,7 @@ async def yaycasino_uc(ctx, channel: discord.abc.Messageable):
             )
             if not opened_rewards:
                 print("[YayCasino] Rewards/Coins button not found.")
-                await _send_status_shot(sb, channel, "YayCasino: countdown not available (or auth failed).", "yaycasino_unavailable")
+                await _send_status_shot(sb, channel, "Rewards/Coins button not found.", "yaycasino_unavailable")
                 return
 
             sb.wait(10)  # allow the rewards modal to render fully
@@ -237,7 +237,7 @@ async def yaycasino_uc(ctx, channel: discord.abc.Messageable):
                 print("[YayCasino] Claimed successfully.")
             else:
                 print("[YayCasino] No claim available (likely already claimed).")
-                await _send_status_shot(sb, channel, "YayCasino: countdown not available (or auth failed).", "yaycasino_unavailable")
+                await _send_status_shot(sb, channel, "YayCasino: bonus not available (or auth failed).", "yaycasino_unavailable")
 
     except Exception as e:
         print(f"[YayCasino][ERROR] Exception during automation: {e}")
