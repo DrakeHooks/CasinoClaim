@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
-set -euo pipefail
+
+set -eu
+# (optional) only try pipefail if this shell supports it
+if (set -o pipefail 2>/dev/null); then
+  set -o pipefail
+fi
 
 # ============================================================
 #  DISPLAY / Xvfb / VNC setup

@@ -185,6 +185,6 @@ async def fortunewheelz_flow(ctx, driver, channel):
 
     countdown = _read_countdown(driver)
     if countdown:
-        await channel.send(f"Next Fortune Wheelz bonus Available in: {countdown}")
+        await channel.send(f"Next Fortune Wheelz Bonus Available in: {countdown}")
     # If neither was found, we silently return; the main loop will revisit later.
 
