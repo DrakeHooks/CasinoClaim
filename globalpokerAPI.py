@@ -111,7 +111,7 @@ async def claim_global_poker_bonus(ctx, driver, channel):
         if bonus_claimed:
             await channel.send("Global Poker Daily Bonus Claimed!")
         else:
-            await channel.send("(Global Poker) No bonus was claimed. All buttons were attempted, but none were clickable.")
+            print("[Global Poker] No bonus was claimed. All buttons were attempted, but none were clickable.")
             
     except Exception as e:
         await channel.send(f"Error claiming Global Poker bonus: {str(e)}")
@@ -128,7 +128,8 @@ async def click_get_coins_button(driver, channel):
         await asyncio.sleep(3)  # Wait for any UI transitions
 
     except TimeoutException:
-        await channel.send("Get Coins button not found! Check TOS or button XPATHS!")
+        print("[Global Poker] 'Get Coins' button not found! Check TOS or button XPATHS!")
+        await channel.send("Global Poker: 'Get Coins' button not found! Check TOS or button XPATHS!")
 
 # Main function to check the countdown first, then claim the bonus if not found
 async def global_poker(ctx, driver, channel):
