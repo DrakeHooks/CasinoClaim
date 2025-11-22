@@ -1,5 +1,7 @@
 # Drake Hooks + WaterTrooper
-# Casino Claim 2 — Fortune Wheelz API (de-recursed + guarded)
+# Casino Claim 2 
+# Fortune Wheelz API
+# Notes: Popup closer accepts xpaths, spans, and other elements.
 
 import os
 import re
@@ -41,8 +43,8 @@ COUNTDOWN_DISABLED_BTN_GENERIC = "//button[@disabled and contains(normalize-spac
 
 # Popups to detect and close (add more XPaths here as you discover them)
 POPUP_CLOSE_XPATHS = [
-    "/html/body/div[5]/div/div[1]/span",
     "/html/body/div[4]/div/div[1]/span",
+    "/html/body/div[5]/div/div[1]/span",
     # "/html/body/div[6]/div/div[1]/span",  # example future popup
     # "/html/body/div[7]/div/div[1]/span",
 ]
@@ -70,35 +72,107 @@ def _normalize_countdown(txt: str) -> str | None:
 
 def _close_popups(driver, xpaths: list[str] | None = None, max_passes: int = 2) -> None:
     """
-    Best-effort closer for Fortune Wheelz popups.
+    Extremely robust popup closer for FortuneWheelz.
 
-    - Only called after login by our main flow.
-    - Supports 0, 1, or multiple popups.
-    - Runs up to `max_passes` passes; on each pass it tries every xpath in `xpaths`.
-      If a pass closes nothing, we stop early.
+    Adds:
+      - span.close (CSS)
+      - span[data-tid*='close']
+      - JS click fallback
+      - click via ActionChains fallback
+      - final JS “remove all close buttons” fallback
     """
+
     if xpaths is None:
         xpaths = POPUP_CLOSE_XPATHS
 
+    def js_click(el):
+        try:
+            driver.execute_script("arguments[0].click();", el)
+            return True
+        except Exception:
+            return False
+
+    def try_close_element(el):
+        try:
+            el.click()
+            return True
+        except Exception:
+            # fallback to JS
+            return js_click(el)
+
     for _ in range(max_passes):
         closed_any = False
+
+        # ──────────────────────────────────────────────
+        # 1) Known XPaths
+        # ──────────────────────────────────────────────
         for xp in xpaths:
             try:
-                el = WebDriverWait(driver, 3).until(
+                el = WebDriverWait(driver, 2).until(
                     EC.element_to_be_clickable((By.XPATH, xp))
                 )
-                el.click()
-                closed_any = True
+                if try_close_element(el):
+                    closed_any = True
             except TimeoutException:
-                continue
-            except Exception:
-                # If something weird happens (stale, intercepted, etc.), just move on
-                continue
+                pass
 
+        # ──────────────────────────────────────────────
+        # 2) Generic <span class="close">
+        # ──────────────────────────────────────────────
+        try:
+            close_spans = driver.find_elements(By.CSS_SELECTOR, "span.close")
+            for el in close_spans:
+                if try_close_element(el):
+                    closed_any = True
+        except Exception:
+            pass
+
+        # ──────────────────────────────────────────────
+        # 3) Generic <span data-tid*='close'>
+        # ──────────────────────────────────────────────
+        try:
+            tid_spans = driver.find_elements(By.CSS_SELECTOR, "span[data-tid*='close']")
+            for el in tid_spans:
+                if try_close_element(el):
+                    closed_any = True
+        except Exception:
+            pass
+
+        # ──────────────────────────────────────────────
+        # 4) Any visible span whose innerText contains "x"
+        # (Some sites use × or x as text for close)
+        # ──────────────────────────────────────────────
+        try:
+            maybe_x = driver.find_elements(By.TAG_NAME, "span")
+            for el in maybe_x:
+                try:
+                    t = (el.text or "").strip().lower()
+                    if t in ("x", "×", "close"):
+                        if try_close_element(el):
+                            closed_any = True
+                except Exception:
+                    continue
+        except Exception:
+            pass
+
+        # ──────────────────────────────────────────────
+        # Early exit
+        # ──────────────────────────────────────────────
         if not closed_any:
-            # No popups closed this pass → nothing else to do
             break
 
+    # ────────────────────────────────────────────────────────
+    # FINAL KILL-SWITCH: Remove all close buttons if still open
+    # ────────────────────────────────────────────────────────
+    try:
+        driver.execute_script("""
+            document.querySelectorAll('span.close, span[data-tid*="close"]').forEach(e=>{
+                try { e.click(); } catch(err){}
+                try { e.remove(); } catch(err){}
+            });
+        """)
+    except Exception:
+        pass
 
 # ───────────────────────────────────────────────────────────
 #  More Helpers
