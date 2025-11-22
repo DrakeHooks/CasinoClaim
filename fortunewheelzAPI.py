@@ -42,6 +42,7 @@ COUNTDOWN_DISABLED_BTN_GENERIC = "//button[@disabled and contains(normalize-spac
 # Popups to detect and close (add more XPaths here as you discover them)
 POPUP_CLOSE_XPATHS = [
     "/html/body/div[5]/div/div[1]/span",
+    "/html/body/div[4]/div/div[1]/span",
     # "/html/body/div[6]/div/div[1]/span",  # example future popup
     # "/html/body/div[7]/div/div[1]/span",
 ]
