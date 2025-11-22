@@ -59,6 +59,7 @@ The bot is designed to check most casinos automatically in 2-hour intervals, wit
 | JefeBet         | ✓          | ✓              | No                          | $0.20 every 6 hours              | Yes     |
 | SpinQuest       | ✓          | ✓              | No                          | $1.00 Daily                      | Yes     |
 | FortuneWheelz   | ✓          | ✗              | No                          | $0.20 Average Daily              | Yes     |
+| Jumbo88         | ✓          | ✓              | No                          | Up to 5 SC Daily Spin             | Yes     |
 | NoLimitCoins    | ✗          | ✗              | No                          | $0.20 Average Daily              | Yes     |
 | Modo            | ✗          | ✗              | No                          | $0.30-$1.00 Daily                | Yes     |
 | Stake           | ✗          | ✗              | Yes                         | $1.00 Daily                      | Yes     |
