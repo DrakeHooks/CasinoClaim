@@ -97,112 +97,111 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
 
     sb = None
     try:
-        async with ctx.typing():
-            with SB(uc=True, headed=True) as sb:
-                # ── Step 1: open login page ──
-                sb.uc_open_with_reconnect(LOGIN_URL, 8)
-                sb.wait_for_ready_state_complete()
+        with SB(uc=True, headed=True) as sb:
+            # ── Step 1: open login page ──
+            sb.uc_open_with_reconnect(LOGIN_URL, 8)
+            sb.wait_for_ready_state_complete()
 
-                # ── Step 2: type credentials and click login ──
-                sb.wait(1)
-                sb.type("input[id='emailAddress']", username)
-                sb.type("input[id='password']", password)
+            # ── Step 2: type credentials and click login ──
+            sb.wait(1)
+            sb.type("input[id='emailAddress']", username)
+            sb.type("input[id='password']", password)
 
-                # Try to solve captcha via helper, if available
-                try:
-                    sb.uc_gui_click_captcha()
-                except Exception:
-                    pass
+            # Try to solve captcha via helper, if available
+            try:
+                sb.uc_gui_click_captcha()
+            except Exception:
+                pass
 
-                sb.wait(1.5)
-                _force_click_xpath(
-                    sb,
-                    "/html/body/div[1]/div[2]/main/div/div/div/div[2]/form/div[4]/button",
-                    timeout=10,
-                )
+            sb.wait(1.5)
+            _force_click_xpath(
+                sb,
+                "/html/body/div[1]/div[2]/main/div/div/div/div[2]/form/div[4]/button",
+                timeout=10,
+            )
 
-                sb.wait(6)
-                sb.wait_for_ready_state_complete()
+            sb.wait(6)
+            sb.wait_for_ready_state_complete()
 
-                # ── Step 3: close any popup if present ──
-                _force_click_xpath(sb, POPUP_CLOSE_XP, timeout=4)
-                try:
-                    sb.press_keys("body", "ESCAPE")
-                except Exception:
-                    pass
+            # ── Step 3: close any popup if present ──
+            _force_click_xpath(sb, POPUP_CLOSE_XP, timeout=4)
+            try:
+                sb.press_keys("body", "ESCAPE")
+            except Exception:
+                pass
 
-                sb.wait(2)
-                sb.wait_for_ready_state_complete()
+            sb.wait(2)
+            sb.wait_for_ready_state_complete()
 
-                # ── Step 4: detect login state ──
+            # ── Step 4: detect login state ──
+            login_ok = False
+            try:
+                sb.wait_for_element_visible(GET_COINS_BTN_XP, timeout=8)
+                login_ok = True
+            except Exception:
                 login_ok = False
+
+            # Fallback: URL heuristic
+            if not login_ok:
                 try:
-                    sb.wait_for_element_visible(GET_COINS_BTN_XP, timeout=8)
-                    login_ok = True
+                    current_url = sb.get_current_url()
+                    if current_url.startswith(LOBBY_URL):
+                        login_ok = True
                 except Exception:
-                    login_ok = False
+                    pass
 
-                # Fallback: URL heuristic
-                if not login_ok:
-                    try:
-                        current_url = sb.get_current_url()
-                        if current_url.startswith(LOBBY_URL):
-                            login_ok = True
-                    except Exception:
-                        pass
+            if not login_ok:
+                # Login failed / not in lobby – send screenshot for debugging
+                await _send_shot(
+                    sb,
+                    channel,
+                    "americanluck_login_failed.png",
+                    "American Luck: Login failed or bonus unavailable.",
+                )
+                return
 
-                if not login_ok:
-                    # Login failed / not in lobby – send screenshot for debugging
-                    await _send_shot(
-                        sb,
-                        channel,
-                        "americanluck_login_failed.png",
-                        "American Luck: Login failed or bonus unavailable.",
-                    )
-                    return
-
-                # ── Step 5: open Get Coins modal ──
-                opened = _force_click_xpath(sb, GET_COINS_BTN_XP, timeout=8)
-                if not opened:
-                    sb.wait(3)
-                    opened = _force_click_xpath(sb, GET_COINS_BTN_XP, timeout=6)
-
-                if not opened:
-                    await _send_shot(
-                        sb,
-                        channel,
-                        "americanluck_getcoins_missing.png",
-                        "American Luck: Could not open **Get Coins**. "
-                        "Layout may have changed or bonus is unavailable.",
-                    )
-                    return
-
-                sb.wait_for_ready_state_complete()
+            # ── Step 5: open Get Coins modal ──
+            opened = _force_click_xpath(sb, GET_COINS_BTN_XP, timeout=8)
+            if not opened:
                 sb.wait(3)
+                opened = _force_click_xpath(sb, GET_COINS_BTN_XP, timeout=6)
 
-                # ── Step 6: click Collect ──
-                collected = _force_click_xpath(sb, COLLECT_BTN_XP, timeout=8)
-                if not collected:
-                    sb.wait(4)
-                    collected = _force_click_xpath(sb, COLLECT_BTN_XP, timeout=6)
+            if not opened:
+                await _send_shot(
+                    sb,
+                    channel,
+                    "americanluck_getcoins_missing.png",
+                    "American Luck: Could not open **Get Coins**. "
+                    "Layout may have changed or bonus is unavailable.",
+                )
+                return
 
-                if collected:
-                    sb.wait(2)
-                    await _send_shot(
-                        sb,
-                        channel,
-                        "americanluck_claimed.png",
-                        "American Luck Daily Bonus Claimed!",
-                    )
-                else:
-                    # This is the case you care about: Collect button missing / XPath changed
-                    await _send_shot(
-                        sb,
-                        channel,
-                        "americanluck_collect_missing.png",
-                        "American Luck: Could not find **Collect** button. "
-                        "Bonus may be unavailable, or COLLECT_BTN_XP needs update.",
-                    )
+            sb.wait_for_ready_state_complete()
+            sb.wait(3)
+
+            # ── Step 6: click Collect ──
+            collected = _force_click_xpath(sb, COLLECT_BTN_XP, timeout=8)
+            if not collected:
+                sb.wait(4)
+                collected = _force_click_xpath(sb, COLLECT_BTN_XP, timeout=6)
+
+            if collected:
+                sb.wait(2)
+                await _send_shot(
+                    sb,
+                    channel,
+                    "americanluck_claimed.png",
+                    "American Luck Daily Bonus Claimed!",
+                )
+            else:
+                # This is the case you care about: Collect button missing / XPath changed
+                await _send_shot(
+                    sb,
+                    channel,
+                    "americanluck_collect_missing.png",
+                    "American Luck: Could not find **Collect** button. "
+                    "Bonus may be unavailable, or COLLECT_BTN_XP needs update.",
+                )
 
     except Exception as e:
         # Top-level crash: try to capture the state for debugging
