@@ -83,7 +83,7 @@ def _force_click_xpath(sb: SB, xpath: str, timeout: float = 10) -> bool:
 
 
 # ───────────────────────────────────────────────────────────
-# Main flow
+# American Luck Main flow (UC mode)
 # ───────────────────────────────────────────────────────────
 
 async def americanluck_uc(ctx, channel: discord.abc.Messageable):
