@@ -33,6 +33,25 @@ from discord.ext import commands
 # (other modules may use these; imports are harmless here)
 import undetected_chromedriver as uc  # noqa: F401
 
+from concurrent.futures import ThreadPoolExecutor
+_executor = ThreadPoolExecutor(max_workers=4)
+
+import threading
+_active_exec_jobs = 0
+_active_exec_lock = threading.Lock()
+
+def _exec_job_started():
+    global _active_exec_jobs
+    with _active_exec_lock:
+        _active_exec_jobs += 1
+
+def _exec_job_finished():
+    global _active_exec_jobs
+    with _active_exec_lock:
+        _active_exec_jobs = max(0, _active_exec_jobs - 1)
+
+
+
 # ───────────────────────────────────────────────────────────
 # Dynamic API imports (missing modules are OK)
 # ───────────────────────────────────────────────────────────
@@ -267,9 +286,14 @@ async def _run_stake(channel):          await stake_claim(driver, bot, None, cha
 async def _run_fortunewheelz(channel):  await fortunewheelz_flow(None, driver, channel)
 async def _run_spinquest(channel):      await spinquest_flow(None, driver, channel)
 async def _run_americanluck(channel):   await americanluck_uc(None, channel)
-async def _run_fortunecoins(channel):   await fortunecoins_uc(None, channel)  # <- UC flow, 24h interval
-
-
+async def _run_fortunecoins(channel):
+    loop = asyncio.get_running_loop()
+    from fortunecoinsAPI import fortunecoins_uc_blocking
+    _exec_job_started()
+    try:
+        await loop.run_in_executor(_executor, fortunecoins_uc_blocking, bot, channel.id, loop)
+    finally:
+        _exec_job_finished()
 
 casino_loop_entries: List[CasinoLoopEntry] = [
     CasinoLoopEntry("luckybird",     "LuckyBird",         _run_luckybird,       120),
@@ -292,7 +316,7 @@ casino_loop_entries: List[CasinoLoopEntry] = [
     CasinoLoopEntry("zula",          "Zula Casino",       _run_zula,            1440),
     CasinoLoopEntry("sportzino",     "Sportzino",         _run_sportzino,       1440),
     CasinoLoopEntry("yaycasino",     "YayCasino",         _run_yaycasino,       1440),
-    CasinoLoopEntry("smilescasino",  "Smiles Casino",     _run_smilescasino,    1440),
+    # CasinoLoopEntry("smilescasino",  "Smiles Casino",     _run_smilescasino,    1440),
     # CasinoLoopEntry("luckyland",     "LuckyLand",         _run_luckyland,       1440),
 
 ]
@@ -452,20 +476,25 @@ async def stop_loop_command(ctx: commands.Context):
 
 @bot.command(name="cleardatadir")
 async def clear_data_dir(ctx: commands.Context):
+    global driver  # <-- must be before any use of driver in this function
+
     """
-    Interactively clear the persistent Chrome user-data directory.
-    This will stop the loop, quit Chrome, delete the directory, and restart the bot.
+    Hot-clear the persistent Chrome user-data directory without killing the bot.
+    Stops the loop, waits for any executor job to finish, quits Chrome,
+    deletes the profile, recreates the driver, and (optionally) restarts the loop.
     """
     root = instance_dir or os.getenv("CHROME_USER_DATA_DIR", "").strip()
     if not root:
         await ctx.send("⚠️ No CHROME_INSTANCE_DIR or CHROME_USER_DATA_DIR configured — nothing to clear.")
         return
+    ...
+    # (everything else the same)
 
-    # Confirm with the invoking user
+
     await ctx.send(
         "🧹 **Clear Chrome data directory?**\n"
         f"This will stop the loop, quit Chrome, delete:\n```{root}```\n"
-        "and restart the bot. You will want to run !auth <casino site> after for every site needing google auth\n\n"
+        "and then restart Chrome without restarting the bot.\n\n"
         "Type **YES** within 20 seconds to confirm, or anything else to cancel."
     )
 
@@ -482,50 +511,80 @@ async def clear_data_dir(ctx: commands.Context):
         await ctx.send("❎ Cancelled.")
         return
 
-    # Proceed
-    await ctx.send("⏳ Stopping the loop and shutting down Chrome…")
-
-    # Stop the automated loop if needed
+    # 1) Stop automated loop
+    await ctx.send("🛑 Stopping the loop…")
     try:
         if is_main_loop_running():
             await stop_main_loop()
     except Exception:
         pass
 
-    # Quit Chrome to release locks
+    # 2) Wait briefly for any background executor job (e.g., FC) to finish
+    await ctx.send("⏳ Waiting for background tasks to finish (up to 20s)…")
+    for _ in range(40):  # 40 * 0.5s = 20s
+        with _active_exec_lock:
+            busy = _active_exec_jobs
+        if busy == 0:
+            break
+        await asyncio.sleep(0.5)
+    else:
+        await ctx.send("⚠️ Background task still running; proceeding anyway.")
+
+    # 3) Quit Chrome to release locks
+    await ctx.send("🔌 Quitting Chrome…")
     try:
         driver.quit()
     except Exception:
         pass
 
-    # Extra safeguard: kill any stray chrome that might still be alive
+    # 4) Kill any stray Chrome
     try:
-        import signal, psutil  # psutil is optional; ignore if not available
+        import psutil, signal
+        killed = 0
         for p in psutil.process_iter(attrs=["name", "cmdline"]):
-            name = (p.info.get("name") or "").lower()
-            cmd  = " ".join(p.info.get("cmdline") or [])
-            if "chrome" in name or "--user-data-dir=" in cmd:
-                try:
-                    p.send_signal(signal.SIGKILL)
-                except Exception:
-                    pass
+            nm = (p.info.get("name") or "").lower()
+            cmd = " ".join(p.info.get("cmdline") or [])
+            if "chrome" in nm or "chromium" in nm:
+                if (not root) or (f"--user-data-dir={root}" in cmd):
+                    try:
+                        p.send_signal(signal.SIGKILL); killed += 1
+                    except Exception:
+                        pass
+        if killed:
+            await ctx.send(f"🔪 Killed {killed} stray Chrome processes.")
     except Exception:
         pass
 
-    # Delete directory
+    # 5) Delete the profile directory
+    await ctx.send(f"🧽 Clearing Chrome user-data at:\n```{root}```")
     try:
         import shutil
         shutil.rmtree(root, ignore_errors=True)
-        await ctx.send("✅ Chrome user data directory cleared. Restarting bot…")
+        await ctx.send("✅ Chrome user-data cleared.")
     except Exception as e:
-        await ctx.send(f"⚠️ Failed to clear Chrome data directory: `{e}`")
+        await ctx.send(f"⚠️ Failed to clear profile dir: `{e}`")
         return
 
-    # Restart the bot process (entrypoint will relaunch and recreate a fresh profile)
+    # 6) Recreate the WebDriver (fresh profile)
+    await ctx.send("🚀 Restarting Chrome with a fresh profile…")
     try:
-        await bot.close()
-    finally:
-        os._exit(0)
+        # (re)apply any flags in case code refactors later
+        _apply_common_chrome_flags(options)
+        driver = _build_driver_with_retry(options)
+        await ctx.send("✅ Chrome restarted.")
+    except Exception as e:
+        await ctx.send(f"❌ Failed to restart Chrome: `{e}`")
+        return
+
+    # 7) (Optional) Restart the loop automatically
+    try:
+        channel = bot.get_channel(DISCORD_CHANNEL)
+        if channel and not is_main_loop_running():
+            await start_main_loop(channel)
+            await ctx.send("🎰 Casino loop restarted.")
+    except Exception:
+        pass
+
 
 
 # ───────────────────────────────────────────────────────────
@@ -1004,7 +1063,7 @@ async def globalpoker_cmd(ctx):
     await ctx.send("Checking GlobalPoker for bonus…")
     await global_poker(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
 
-@bot.command(name="jefebet", aliases=["jefe", "jefebet casino"])
+@bot.command(name="jefebet", aliases=["jefe", "jefebet casino", "jefe bet", "jb"])
 async def jefebet_cmd(ctx):
     await ctx.send("Checking JefeBet for bonus…")
     await jefebet_casino(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
@@ -1062,7 +1121,13 @@ async def fortunewheelz_cmd(ctx):
 async def fortunecoins_cmd(ctx):
     await ctx.send("Checking Fortune Coins for bonus…")
     channel = bot.get_channel(DISCORD_CHANNEL)
-    await fortunecoins_uc(ctx, channel)
+    loop = asyncio.get_running_loop()
+    from fortunecoinsAPI import fortunecoins_uc_blocking
+    _exec_job_started()
+    try:
+        await loop.run_in_executor(_executor, fortunecoins_uc_blocking, bot, channel.id, loop)
+    finally:
+        _exec_job_finished()
 
 @bot.command(name="spinquest")
 async def spinquest_cmd(ctx):

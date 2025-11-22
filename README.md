@@ -13,23 +13,23 @@ Never miss a casino bonus again! A discord app for claiming social casino bonuse
 
 </p>
 
-# About 🧾
+# About 
 Casino Claim is a discord bot for claiming social casino bonuses. The bot will automatically claim your bonus, provide a countdown for the next, and authenticate if needed.
 
-# DISCLAIMER ⚖️
+# DISCLAIMER 
 I am not responsible for any financial loss or gain incurred with the use of this tool. I have no relationship with any business or website. This tool is for educational purposes only and is provided as is with no warranty.
 
-# Having an Issue? 🤔
+# Having an Issue? 
 For direct support, feature/casino requests, and community access, please sponsor me below and I will help you on Discord (exclusive to Sponsors and Contributors only).
 
 [![Sponsor](https://img.shields.io/badge/sponsor-30363D?style=for-the-badge&logo=GitHub-Sponsors&logoColor=white)](https://github.com/sponsors/DrakeHooks)
 [![ko-fi](https://img.shields.io/badge/Ko--fi-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/drakehooks)
 
-# Acknowledgement 🏆
+# Acknowledgement 
 This program is heavily inspired by auto-rsa from Nelson Dane. Go check it out and give it a star here: https://github.com/NelsonDane/auto-rsa
 
 
-# Installation 🛠️
+# Installation 
 1. Install `git` for your operating system. Then, install `docker` and `docker-compose` for your operating system. You can follow this guide to install docker and docker-compose: https://docs.docker.com/get-docker/ Note: If you are using Windows, I strongly recommend docker desktop for Windows.
 
 2. Clone this repository and cd into it:
@@ -100,6 +100,6 @@ If you identify a fix, feel free to submit a pull request and I will review it.
 
 
 # Problem Gambling 🎲
-Gambling can become addicting, if you start feeling addicted, please get help before it affects your life negatively. Always remember, you are not alone!
+Gambling can become addictive. If you start feeling addicted, please seek help before it affects your life negatively. Always remember—you are not alone!
 
 <a href="https://www.ncpgambling.org/help-treatment/"><img src="https://www.ncpgambling.org/wp-content/themes/magneti/assets/build/images/800gamb-logo-header.svg"/></a>

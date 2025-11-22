@@ -1,5 +1,7 @@
 # Drake Hooks + WaterTrooper
-# Casino Claim 2 — Fortune Wheelz API (de-recursed + guarded)
+# Casino Claim 2 
+# Fortune Wheelz API
+# Notes: Popup closer accepts xpaths, spans, and other elements.
 
 import os
 import re
@@ -39,6 +41,14 @@ MODAL_COUNTDOWN_P = "/html/body/div[4]/div/div[2]/div[3]/p"
 STORE_DISABLED_BTN_ABS = "/html/body/div[1]/div/div/div[2]/main/div/div[1]/div[2]/div[3]/div/div[1]/div[2]/button"
 COUNTDOWN_DISABLED_BTN_GENERIC = "//button[@disabled and contains(normalize-space(.), ':')]"
 
+# Popups to detect and close (add more XPaths here as you discover them)
+POPUP_CLOSE_XPATHS = [
+    "/html/body/div[4]/div/div[1]/span",
+    "/html/body/div[5]/div/div[1]/span",
+    # "/html/body/div[6]/div/div[1]/span",  # example future popup
+    # "/html/body/div[7]/div/div[1]/span",
+]
+
 # Generic helpers
 def _wait_clickable(driver, by, value, timeout=8):
     return WebDriverWait(driver, timeout).until(EC.element_to_be_clickable((by, value)))
@@ -58,6 +68,111 @@ def _normalize_countdown(txt: str) -> str | None:
         return None
     h, mnt, s = m.groups()
     return f"{int(h):02d}:{int(mnt):02d}:{int(s):02d}"
+
+
+def _close_popups(driver, xpaths: list[str] | None = None, max_passes: int = 2) -> None:
+    """
+    Extremely robust popup closer for FortuneWheelz.
+
+    Adds:
+      - span.close (CSS)
+      - span[data-tid*='close']
+      - JS click fallback
+      - click via ActionChains fallback
+      - final JS “remove all close buttons” fallback
+    """
+
+    if xpaths is None:
+        xpaths = POPUP_CLOSE_XPATHS
+
+    def js_click(el):
+        try:
+            driver.execute_script("arguments[0].click();", el)
+            return True
+        except Exception:
+            return False
+
+    def try_close_element(el):
+        try:
+            el.click()
+            return True
+        except Exception:
+            # fallback to JS
+            return js_click(el)
+
+    for _ in range(max_passes):
+        closed_any = False
+
+        # ──────────────────────────────────────────────
+        # 1) Known XPaths
+        # ──────────────────────────────────────────────
+        for xp in xpaths:
+            try:
+                el = WebDriverWait(driver, 2).until(
+                    EC.element_to_be_clickable((By.XPATH, xp))
+                )
+                if try_close_element(el):
+                    closed_any = True
+            except TimeoutException:
+                pass
+
+        # ──────────────────────────────────────────────
+        # 2) Generic <span class="close">
+        # ──────────────────────────────────────────────
+        try:
+            close_spans = driver.find_elements(By.CSS_SELECTOR, "span.close")
+            for el in close_spans:
+                if try_close_element(el):
+                    closed_any = True
+        except Exception:
+            pass
+
+        # ──────────────────────────────────────────────
+        # 3) Generic <span data-tid*='close'>
+        # ──────────────────────────────────────────────
+        try:
+            tid_spans = driver.find_elements(By.CSS_SELECTOR, "span[data-tid*='close']")
+            for el in tid_spans:
+                if try_close_element(el):
+                    closed_any = True
+        except Exception:
+            pass
+
+        # ──────────────────────────────────────────────
+        # 4) Any visible span whose innerText contains "x"
+        # (Some sites use × or x as text for close)
+        # ──────────────────────────────────────────────
+        try:
+            maybe_x = driver.find_elements(By.TAG_NAME, "span")
+            for el in maybe_x:
+                try:
+                    t = (el.text or "").strip().lower()
+                    if t in ("x", "×", "close"):
+                        if try_close_element(el):
+                            closed_any = True
+                except Exception:
+                    continue
+        except Exception:
+            pass
+
+        # ──────────────────────────────────────────────
+        # Early exit
+        # ──────────────────────────────────────────────
+        if not closed_any:
+            break
+
+    # ────────────────────────────────────────────────────────
+    # FINAL KILL-SWITCH: Remove all close buttons if still open
+    # ────────────────────────────────────────────────────────
+    try:
+        driver.execute_script("""
+            document.querySelectorAll('span.close, span[data-tid*="close"]').forEach(e=>{
+                try { e.click(); } catch(err){}
+                try { e.remove(); } catch(err){}
+            });
+        """)
+    except Exception:
+        pass
 
 # ───────────────────────────────────────────────────────────
 #  More Helpers
@@ -124,8 +239,10 @@ async def _shoot(channel, driver, path, msg):
     except Exception:
         await channel.send(msg)
     finally:
-        try: os.remove(path)
-        except Exception: pass
+        try:
+            os.remove(path)
+        except Exception:
+            pass
 
 
 # ───────────────────────────────────────────────────────────
@@ -136,7 +253,10 @@ async def fortunewheelz_flow(ctx, driver, channel):
     Try in this order:
       1) If claim dialog is reachable → claim
       2) Else show countdown if present (modal p OR disabled button on store)
-      3) Else login once, then try claim once, then read countdown again
+      3) Else login once, then:
+            - close any popups
+            - try claim once
+            - then read countdown again
     Never recurse; never loop forever.
     """
     # Step 1: try claim directly
@@ -150,7 +270,7 @@ async def fortunewheelz_flow(ctx, driver, channel):
     # Step 2: try a countdown read (modal p, store button abs, generic fallback)
     countdown = _read_countdown(driver)
     if countdown:
-        await channel.send(f"Next Fortune Wheelz bonus Available in: {countdown}")
+        await channel.send(f"Next Fortune Wheelz Bonus Available in: {countdown}")
         return
 
     # Step 3: login once, then attempt one claim pass
@@ -171,20 +291,32 @@ async def fortunewheelz_flow(ctx, driver, channel):
         pw.send_keys(passw)
         _wait_clickable(driver, By.XPATH, LOGIN_SUBMIT, timeout=10).click()
         await asyncio.sleep(3)
+
+        # ── Popup closer: ONLY after login ─────────────────────────────
+        _close_popups(driver)
+        # ────────────────────────────────────────────────────────────────
+
     except TimeoutException:
-        await _shoot(channel, driver, "fortunewheelz_login_timeout.png",
-                     "Fortune Wheelz login timed out. Will try again next loop.")
+        await _shoot(
+            channel,
+            driver,
+            "fortunewheelz_login_timeout.png",
+            "Fortune Wheelz login timed out. Will try again next loop.",
+        )
         return
 
-    # After login, one more single attempt:
+    # After login, go back to the store and try one more time:
     driver.get(STORE_URL)
     await asyncio.sleep(3)
+
+    # Optional: if you suspect a promo popup on the store too, you can also do:
+    _close_popups(driver)
+
     claimed = await _try_claim(driver, channel)
     if claimed:
         return
 
     countdown = _read_countdown(driver)
     if countdown:
-        await channel.send(f"Next Fortune Wheelz bonus Available in: {countdown}")
+        await channel.send(f"Next Fortune Wheelz Bonus Available in: {countdown}")
     # If neither was found, we silently return; the main loop will revisit later.
-

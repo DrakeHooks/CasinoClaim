@@ -100,18 +100,19 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
                     await _send_shot(sb, channel, "americanluck_login_failed.png",
                     "American Luck: Login failed (Get Coins not visible).")
 
+            # Lobby refresh/ready for state complete breaking claim logic.
+            
+            # # Let auth redirects settle
+            # sb.wait(6)
+            # sb.refresh_page()
+            # sb.wait_for_ready_state_complete()
 
-            # Let auth redirects settle
-            sb.wait(6)
-            sb.refresh_page()
-            sb.wait_for_ready_state_complete()
-
-            # Go to lobby (if not already there)
-            try:
-                sb.open(LOBBY_URL)
-                sb.wait_for_ready_state_complete()
-            except Exception:
-                pass
+            # # Go to lobby (if not already there)
+            # try:
+            #     sb.open(LOBBY_URL)
+            #     sb.wait_for_ready_state_complete()
+            # except Exception:
+            #     pass
 
             # Close known popup and escape any stray modals
             _force_click_xpath(sb, POPUP_CLOSE_XP, timeout=5)

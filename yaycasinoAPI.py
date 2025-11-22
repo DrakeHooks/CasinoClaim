@@ -182,18 +182,22 @@ async def yaycasino_uc(ctx, channel: discord.abc.Messageable):
                 await _send_status_shot(sb, channel, "YayCasino: countdown not available (or auth failed).", "yaycasino_unavailable")
                 return
 
-            # 2) Post-login settle and refresh into lobby
-            sb.wait(8)
-            sb.refresh_page()
-            sb.wait_for_ready_state_complete()
-            print("[YayCasino] Post-login refresh complete (lobby expected).")
 
-            # (Optional) Force open lobby URL
-            try:
-                sb.open(LOBBY_URL)
-                sb.wait_for_ready_state_complete()
-            except Exception:
-                pass
+            # 2) Post login settle breaking Yay Casino claim function, so commented out for now.
+
+
+            # 2) Post-login settle and refresh into lobby
+            # sb.wait(8)
+            # sb.refresh_page()
+            # sb.wait_for_ready_state_complete()
+            # print("[YayCasino] Post-login refresh complete (lobby expected).")
+
+            # # (Optional) Force open lobby URL
+            # try:
+            #     sb.open(LOBBY_URL)
+            #     sb.wait_for_ready_state_complete()
+            # except Exception:
+            #     pass
 
             # 3) Close popups
             _close_popups_flexible(sb)
@@ -209,7 +213,7 @@ async def yaycasino_uc(ctx, channel: discord.abc.Messageable):
             )
             if not opened_rewards:
                 print("[YayCasino] Rewards/Coins button not found.")
-                await _send_status_shot(sb, channel, "YayCasino: countdown not available (or auth failed).", "yaycasino_unavailable")
+                await _send_status_shot(sb, channel, "Rewards/Coins button not found.", "yaycasino_unavailable")
                 return
 
             sb.wait(10)  # allow the rewards modal to render fully
@@ -233,7 +237,7 @@ async def yaycasino_uc(ctx, channel: discord.abc.Messageable):
                 print("[YayCasino] Claimed successfully.")
             else:
                 print("[YayCasino] No claim available (likely already claimed).")
-                await _send_status_shot(sb, channel, "YayCasino: countdown not available (or auth failed).", "yaycasino_unavailable")
+                await _send_status_shot(sb, channel, "YayCasino: bonus not available (or auth failed).", "yaycasino_unavailable")
 
     except Exception as e:
         print(f"[YayCasino][ERROR] Exception during automation: {e}")
@@ -241,4 +245,4 @@ async def yaycasino_uc(ctx, channel: discord.abc.Messageable):
             with SB(uc=True, headed=True) as sb_fallback:
                 await _send_status_shot(sb_fallback, channel, "YayCasino: bonus not available (or auth failed).", "yaycasino_error")
         except Exception:
-            await channel.send("YayCasino: countdown not available (or auth failed).")
+            await channel.send("YayCasino: bonus not available (or auth failed).")
