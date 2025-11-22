@@ -1,39 +1,41 @@
 # Drake Hooks + WaterTrooper
 # Casino Claim 2
 # American Luck API (SeleniumBase UC)
-# Exposes: async def americanluck_uc(ctx, channel)
+# Notes: Popup handler included. Xpaths subject to change. 
 
 import os
 import discord
 from dotenv import load_dotenv
 from seleniumbase import SB
 
+
+
+# ───────────────────────────────────────────────────────────
+# American Luck Config and Constants
+# ───────────────────────────────────────────────────────────
+
 load_dotenv()
-
-
-# ───────────────────────────────────────────────────────────
-# Constants and Config
-# ───────────────────────────────────────────────────────────
-
-
 
 LOGIN_URL = "https://americanluck.com/login"
 LOBBY_URL = "https://americanluck.com/lobby"
 
 POPUP_CLOSE_XP   = "/html/body/div[5]/div/button"
 GET_COINS_BTN_XP = "/html/body/div[1]/div[2]/header/div[2]/button[1]"
-COLLECT_BTN_XP   = "/html/body/div[7]/div/div/section[1]/div/div/div[1]/div/div[3]/button[1]"
+# Updated: no [1] at the end
+COLLECT_BTN_XP   = "/html/body/div[7]/div/div/section[1]/div/div/div[1]/div/div[3]/button"
 
 
 # ───────────────────────────────────────────────────────────
-# American Luck Casino Helpers
+# Helpers
 # ───────────────────────────────────────────────────────────
+
 async def _send_shot(sb: SB, channel: discord.abc.Messageable, path: str, caption: str):
-    """Save a screenshot, send to Discord, and clean up the file."""
+    """Save a screenshot, send it to Discord, then clean it up."""
     try:
         sb.save_screenshot(path)
         await channel.send(caption, file=discord.File(path))
     except Exception:
+        # Fall back to text-only if something goes wrong
         try:
             await channel.send(caption)
         except Exception:
@@ -46,17 +48,24 @@ async def _send_shot(sb: SB, channel: discord.abc.Messageable, path: str, captio
             pass
 
 
-def _force_click_xpath(sb: SB, xpath: str, timeout: float = 12) -> bool:
-    """Click a stubborn XPath with multiple strategies."""
+def _force_click_xpath(sb: SB, xpath: str, timeout: float = 10) -> bool:
+    """
+    Try hard to click an element by XPath.
+    Returns True if any strategy succeeds, False otherwise.
+    """
     try:
         sb.wait_for_element_visible(xpath, timeout=timeout)
     except Exception:
         return False
+
     try:
         sb.scroll_to(xpath)
     except Exception:
         pass
-    for mode in ("click", "slow", "js", "directjs"):
+
+    # Try a few different click strategies
+    strategies = ("click", "slow", "js", "directjs")
+    for mode in strategies:
         try:
             if mode == "click":
                 sb.click_xpath(xpath, timeout=2)
@@ -70,136 +79,144 @@ def _force_click_xpath(sb: SB, xpath: str, timeout: float = 12) -> bool:
             return True
         except Exception:
             continue
+
     return False
 
 
 # ───────────────────────────────────────────────────────────
-# American Luck Main Flow (UC Mode)
+# Main flow
 # ───────────────────────────────────────────────────────────
+
 async def americanluck_uc(ctx, channel: discord.abc.Messageable):
     await channel.send("Launching **American Luck** (UC)…")
 
     creds = os.getenv("AMERICANLUCK")
     if not creds or ":" not in creds:
-        await channel.send("⚠️ AMERICANLUCK not set (email:pass) in .env")
+        await channel.send("⚠️ AMERICANLUCK not set in `.env` (expected `email:password`).")
         return
     username, password = creds.split(":", 1)
 
     sb = None
     try:
-        with SB(uc=True, headed=True) as sb:
-            # Open login
-            sb.uc_open_with_reconnect(LOGIN_URL, 8)
-            sb.wait_for_ready_state_complete()
-            # await _send_shot(sb, channel, "americanluck_login.png",
-            #                      " American Luck: Login page ")
+        async with ctx.typing():
+            with SB(uc=True, headed=True) as sb:
+                # ── Step 1: open login page ──
+                sb.uc_open_with_reconnect(LOGIN_URL, 8)
+                sb.wait_for_ready_state_complete()
 
-            # Try to type only into these two fields
-            typed = False
-            try:
-                sb.wait(5)
+                # ── Step 2: type credentials and click login ──
+                sb.wait(1)
                 sb.type("input[id='emailAddress']", username)
-                sb.wait(5)
                 sb.type("input[id='password']", password)
-                sb.uc_gui_click_captcha()
-                sb.wait(10)
+
+                # Try to solve captcha via helper, if available
+                try:
+                    sb.uc_gui_click_captcha()
+                except Exception:
+                    pass
+
+                sb.wait(1.5)
                 _force_click_xpath(
                     sb,
                     "/html/body/div[1]/div[2]/main/div/div/div/div[2]/form/div[4]/button",
-                    timeout=12,
-                )
-                typed = True
-            except Exception:
-                await _send_shot(
-                    sb,
-                    channel,
-                    "americanluck_login_failed.png",
-                    "American Luck: Login failed (Get Coins not visible).",
+                    timeout=10,
                 )
 
-            # Close known popup and escape any stray modals
-            popup_closed = _force_click_xpath(sb, POPUP_CLOSE_XP, timeout=5)
-            if not popup_closed:
-                # Non-fatal, just log that popup XPath might have changed
-                print("American Luck: POPUP_CLOSE_XP not found. XPath may have been updated.")
+                sb.wait(6)
+                sb.wait_for_ready_state_complete()
 
-            try:
-                sb.press_keys("body", "ESCAPE")
-            except Exception:
-                pass
+                # ── Step 3: close any popup if present ──
+                _force_click_xpath(sb, POPUP_CLOSE_XP, timeout=4)
+                try:
+                    sb.press_keys("body", "ESCAPE")
+                except Exception:
+                    pass
 
-            # Check login state by presence of Get Coins button
-            login_ok = False
-            try:
-                sb.wait_for_element_visible(GET_COINS_BTN_XP, timeout=8)
-                login_ok = True
-            except Exception:
+                sb.wait(2)
+                sb.wait_for_ready_state_complete()
+
+                # ── Step 4: detect login state ──
                 login_ok = False
+                try:
+                    sb.wait_for_element_visible(GET_COINS_BTN_XP, timeout=8)
+                    login_ok = True
+                except Exception:
+                    login_ok = False
 
-            if login_ok:
-                # ───────── Claim logic (quiet unless success) ─────────
+                # Fallback: URL heuristic
+                if not login_ok:
+                    try:
+                        current_url = sb.get_current_url()
+                        if current_url.startswith(LOBBY_URL):
+                            login_ok = True
+                    except Exception:
+                        pass
+
+                if not login_ok:
+                    # Login failed / not in lobby – send screenshot for debugging
+                    await _send_shot(
+                        sb,
+                        channel,
+                        "americanluck_login_failed.png",
+                        "American Luck: Login failed or bonus unavailable.",
+                    )
+                    return
+
+                # ── Step 5: open Get Coins modal ──
                 opened = _force_click_xpath(sb, GET_COINS_BTN_XP, timeout=8)
                 if not opened:
                     sb.wait(3)
                     opened = _force_click_xpath(sb, GET_COINS_BTN_XP, timeout=6)
 
                 if not opened:
-                    msg = (
-                        "American Luck: Could not click **Get Coins** button. "
-                        "XPaths may have been updated."
+                    await _send_shot(
+                        sb,
+                        channel,
+                        "americanluck_getcoins_missing.png",
+                        "American Luck: Could not open **Get Coins**. "
+                        "Layout may have changed or bonus is unavailable.",
                     )
-                    print(msg)
-                    await channel.send(msg)
-                    # Bail early, since we can't even open the claim modal
                     return
 
-                if opened:
-                    sb.wait_for_ready_state_complete()
-                    sb.wait(3)
-                    collected = _force_click_xpath(sb, COLLECT_BTN_XP, timeout=8)
-                    if not collected:
-                        sb.wait(4)
-                        collected = _force_click_xpath(sb, COLLECT_BTN_XP, timeout=5)
+                sb.wait_for_ready_state_complete()
+                sb.wait(3)
 
-                    if collected:
-                        sb.wait(2)
-                        await _send_shot(
-                            sb,
-                            channel,
-                            "americanluck_claimed.png",
-                            "American Luck Daily Bonus Claimed!",
-                        )
-                    else:
-                        msg = (
-                            "American Luck: Could not find **Collect** button. "
-                            "Bonus may be unavailable or XPaths may have been updated."
-                        )
-                        print(msg)
-                        await channel.send(msg)
-                # If collected fails, we already sent a message above
+                # ── Step 6: click Collect ──
+                collected = _force_click_xpath(sb, COLLECT_BTN_XP, timeout=8)
+                if not collected:
+                    sb.wait(4)
+                    collected = _force_click_xpath(sb, COLLECT_BTN_XP, timeout=6)
 
-            else:
-                # Send login **failure** screenshot + hint about XPaths
-                await _send_shot(
-                    sb,
-                    channel,
-                    "americanluck_login_failed.png",
-                    "American Luck: Login failed, bonus unavailable, or XPaths may have been updated.",
-                )
+                if collected:
+                    sb.wait(2)
+                    await _send_shot(
+                        sb,
+                        channel,
+                        "americanluck_claimed.png",
+                        "American Luck Daily Bonus Claimed!",
+                    )
+                else:
+                    # This is the case you care about: Collect button missing / XPath changed
+                    await _send_shot(
+                        sb,
+                        channel,
+                        "americanluck_collect_missing.png",
+                        "American Luck: Could not find **Collect** button. "
+                        "Bonus may be unavailable, or COLLECT_BTN_XP needs update.",
+                    )
 
     except Exception as e:
-        # Try to send an error-state screenshot if the browser exists
+        # Top-level crash: try to capture the state for debugging
         try:
             if sb is not None:
                 await _send_shot(
                     sb,
                     channel,
                     "americanluck_error.png",
-                    f"⚠️ American Luck crashed: {e}",
+                    f"⚠️ American Luck crashed: `{e}`",
                 )
             else:
-                await channel.send(
-                    f"⚠️ American Luck crashed before browser started: {e}"
-                )
+                await channel.send(f"⚠️ American Luck crashed before browser started: `{e}`")
         except Exception:
+            # Last-resort: swallow any errors trying to report the crash
             pass
