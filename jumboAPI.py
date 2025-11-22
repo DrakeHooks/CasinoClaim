@@ -170,9 +170,12 @@ async def claim_jumbo_bonus(ctx, driver, channel):
         countdown = re.sub(r"Available\s+", "", raw)           # => "22:27:06"
         await channel.send(f"Next Jumbo Bonus Available in: {countdown}")
         return
-    except Exception:
+    except:
         print("[Jumbo] Unable to read countdown.")
-
+        screenshot = "jumbo_countdown_error.png"
+        driver.save_screenshot(screenshot)
+        await channel.send("Jumbo: unable to read countdown.",file=discord.File(screenshot))
+        os.remove(screenshot)
 # ───────────────────────────────────────────────────────────
 # 4) (Optional) Standalone Countdown Reader
 # ───────────────────────────────────────────────────────────
