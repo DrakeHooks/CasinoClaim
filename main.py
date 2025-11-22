@@ -304,8 +304,8 @@ casino_loop_entries: List[CasinoLoopEntry] = [
     CasinoLoopEntry("jefebet",       "JefeBet",           _run_jefebet,         120),
     CasinoLoopEntry("spinquest",     "SpinQuest",         _run_spinquest,       120),
     CasinoLoopEntry("fortunewheelz", "Fortune Wheelz",    _run_fortunewheelz,   120),
-    CasinoLoopEntry("nolimitcoins",  "NoLimitCoins",      _run_nlc,             120),
     CasinoLoopEntry("jumbo",         "Jumbo",             _run_jumbo,           120),
+    CasinoLoopEntry("nolimitcoins",  "NoLimitCoins",      _run_nlc,             120),
 
     # Enable when you want Modo and Stake in the loop cadence:
     # CasinoLoopEntry("modo",          "Modo",              _run_modo,            120),
