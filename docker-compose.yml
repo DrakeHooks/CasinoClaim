@@ -1,18 +1,20 @@
 services:
   casino-bot:
     container_name: casino-bot
-    image: drakehooks/casinoclaim:testing
+    image: docker.io/drakehooks/casinoclaim:testing
     ports:
       - "5900:5900"
     environment:
-      - CHROME_INSTANCE_DIR=/data/chrome     # ← use the branch main.py prefers
+      # Persistent chrome instance data
+      - CHROME_INSTANCE_DIR=/data/chrome
       - CHROME_PROFILE_DIR=Default
       - PYTHONPATH=/app:/app/apis:/app/app
-      # Optional: persist Fortune Coins SB/UC profile too:
-      - FC_USER_DATA_DIR=/data/fortunecoins  # ← optional
+      # Optional: persist Fortune Coins SB/UC profile
+      - FC_USER_DATA_DIR=/data/fortunecoins 
     volumes:
       - ./:/app
-      - chrome-profile:/data/chrome          # ← persistent named volume for main Selenium
+      # Persistent named volume for main Selenium
+      - chrome-profile:/data/chrome          
       # Optional: a separate FC profile directory inside the same named volume
       - chrome-profile:/data/fortunecoins    # ← reuse the same volume namespace
       - ./CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx:/temp/CAPTCHA-Solver.crx
@@ -21,19 +23,23 @@ services:
     shm_size: "2g"
     restart: unless-stopped
     entrypoint: ["/bin/bash","-lc","bash /app/entrypoint.sh"]
-    labels:
-      - com.centurylinklabs.watchtower.enable=true
 
   watchtower:
-    container_name: watchtower
+    # Detect and auto update casino-bot container every hour
     image: containrrr/watchtower:latest
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+    container_name: watchtower
+    hostname: casino-bot
     environment:
       - WATCHTOWER_CLEANUP=true
-      - WATCHTOWER_LABEL_ENABLE=true
+      - WATCHTOWER_INCLUDE_STOPPED=true
       - WATCHTOWER_POLL_INTERVAL=3600
+    command:
+      - casino-bot
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
 
 volumes:
   chrome-profile:
+
+
