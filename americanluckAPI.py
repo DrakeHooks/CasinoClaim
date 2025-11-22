@@ -67,7 +67,7 @@ def _force_click_xpath(sb: SB, xpath: str, timeout: float = 10) -> bool:
     for mode in strategies:
         try:
             if mode == "click":
-                sb.click_xpath(xpath, timeout=2)
+                sb.click_xpath(xpath, timeout=4)
             elif mode == "slow":
                 sb.slow_click(xpath)
             elif mode == "js":
