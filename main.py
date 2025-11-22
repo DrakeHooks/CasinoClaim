@@ -139,6 +139,7 @@ def _clean_chrome_locks(root: str, profile: str) -> None:
 
 def _apply_common_chrome_flags(opts: Options) -> None:
     opts.add_argument("--window-size=1920,1080")
+    opts.add_argument("--hide-crash-restore-bubble")
     opts.add_argument("--no-first-run")
     opts.add_argument("--no-default-browser-check")
     opts.add_argument("--disable-dev-shm-usage")
