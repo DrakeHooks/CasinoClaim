@@ -1,44 +1,42 @@
 services:
   casino-bot:
     container_name: casino-bot
-    image: docker.io/drakehooks/casinoclaim:testing
+    image: drakehooks/casinoclaim:testing
     ports:
       - "5900:5900"
     environment:
-      # Persistent chrome instance data
       - CHROME_INSTANCE_DIR=/data/chrome
       - CHROME_PROFILE_DIR=Default
       - PYTHONPATH=/app:/app/apis:/app/app
-      # Optional: persist Fortune Coins SB/UC profile
-      - FC_USER_DATA_DIR=/data/fortunecoins 
+      - FC_USER_DATA_DIR=/data/fortunecoins
+      # Tell the !reset command where the compose project & file are:
+      - COMPOSE_DIR=/app
+      - COMPOSE_FILE=/app/docker-compose.yml
     volumes:
-      # Persistent named volume for main Selenium
-      - chrome-profile:/data/chrome          
-      # Optional: a separate FC profile directory inside the same named volume
-      - chrome-profile:/data/fortunecoins    # ← reuse the same volume namespace
+      - ./:/app
+      - chrome-profile:/data/chrome
+      - chrome-profile:/data/fortunecoins
       - ./CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx:/temp/CAPTCHA-Solver.crx
+      # 👇 allow docker CLI inside the container to talk to host daemon
+      - /var/run/docker.sock:/var/run/docker.sock
     env_file:
       - .env
     shm_size: "2g"
     restart: unless-stopped
     entrypoint: ["/bin/bash","-lc","bash /app/entrypoint.sh"]
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
 
   watchtower:
-    # Detect and auto update casino-bot container every hour
-    image: containrrr/watchtower:latest
     container_name: watchtower
-    hostname: casino-bot
-    environment:
-      - WATCHTOWER_CLEANUP=true
-      - WATCHTOWER_INCLUDE_STOPPED=true
-      - WATCHTOWER_POLL_INTERVAL=3600
-    command:
-      - casino-bot
+    image: containrrr/watchtower:latest
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_LABEL_ENABLE=true
+      - WATCHTOWER_POLL_INTERVAL=3600
     restart: unless-stopped
 
 volumes:
   chrome-profile:
-
-
