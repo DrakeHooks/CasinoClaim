@@ -1,6 +1,6 @@
 # Drake Hooks + WaterTrooper
 # Casino Claim 2
-# LuckyLand API — cookies fix + canvas login button + credential submit
+# LuckyLand API — cookies fix + canvas login button + canvas-based credential submit
 
 import os
 import time
@@ -30,6 +30,7 @@ LOGIN_THRESH      = 0.75
 FIND_RETRIES      = 10
 FIND_DELAY        = 0.6
 AFTER_CLICK_WAIT  = 5.0
+
 
 # ────────────────────────────────────────────
 # File / image helpers
@@ -347,20 +348,130 @@ async def _click_template_on_canvas(
 
 
 # ────────────────────────────────────────────
+# Canvas-based typing for login popup
+# ────────────────────────────────────────────
+
+def _canvas_type_login(sb: SB, email: str, password: str) -> dict:
+    """
+    When the login popup is drawn on the canvas (no HTML inputs),
+    we:
+      1) Click the approximate center of the E-Mail field.
+      2) Type the email via synthetic KeyboardEvents.
+      3) Press Tab to jump to the Password field.
+      4) Type the password.
+      5) Press Enter to submit.
+
+    Email/password field centers are expressed as fractions of viewport.
+    Tuned for 1920x1080 but scaled dynamically.
+    """
+    # Fractions based on your screenshot (rough but centered)
+    EMAIL_X_FRACTION = 0.50
+    EMAIL_Y_FRACTION = 0.44
+    # We only need Tab to reach password, so no direct click on password box.
+
+    # Get viewport size in CSS pixels
+    vw = float(
+        sb.execute_script(
+            "return window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth || 0;"
+        ) or 0
+    )
+    vh = float(
+        sb.execute_script(
+            "return window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight || 0;"
+        ) or 0
+    )
+
+    if vw <= 0 or vh <= 0:
+        return {"mode": "canvas", "error": "bad_viewport", "vw": vw, "vh": vh}
+
+    email_x = int(vw * EMAIL_X_FRACTION)
+    email_y = int(vh * EMAIL_Y_FRACTION)
+
+    print(f"[LuckyLand] Canvas login: clicking email at CSS ({email_x},{email_y})")
+    _click_at_css_point(sb, email_x, email_y)
+    time.sleep(0.5)
+
+    # JS helpers to type text and press a single key (Tab/Enter)
+    js_type = r"""
+      (function(text){
+        const target = document.activeElement || document.body;
+        for (let i = 0; i < text.length; i++) {
+          const ch = text[i];
+          const code = ch;
+          const keyCode = ch.charCodeAt(0);
+          const evtInit = {
+            key: ch,
+            code: code,
+            keyCode: keyCode,
+            which: keyCode,
+            bubbles: true,
+            cancelable: true
+          };
+          try {
+            target.dispatchEvent(new KeyboardEvent('keydown',  evtInit));
+            target.dispatchEvent(new KeyboardEvent('keyup',    evtInit));
+          } catch (e) {}
+        }
+      })(arguments[0]);
+    """
+
+    js_key = r"""
+      (function(key){
+        const target = document.activeElement || document.body;
+        let keyCode = 0;
+        if (key === 'Tab')   keyCode = 9;
+        if (key === 'Enter') keyCode = 13;
+        const evtInit = {
+          key: key,
+          code: key,
+          keyCode: keyCode,
+          which: keyCode,
+          bubbles: true,
+          cancelable: true
+        };
+        try {
+          target.dispatchEvent(new KeyboardEvent('keydown', evtInit));
+          target.dispatchEvent(new KeyboardEvent('keyup',   evtInit));
+        } catch (e) {}
+      })(arguments[0]);
+    """
+
+    # Type email
+    print("[LuckyLand] Canvas login: typing email…")
+    sb.execute_script(js_type, email)
+    time.sleep(0.4)
+
+    # Tab to password field
+    print("[LuckyLand] Canvas login: sending Tab to reach password field…")
+    sb.execute_script(js_key, "Tab")
+    time.sleep(0.4)
+
+    # Type password
+    print("[LuckyLand] Canvas login: typing password…")
+    sb.execute_script(js_type, password)
+    time.sleep(0.4)
+
+    # Press Enter to submit
+    print("[LuckyLand] Canvas login: sending Enter to submit…")
+    sb.execute_script(js_key, "Enter")
+
+    return {
+        "mode": "canvas",
+        "vw": vw,
+        "vh": vh,
+        "email_x": email_x,
+        "email_y": email_y,
+    }
+
+
+# ────────────────────────────────────────────
 # Login popup: fill creds + submit
 # ────────────────────────────────────────────
 
 def _fill_login_and_submit(sb: SB, email: str, password: str) -> dict:
     """
-    Finds the E-Mail + Password inputs (if they exist as HTML inputs),
-    fills them with .env creds, and submits the form.
-
-    - Searches all <input> elements and heuristically picks:
-        * emailEl: type=email or name/placeholder contains 'email' / 'mail'
-        * passEl : type=password or name/placeholder contains 'pass'
-    - Sets .value, dispatches 'input' events.
-    - If passEl.form exists, dispatches 'submit' and then form.submit().
-    - Also simulates pressing Enter on the password field for good measure.
+    First tries to find real HTML <input> elements for E-Mail / Password.
+    If none are found (canvas-only UI), falls back to _canvas_type_login().
     """
     js = r"""
       return (function(emailVal, passVal){
@@ -380,6 +491,15 @@ def _fill_login_and_submit(sb: SB, email: str, password: str) -> dict:
           if (!passEl && (type === 'password' || name.includes('pass') || ph.includes('pass'))) {
             passEl = el;
           }
+        }
+
+        if (!emailEl && !passEl) {
+          return {
+            hasEmail: false,
+            hasPass : false,
+            emailType: null,
+            passType : null
+          };
         }
 
         if (emailEl) {
@@ -426,16 +546,26 @@ def _fill_login_and_submit(sb: SB, email: str, password: str) -> dict:
           hasEmail: !!emailEl,
           hasPass : !!passEl,
           emailType: emailEl ? emailEl.type : null,
-          passType : passEl ? passEl.type : null
+          passType : passEl ? passEl.type : null,
+          mode: 'html'
         };
       })(arguments[0], arguments[1]);
     """
     try:
         result = sb.execute_script(js, email, password) or {}
     except Exception as e:
-        result = {"error": str(e)}
+        result = {"error": str(e), "mode": "html_js_error"}
 
-    print(f"[LuckyLand] _fill_login_and_submit result: {result}")
+    # If no HTML inputs, fall back to canvas typing
+    if not result.get("hasEmail") and not result.get("hasPass"):
+        print("[LuckyLand] No HTML inputs detected; switching to canvas typing mode.")
+        canvas_result = _canvas_type_login(sb, email, password)
+        # merge / annotate
+        out = {"mode": "canvas"}
+        out.update(canvas_result)
+        return out
+
+    print(f"[LuckyLand] _fill_login_and_submit HTML result: {result}")
     return result
 
 
@@ -450,7 +580,8 @@ async def luckyland_uc(ctx, channel: discord.abc.Messageable):
       2. Close cookies if present.
       3. (Optional) Click any pre-login image/button.
       4. Click purple 'Log into Existing Account' button on canvas.
-      5. When login popup appears, fill creds from .env and submit.
+      5. When login popup appears, fill creds from .env and submit
+         (HTML inputs if present; otherwise canvas typing).
       6. Screenshot a few seconds after submitting.
     """
     if ":" not in LUCKYLAND_CRED:
@@ -512,7 +643,7 @@ async def luckyland_uc(ctx, channel: discord.abc.Messageable):
             # We should now be on the login popup you screenshotted.
             await channel.send("[LuckyLand] Detected login popup — filling credentials from .env…")
             fill_result = _fill_login_and_submit(sb, email, password)
-            await channel.send(f"[LuckyLand] Login fields located: {fill_result}")
+            await channel.send(f"[LuckyLand] Login fields located / mode: {fill_result}")
 
             # Wait a few seconds for the login request + transition
             time.sleep(AFTER_CLICK_WAIT)
