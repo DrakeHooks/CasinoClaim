@@ -19,7 +19,7 @@ LOGIN_URL = "https://luckylandslots.com/"
 LUCKYLAND_CRED = os.getenv("LUCKYLAND", "")  # "email:password"
 
 # If coordinates seem slightly off in your environment, tweak DPR
-DPR = float(os.getenv("LUCKYLAND_DPR", "1.25"))
+DPR = float(os.getenv("LUCKYLAND_DPR", "1.00"))
 
 # Template images (put in ./images/ or repo root)
 COOKIES_IMG       = "luckyland_cookies.png"      # optional
