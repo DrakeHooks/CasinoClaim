@@ -245,4 +245,4 @@ async def yaycasino_uc(ctx, channel: discord.abc.Messageable):
             with SB(uc=True, headed=True) as sb_fallback:
                 await _send_status_shot(sb_fallback, channel, "YayCasino: bonus not available (or auth failed).", "yaycasino_error")
         except Exception:
-            await channel.send("YayCasino: bonus not available (or auth failed).")
+            await channel.send("[YayCasino] bonus not available (or auth failed).")
