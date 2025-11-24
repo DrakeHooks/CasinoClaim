@@ -1,13 +1,12 @@
 # Drake Hooks + WaterTrooper
 # Casino Claim 2
 # American Luck API (SeleniumBase UC)
-# Notes: Popup handler included. Xpaths subject to change. 
+# Notes: Popup handler included. Xpaths subject to change.
 
 import os
 import discord
 from dotenv import load_dotenv
 from seleniumbase import SB
-
 
 
 # ───────────────────────────────────────────────────────────
@@ -21,7 +20,13 @@ LOBBY_URL = "https://americanluck.com/lobby"
 
 POPUP_CLOSE_XP   = "/html/body/div[5]/div/button"
 GET_COINS_BTN_XP = "/html/body/div[1]/div[2]/header/div[2]/button[1]"
-COLLECT_BTN_XP   = "/html/body/div[7]/div/div/section[1]/div/div/div[1]/div/div[3]/button[1]"
+
+# Collect button via CSS selector (from devtools)
+COLLECT_BTN_CSS = (
+    "body > div.dialog-container > div > div > section:nth-child(2) > div > div > "
+    "div:nth-child(1) > div > div.free-reward-card__button-container > "
+    "button.rag-button.rag-button--primary.free-reward-card__button > div.button-content"
+)
 
 
 # ───────────────────────────────────────────────────────────
@@ -74,6 +79,40 @@ def _force_click_xpath(sb: SB, xpath: str, timeout: float = 10) -> bool:
                 sb.js_click(xpath)
             else:
                 el = sb.find_element(xpath)
+                sb.execute_script("arguments[0].click();", el)
+            return True
+        except Exception:
+            continue
+
+    return False
+
+
+def _force_click_css(sb: SB, css: str, timeout: float = 10) -> bool:
+    """
+    Try hard to click an element by CSS selector.
+    Returns True if any strategy succeeds, False otherwise.
+    """
+    try:
+        sb.wait_for_element_visible(css, timeout=timeout)
+    except Exception:
+        return False
+
+    try:
+        sb.scroll_to(css)
+    except Exception:
+        pass
+
+    strategies = ("click", "slow", "js", "directjs")
+    for mode in strategies:
+        try:
+            if mode == "click":
+                sb.click(css)
+            elif mode == "slow":
+                sb.slow_click(css)
+            elif mode == "js":
+                sb.js_click(css)
+            else:
+                el = sb.find_element(css)
                 sb.execute_script("arguments[0].click();", el)
             return True
         except Exception:
@@ -179,11 +218,11 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
             sb.wait_for_ready_state_complete()
             sb.wait(3)
 
-            # ── Step 6: click Collect ──
-            collected = _force_click_xpath(sb, COLLECT_BTN_XP, timeout=8)
+            # ── Step 6: click Collect via CSS selector ──
+            collected = _force_click_css(sb, COLLECT_BTN_CSS, timeout=8)
             if not collected:
                 sb.wait(4)
-                collected = _force_click_xpath(sb, COLLECT_BTN_XP, timeout=6)
+                collected = _force_click_css(sb, COLLECT_BTN_CSS, timeout=6)
 
             if collected:
                 sb.wait(2)
@@ -194,13 +233,13 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
                     "American Luck Daily Bonus Claimed!",
                 )
             else:
-                # This is the case you care about: Collect button missing / XPath changed
+                # This is the case you care about: Collect button missing / selector changed
                 await _send_shot(
                     sb,
                     channel,
                     "americanluck_collect_missing.png",
                     "[American Luck] Could not find **Collect** button. "
-                    "Bonus may be unavailable, or COLLECT_BTN_XP needs update.",
+                    "Bonus may be unavailable, or COLLECT_BTN_CSS needs update.",
                 )
 
     except Exception as e:
@@ -214,7 +253,9 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
                     f"⚠️ American Luck crashed: `{e}`",
                 )
             else:
-                await channel.send(f"⚠️ American Luck crashed before browser started: `{e}`")
+                await channel.send(
+                    f"⚠️ American Luck crashed before browser started: `{e}`"
+                )
         except Exception:
             # Last-resort: swallow any errors trying to report the crash
             pass
