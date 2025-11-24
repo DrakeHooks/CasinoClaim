@@ -73,7 +73,7 @@ async def login_to_global_poker(driver, channel):
             print("Already logged in to Global Poker.")
         
     except TimeoutException:
-        await channel.send("Login to Global Poker failed. Please check the XPATHs or credentials.")
+        await channel.send("[Global Poker] Login to Global Poker failed. Please check the XPATHs or credentials.")
         return False
 
     return True
@@ -129,7 +129,7 @@ async def click_get_coins_button(driver, channel):
 
     except TimeoutException:
         print("[Global Poker] 'Get Coins' button not found! Check TOS or button XPATHS!")
-        await channel.send("Global Poker: 'Get Coins' button not found! Check TOS or button XPATHS!")
+        await channel.send("[Global Poker] 'Get Coins' button not found! Check TOS or button XPATHS!")
 
 # Main function to check the countdown first, then claim the bonus if not found
 async def global_poker(ctx, driver, channel):
