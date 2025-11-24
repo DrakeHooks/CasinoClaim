@@ -1,10 +1,13 @@
 # Drake Hooks + WaterTrooper
 # Casino Claim 2
-# LuckyLand API — cookies fix + canvas login button + auto-box credential submit (WebDriver typing + Login click, UC + CDP Mode)
+# LuckyLand API — canvas-targeted pointer click (with debug screenshots)
 
 import os
 import time
 from typing import Optional, Tuple, List
+
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 import discord
 from dotenv import load_dotenv
@@ -13,32 +16,29 @@ from seleniumbase import SB
 import cv2
 import numpy as np
 
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.common.action_chains import ActionChains
-
 load_dotenv()
 
 LOGIN_URL = "https://luckylandslots.com/"
 LUCKYLAND_CRED = os.getenv("LUCKYLAND", "")  # "email:password"
 
-# Template images (put these in ./images/ or repo root)
+# If coordinates seem slightly off in your environment, tweak DPR
+DPR = float(os.getenv("LUCKYLAND_DPR", "1.25"))
+
+# Templates (put these in ./images or repo root)
 COOKIES_IMG       = "luckyland_cookies.png"       # optional
 PRELOGIN_BTN_IMG  = "luckyland_loginbtn0.png"     # optional
-LOGIN_BTN_IMG     = "luckylandloginbtn.png"       # REQUIRED (purple "Log into Existing Account" button)
+LOGIN_BTN_IMG     = "luckylandloginbtn.png"       # required ("Log into Existing Account")
 
-# Thresholds / timing
 COOKIES_THRESH    = 0.80
 PRELOGIN_THRESH   = 0.80
 LOGIN_THRESH      = 0.75
+
 FIND_RETRIES      = 10
-FIND_DELAY        = 0.6
+FIND_DELAY        = 0.5
 AFTER_CLICK_WAIT  = 5.0
 
 
-# ────────────────────────────────────────────
-# File / image helpers
-# ────────────────────────────────────────────
+# -------------- basic helpers --------------
 
 def _img_search_paths(filename: str) -> List[str]:
     here = os.path.dirname(os.path.abspath(__file__))
@@ -53,9 +53,7 @@ def _img_search_paths(filename: str) -> List[str]:
 def _load_template(filename: str) -> Optional[np.ndarray]:
     for p in _img_search_paths(filename):
         if os.path.exists(p):
-            print(f"[LuckyLand] Loaded template {filename} from {p}")
             return cv2.imread(p, cv2.IMREAD_COLOR)
-    print(f"[LuckyLand] Template {filename} not found")
     return None
 
 
@@ -64,28 +62,9 @@ def _grab_bgr(sb: SB) -> np.ndarray:
     return cv2.imdecode(data, cv2.IMREAD_COLOR)
 
 
-def _match_template(
-    bgr: np.ndarray, tmpl: np.ndarray, thresh: float
-) -> Optional[Tuple[Tuple[int, int], Tuple[int, int], float]]:
-    """
-    Returns (top_left, bottom_right, maxVal) if match >= thresh; otherwise None.
-    Coordinates are in screenshot pixels.
-    """
-    res = cv2.matchTemplate(bgr, tmpl, cv2.TM_CCOEFF_NORMED)
-    _, maxVal, _, maxLoc = cv2.minMaxLoc(res)
-    print(f"[LuckyLand] Template score={maxVal:.3f} (thresh={thresh})")
-    if maxVal >= thresh:
-        th, tw = tmpl.shape[:2]
-        top_left = maxLoc
-        bottom_right = (maxLoc[0] + tw, maxLoc[1] + th)
-        return top_left, bottom_right, maxVal
-    return None
-
-
 def _save_debug(sb: SB, name: str) -> str:
-    path = f"/tmp/{name}.png"
+    path = f"/tmp/luckyland_{name}.png"
     sb.save_screenshot(path)
-    print(f"[DEBUG] Saved screenshot {path}")
     return path
 
 
@@ -96,14 +75,12 @@ async def _send_shot(channel: discord.abc.Messageable, caption: str, path: str):
         await channel.send(f"{caption} (screenshot missing: {path})")
 
 
-# ────────────────────────────────────────────
-# JS click-at-point helper (works on canvas)
-# ────────────────────────────────────────────
+# -------------- canvas clicking via JS --------------
 
-_JS_CLICK_AT_POINT = r"""
+_JS_CANVAS_CLICK = r"""
 (function(xCss, yCss){
   const el = document.elementFromPoint(xCss, yCss);
-  if (!el) return { ok:false, why:"NO_ELEMENT" };
+  if (!el) return {ok:false, why:"NO_ELEMENT"};
 
   const Ev = (window.PointerEvent || window.MouseEvent);
   const base = {
@@ -121,12 +98,10 @@ _JS_CLICK_AT_POINT = r"""
   function fire(type) {
     try {
       el.dispatchEvent(new Ev(type, base));
-    } catch (e) {
+    } catch(e) {
       try {
         el.dispatchEvent(new MouseEvent(type, base));
-      } catch (e2) {
-        // swallow
-      }
+      } catch(e2) {}
     }
   }
 
@@ -138,8 +113,8 @@ _JS_CLICK_AT_POINT = r"""
     fire('mouseup');
     fire('pointerup');
     fire('click');
-  } catch (e) {
-    return { ok:false, why:String(e), tag:el.tagName, id:el.id || null, className:el.className || null };
+  } catch(e) {
+    return {ok:false, why:String(e), tag: el.tagName, id: el.id || null, className: el.className || null};
   }
 
   return {
@@ -152,555 +127,164 @@ _JS_CLICK_AT_POINT = r"""
 """
 
 
-def _click_at_css_point(sb: SB, x_css: int, y_css: int) -> dict:
-    """
-    Clicks at given CSS pixel coords by dispatching events to
-    document.elementFromPoint(x,y). Works even if it's a canvas.
-    """
+def _canvas_click(sb: SB, x_css: int, y_css: int) -> None:
     try:
-        result = sb.execute_script(_JS_CLICK_AT_POINT, int(x_css), int(y_css)) or {}
+        result = sb.execute_script(_JS_CANVAS_CLICK, int(x_css), int(y_css)) or {}
+        print(f"[LuckyLand] canvas_click at ({x_css},{y_css}) -> {result}")
     except Exception as e:
-        result = {"ok": False, "why": f"JS_ERR: {e}"}
-
-    print(f"[DEBUG] Click-at-point result: {result}")
-    return result
+        print(f"[LuckyLand] canvas_click JS error: {e}")
 
 
-# ────────────────────────────────────────────
-# Cookie helpers
-# ────────────────────────────────────────────
+# -------------- template matching --------------
 
-def _click_by_text(sb: SB, texts: List[str]) -> bool:
-    """
-    Clicks first button-like element whose text contains any of the strings.
-    """
-    js = r"""
-      const needles = arguments[0].map(t => t.toLowerCase());
-      const lower = s => (s || "").toLowerCase().trim();
-      const candidates = Array.from(
-        document.querySelectorAll('button, [role="button"], .btn, .button')
-      );
-      for (const el of candidates) {
-        const txt = lower(el.innerText || el.textContent || '');
-        if (!txt) continue;
-        for (const n of needles) {
-          if (txt.includes(n)) {
-            el.click();
-            return true;
-          }
-        }
-      }
-      return false;
-    """
-    try:
-        return bool(sb.execute_script(js, texts))
-    except Exception as e:
-        print(f"[LuckyLand] _click_by_text error: {e}")
-        return False
-
-
-def _close_luckyland_cookies(sb: SB, cookies_tmpl: Optional[np.ndarray]) -> None:
-    """
-    Tries to dismiss LuckyLand's cookie UI:
-      - "Confirm my Choices" (left panel)
-      - "Accept All" (left panel)
-      - "Accept Cookies" (bottom bar)
-    Falls back to template-based click if provided.
-    """
-    print("[LuckyLand] Attempting to close cookies…")
-
-    if _click_by_text(sb, ["confirm my choices"]):
-        print("[LuckyLand] Closed cookies via 'Confirm my Choices'")
-        time.sleep(1.0)
-        return
-
-    if _click_by_text(sb, ["accept all"]):
-        print("[LuckyLand] Closed cookies via 'Accept All'")
-        time.sleep(1.0)
-        return
-
-    if _click_by_text(sb, ["accept cookies"]):
-        print("[LuckyLand] Closed cookies via 'Accept Cookies'")
-        time.sleep(1.0)
-        return
-
-    # Optional: template-based click if you have a cookies button image
-    if cookies_tmpl is not None:
-        try:
-            bgr = _grab_bgr(sb)
-            match = _match_template(bgr, cookies_tmpl, COOKIES_THRESH)
-            if match:
-                top_left, bottom_right, _ = match
-                cx = (top_left[0] + bottom_right[0]) // 2
-                cy = (top_left[1] + bottom_right[1]) // 2
-
-                h_img, w_img = bgr.shape[:2]
-                vw = sb.execute_script(
-                    "return window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth || 0;"
-                )
-                vh = sb.execute_script(
-                    "return window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight || 0;"
-                )
-                scale_x = vw / w_img if w_img else 1
-                scale_y = vh / h_img if h_img else 1
-                css_x = int(cx * scale_x)
-                css_y = int(cy * scale_y)
-
-                print(f"[LuckyLand] Cookies tmpl click at CSS ({css_x},{css_y})")
-                _click_at_css_point(sb, css_x, css_y)
-                time.sleep(1.0)
-                return
-        except Exception as e:
-            print(f"[LuckyLand] Cookies template click failed: {e}")
-
-    print("[LuckyLand] Cookies banner may still be present; continuing anyway.")
-
-
-# ────────────────────────────────────────────
-# Template click with bounding-box overlay
-# ────────────────────────────────────────────
-
-async def _click_template_on_canvas(
-    sb: SB,
+def _match_center(
+    bgr: np.ndarray,
     tmpl: np.ndarray,
-    thresh: float,
-    label: str,
-    channel: discord.abc.Messageable,
-) -> bool:
+    thresh: float
+) -> Optional[Tuple[int, int]]:
     """
-    1. Uses OpenCV to find the template in a full screenshot.
-    2. Draws a green rectangle + red dot at the detected center.
-    3. Sends that overlay screenshot to Discord.
-    4. Maps screenshot coordinates -> CSS coords using viewport size.
-    5. Clicks via document.elementFromPoint(x,y).
-    6. Takes another screenshot right after click and sends it.
+    Match template in screenshot and return center (x, y) in screenshot pixels.
+    """
+    res = cv2.matchTemplate(bgr, tmpl, cv2.TM_CCOEFF_NORMED)
+    minVal, maxVal, minLoc, maxLoc = cv2.minMaxLoc(res)
+    print(f"[LuckyLand] match score={maxVal:.3f}, threshold={thresh}")
+    if maxVal >= thresh:
+        th, tw = tmpl.shape[:2]
+        return (maxLoc[0] + tw // 2, maxLoc[1] + th // 2)
+    return None
 
-    Returns True if click was attempted at a matched location.
+
+def _screenshot_point_to_css(sb: SB, pt: Tuple[int, int], bgr: np.ndarray) -> Tuple[int, int]:
     """
-    for attempt in range(1, FIND_RETRIES + 1):
-        print(f"[LuckyLand] {label}: template attempt {attempt}/{FIND_RETRIES}")
+    Convert screenshot pixel coords to CSS coords, accounting for DPR.
+    """
+    h, w = bgr.shape[:2]
+    vw = sb.execute_script("return window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth || 0;")
+    vh = sb.execute_script("return window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight || 0;")
+
+    # Fallbacks
+    vw = int(vw or 1920)
+    vh = int(vh or 1080)
+
+    scale_x = vw / (w / DPR)
+    scale_y = vh / (h / DPR)
+
+    css_x = int(pt[0] * scale_x)
+    css_y = int(pt[1] * scale_y)
+
+    print(f"[LuckyLand] point screenshot={pt}, screenshot_size=({w}x{h}), viewport=({vw}x{vh}), "
+          f"DPR={DPR}, css=({css_x},{css_y})")
+
+    return css_x, css_y
+
+
+def _try_detect_and_click(sb: SB, tmpl: Optional[np.ndarray], thresh: float, label: str) -> bool:
+    if tmpl is None:
+        return False
+    for _ in range(FIND_RETRIES):
         bgr = _grab_bgr(sb)
-        h_img, w_img = bgr.shape[:2]
-
-        match = _match_template(bgr, tmpl, thresh)
-        if not match:
-            time.sleep(FIND_DELAY)
-            continue
-
-        top_left, bottom_right, score = match
-        cx_img = (top_left[0] + bottom_right[0]) // 2
-        cy_img = (top_left[1] + bottom_right[1]) // 2
-
-        # Get viewport size in CSS pixels
-        vw = sb.execute_script(
-            "return window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth || 0;"
-        )
-        vh = sb.execute_script(
-            "return window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight || 0;"
-        )
-        vw = float(vw or 1)
-        vh = float(vh or 1)
-
-        scale_x = vw / float(w_img or 1)
-        scale_y = vh / float(h_img or 1)
-
-        css_x = int(cx_img * scale_x)
-        css_y = int(cy_img * scale_y)
-
-        print(
-            f"[LuckyLand] {label}: screenshot center=({cx_img},{cy_img}), "
-            f"viewport=({vw}x{vh}), css=({css_x},{css_y}), score={score:.3f}"
-        )
-
-        # Create overlay: green rectangle + red dot where we think the button is
-        dbg = bgr.copy()
-        cv2.rectangle(dbg, top_left, bottom_right, (0, 255, 0), 3)
-        cv2.circle(dbg, (cx_img, cy_img), 8, (0, 0, 255), -1)
-        overlay_path = f"/tmp/{label}_detect_overlay.png"
-        cv2.imwrite(overlay_path, dbg)
-        print(f"[LuckyLand] {label}: overlay saved to {overlay_path}")
-
-        await _send_shot(
-            channel,
-            f"[LuckyLand] {label}: detection overlay (green box = match, red dot = click center).",
-            overlay_path,
-        )
-
-        # Click on that CSS point using JS
-        _click_at_css_point(sb, css_x, css_y)
-
-        # Screenshot immediately after click
-        click_path = f"/tmp/{label}_after_click.png"
-        sb.save_screenshot(click_path)
-        print(f"[LuckyLand] {label}: post-click screenshot saved to {click_path}")
-        await _send_shot(
-            channel,
-            f"[LuckyLand] {label}: screenshot immediately after click.",
-            click_path,
-        )
-
-        return True
-
-    # No match
-    fail_path = _save_debug(sb, f"{label}_not_found")
-    await _send_shot(
-        channel,
-        f"[LuckyLand][ERROR] {label}: template not found after {FIND_RETRIES} attempts.",
-        fail_path,
-    )
+        pt = _match_center(bgr, tmpl, thresh)
+        if pt:
+            print(f"[DEBUG] Found {label} at {pt} — canvas-targeted click")
+            css_x, css_y = _screenshot_point_to_css(sb, pt, bgr)
+            _canvas_click(sb, css_x, css_y)
+            return True
+        time.sleep(FIND_DELAY)
+    print(f"[DEBUG] Could not find {label}")
     return False
 
 
-# ────────────────────────────────────────────
-# Canvas-based auto-box typing for login popup
-# ────────────────────────────────────────────
+# -------------- threading + CDP integration --------------
 
-async def _canvas_type_login_auto(
-    sb: SB, email: str, password: str, channel: discord.abc.Messageable
-) -> dict:
-    """
-    When the login popup is drawn on the canvas (no HTML inputs),
-    we:
-      1) Grab a screenshot.
-      2) Compute approximate rectangles for E-Mail, Password, and Login button.
-      3) Draw bounding boxes + dots and send overlay.
-      4) Click E-Mail field and type email via WebDriver send_keys.
-      5) Screenshot.
-      6) Click Password field and type password via WebDriver send_keys.
-      7) Screenshot.
-      8) Click Login button via CSS-point click.
-      9) Screenshot.
-
-    E-Mail box = green, Password box = red, Login button = magenta.
-    """
-    bgr = _grab_bgr(sb)
-    h_img, w_img = bgr.shape[:2]
-    print(f"[LuckyLand] canvas login screenshot size: {w_img}x{h_img}")
-
-    # Panel is roughly centered: use wide horizontal band.
-    panel_left  = int(w_img * 0.25)
-    panel_right = int(w_img * 0.75)
-
-    # Email band and slightly lower password band (tuned from overlays)
-    email_top    = int(h_img * 0.37)
-    email_bottom = int(h_img * 0.46)
-    pass_top     = int(h_img * 0.53)
-    pass_bottom  = int(h_img * 0.62)
-
-    # Login button band even lower
-    login_top    = int(h_img * 0.68)
-    login_bottom = int(h_img * 0.75)
-
-    email_cx = (panel_left + panel_right) // 2
-    email_cy = (email_top + email_bottom) // 2
-
-    pass_cx = email_cx
-    pass_cy = (pass_top + pass_bottom) // 2
-
-    login_cx = email_cx
-    login_cy = (login_top + login_bottom) // 2
-
-    # Draw overlay: green = E-Mail, red = Password, magenta = Login button
-    dbg = bgr.copy()
-    cv2.rectangle(dbg, (panel_left, email_top), (panel_right, email_bottom), (0, 255, 0), 3)
-    cv2.circle(dbg, (email_cx, email_cy), 8, (0, 255, 255), -1)
-
-    cv2.rectangle(dbg, (panel_left, pass_top), (panel_right, pass_bottom), (0, 0, 255), 3)
-    cv2.circle(dbg, (pass_cx, pass_cy), 8, (255, 255, 0), -1)
-
-    cv2.rectangle(dbg, (panel_left, login_top), (panel_right, login_bottom), (255, 0, 255), 3)
-    cv2.circle(dbg, (login_cx, login_cy), 8, (255, 255, 255), -1)
-
-    overlay_path = "/tmp/luckyland_login_fields_overlay.png"
-    cv2.imwrite(overlay_path, dbg)
-    print(f"[LuckyLand] Login fields overlay saved to {overlay_path}")
-    await _send_shot(
-        channel,
-        "[LuckyLand] Canvas login fields overlay — green=E-Mail, red=Password, magenta=Login, dots=click centers.",
-        overlay_path,
-    )
-
-    # Map screenshot coords → CSS coords
-    vw = float(
-        sb.execute_script(
-            "return window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth || 0;"
-        ) or 0
-    )
-    vh = float(
-        sb.execute_script(
-            "return window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight || 0;"
-        ) or 0
-    )
-
-    if vw <= 0 or vh <= 0:
-        return {"mode": "canvas-auto", "error": "bad_viewport", "vw": vw, "vh": vh}
-
-    scale_x = vw / float(w_img or 1)
-    scale_y = vh / float(h_img or 1)
-
-    email_x_css = int(email_cx * scale_x)
-    email_y_css = int(email_cy * scale_y)
-
-    pass_x_css = int(pass_cx * scale_x)
-    pass_y_css = int(pass_cy * scale_y)
-
-    login_x_css = int(login_cx * scale_x)
-    login_y_css = int(login_cy * scale_y)
-
-    print(
-        f"[LuckyLand] Canvas login CSS centers: "
-        f"email=({email_x_css},{email_y_css}), "
-        f"pass=({pass_x_css},{pass_y_css}), "
-        f"login=({login_x_css},{login_y_css}), "
-        f"viewport=({vw}x{vh})"
-    )
-
-    driver = sb.driver
-    body = driver.find_element(By.TAG_NAME, "body")
-
-    # Click E-Mail field and type email using WebDriver key events
-    print(f"[LuckyLand] Clicking E-Mail field at CSS ({email_x_css},{email_y_css})")
-    _click_at_css_point(sb, email_x_css, email_y_css)
-    time.sleep(0.7)
-
-    print("[LuckyLand] Typing email via ActionChains…")
-    ActionChains(driver).send_keys(email).perform()
-    time.sleep(0.7)
-
-    email_shot = "/tmp/luckyland_after_email_type.png"
-    sb.save_screenshot(email_shot)
-    await _send_shot(channel, "[LuckyLand] Screenshot after typing email:", email_shot)
-
-    # Click Password field and type password
-    print(f"[LuckyLand] Clicking Password field at CSS ({pass_x_css},{pass_y_css})")
-    _click_at_css_point(sb, pass_x_css, pass_y_css)
-    time.sleep(0.7)
-
-    print("[LuckyLand] Typing password via ActionChains…")
-    ActionChains(driver).send_keys(password).perform()
-    time.sleep(0.7)
-
-    pass_shot = "/tmp/luckyland_after_password_type.png"
-    sb.save_screenshot(pass_shot)
-    await _send_shot(channel, "[LuckyLand] Screenshot after typing password:", pass_shot)
-
-    # Click Login button on canvas
-    print(f"[LuckyLand] Clicking Login button at CSS ({login_x_css},{login_y_css})")
-    _click_at_css_point(sb, login_x_css, login_y_css)
-    time.sleep(0.7)
-
-    post_login_click_path = "/tmp/luckyland_after_login_button_click.png"
-    sb.save_screenshot(post_login_click_path)
-    await _send_shot(
-        channel,
-        "[LuckyLand] Screenshot after clicking Login button:",
-        post_login_click_path,
-    )
-
-    return {
-        "mode": "canvas-auto",
-        "vw": vw,
-        "vh": vh,
-        "email_center_css": (email_x_css, email_y_css),
-        "pass_center_css": (pass_x_css, pass_y_css),
-        "login_center_css": (login_x_css, login_y_css),
-    }
+EXECUTOR = ThreadPoolExecutor(max_workers=1)
 
 
-# ────────────────────────────────────────────
-# Login popup: fill creds + submit
-# ────────────────────────────────────────────
-
-async def _fill_login_and_submit(
-    sb: SB, email: str, password: str, channel: discord.abc.Messageable
-) -> dict:
-    """
-    First tries to find real HTML <input> elements for E-Mail / Password.
-    If none are found (canvas-only UI), falls back to _canvas_type_login_auto().
-    """
-    js = r"""
-      return (function(emailVal, passVal){
-        const lower = s => (s || "").toLowerCase();
-        const inputs = Array.from(document.querySelectorAll('input'));
-        let emailEl = null;
-        let passEl  = null;
-
-        for (const el of inputs) {
-          const type = lower(el.type);
-          const name = lower(el.name);
-          const ph   = lower(el.placeholder);
-
-          if (!emailEl && (type === 'email' || name.includes('email') || ph.includes('mail'))) {
-            emailEl = el;
-          }
-          if (!passEl && (type === 'password' || name.includes('pass') || ph.includes('pass'))) {
-            passEl = el;
-          }
-        }
-
-        if (!emailEl && !passEl) {
-          return {
-            hasEmail: false,
-            hasPass : false,
-            emailType: null,
-            passType : null,
-            mode: 'html-none'
-          };
-        }
-
-        if (emailEl) {
-          emailEl.focus();
-          emailEl.value = emailVal;
-          emailEl.dispatchEvent(new Event('input', {bubbles:true}));
-          emailEl.dispatchEvent(new Event('change', {bubbles:true}));
-        }
-
-        if (passEl) {
-          passEl.focus();
-          passEl.value = passVal;
-          passEl.dispatchEvent(new Event('input', {bubbles:true}));
-          passEl.dispatchEvent(new Event('change', {bubbles:true}));
-        }
-
-        // Try to submit via form
-        if (passEl && passEl.form) {
-          try {
-            passEl.form.dispatchEvent(new Event('submit', {bubbles:true, cancelable:true}));
-          } catch (e) {}
-          try {
-            passEl.form.submit();
-          } catch (e2) {}
-        }
-
-        // Also simulate Enter key on password field
-        if (passEl) {
-          const evtInit = {
-            key: 'Enter',
-            code: 'Enter',
-            keyCode: 13,
-            which: 13,
-            bubbles: true,
-            cancelable: true
-          };
-          try {
-            passEl.dispatchEvent(new KeyboardEvent('keydown', evtInit));
-            passEl.dispatchEvent(new KeyboardEvent('keyup',   evtInit));
-          } catch (e) {}
-        }
-
-        return {
-          hasEmail: !!emailEl,
-          hasPass : !!passEl,
-          emailType: emailEl ? emailEl.type : null,
-          passType : passEl ? passEl.type : null,
-          mode: 'html'
-        };
-      })(arguments[0], arguments[1]);
-    """
+def _send_text_sync(loop: asyncio.AbstractEventLoop, channel: discord.abc.Messageable, message: str) -> None:
+    """Thread-safe helper to send a text message from the LuckyLand worker."""
     try:
-        result = sb.execute_script(js, email, password) or {}
+        fut = asyncio.run_coroutine_threadsafe(channel.send(message), loop)
+        fut.result()
     except Exception as e:
-        result = {"error": str(e), "mode": "html_js_error"}
-
-    # If no HTML inputs, fall back to canvas auto-box typing
-    if not result.get("hasEmail") and not result.get("hasPass"):
-        print("[LuckyLand] No HTML inputs detected; switching to canvas auto-box typing mode.")
-        canvas_result = await _canvas_type_login_auto(sb, email, password, channel)
-        out = {"mode": "canvas-auto"}
-        out.update(canvas_result)
-        return out
-
-    print(f"[LuckyLand] _fill_login_and_submit HTML result: {result}")
-    return result
+        print(f"[LuckyLand][WARN] Failed to send message: {e}")
 
 
-# ────────────────────────────────────────────
-# Main entry
-# ────────────────────────────────────────────
+def _send_shot_sync(loop: asyncio.AbstractEventLoop, channel: discord.abc.Messageable, caption: str, path: str) -> None:
+    """Thread-safe helper to send a screenshot from the LuckyLand worker."""
+    try:
+        fut = asyncio.run_coroutine_threadsafe(_send_shot(channel, caption, path), loop)
+        fut.result()
+    except Exception as e:
+        print(f"[LuckyLand][WARN] Failed to send screenshot: {e}")
 
-async def luckyland_uc(ctx, channel: discord.abc.Messageable):
-    """
-    LuckyLand flow (UC Mode + CDP Mode):
-      1. Open LuckyLand in UC+CDP Mode.
-      2. Close cookies if present.
-      3. (Optional) Click any pre-login image/button.
-      4. Click purple 'Log into Existing Account' button on canvas.
-      5. When login popup appears, fill creds from .env, click Login button.
-      6. Screenshot a few seconds after submitting.
-    """
-    if ":" not in LUCKYLAND_CRED:
-        await channel.send("[LuckyLand][ERROR] LUCKYLAND env var must be 'email:password'")
-        return
 
-    email, password = LUCKYLAND_CRED.split(":", 1)
+def _luckyland_worker(loop: asyncio.AbstractEventLoop, channel: discord.abc.Messageable) -> None:
+    """Runs the LuckyLand SeleniumBase UC+CDP flow in a background thread."""
 
-    login_tmpl = _load_template(LOGIN_BTN_IMG)
-    cookies_tmpl = _load_template(COOKIES_IMG)        # optional
-    prelogin_tmpl = _load_template(PRELOGIN_BTN_IMG)  # optional
+    cookies_tmpl  = _load_template(COOKIES_IMG)          # optional
+    prelogin_tmpl = _load_template(PRELOGIN_BTN_IMG)     # optional
+    login_tmpl    = _load_template(LOGIN_BTN_IMG)        # required
 
     if login_tmpl is None:
-        await channel.send("[LuckyLand][ERROR] Missing luckylandloginbtn.png template.")
+        _send_text_sync(loop, channel, "[LuckyLand][ERROR] Missing luckylandloginbtn.png")
         return
 
-    await channel.send("Starting LuckyLand (UC + CDP Mode, canvas login + auto-box credential submit)…")
+    _send_text_sync(
+        loop,
+        channel,
+        "Starting LuckyLand (UC + CDP canvas-click debug)…",
+    )
 
     try:
-        # UC Mode + CDP events enabled; CDP driver takes over after activate_cdp_mode()
+        # UC Mode + CDP Mode
         with SB(uc=True, uc_cdp=True) as sb:
             sb.set_window_size(1920, 1080)
-            # Activate CDP Mode from UC Mode and go directly to LuckyLand
             sb.activate_cdp_mode(LOGIN_URL)
             sb.sleep(3.0)
             sb.wait_for_ready_state_complete()
             sb.scroll_to_top()
 
-            # Handle cookies so we can actually see the game
-            _close_luckyland_cookies(sb, cookies_tmpl)
+            # Wake the canvas once (center of viewport)
+            _canvas_click(sb, 960, 540)
 
-            # Optional: pre-login click if you still need it
+            # Cookies (non-fatal)
+            if cookies_tmpl is not None:
+                _try_detect_and_click(sb, cookies_tmpl, COOKIES_THRESH, "cookies")
+
+            # Pre-login (non-fatal)
             if prelogin_tmpl is not None:
-                try:
-                    await _click_template_on_canvas(
-                        sb,
-                        prelogin_tmpl,
-                        PRELOGIN_THRESH,
-                        "luckyland_prelogin",
-                        channel,
-                    )
-                    time.sleep(3.0)
-                except Exception as e:
-                    print(f"[LuckyLand] Prelogin template click error: {e}")
+                _try_detect_and_click(sb, prelogin_tmpl, PRELOGIN_THRESH, "prelogin")
 
-            # Click the purple "Log into Existing Account" canvas button
-            await channel.send(
-                "[LuckyLand] Looking for the purple 'Log into Existing Account' button…"
-            )
-            clicked = await _click_template_on_canvas(
-                sb,
-                login_tmpl,
-                LOGIN_THRESH,
-                "luckyland_login",
+            # Screenshot BEFORE
+            before_path = _save_debug(sb, "before_login_click")
+            _send_shot_sync(loop, channel, "Before login button detection:", before_path)
+
+            # Detect & click the purple "Log into Existing Account"
+            clicked = _try_detect_and_click(sb, login_tmpl, LOGIN_THRESH, "login button")
+
+            # Screenshot AFTER (5s later if clicked; otherwise show failure)
+            if clicked:
+                time.sleep(AFTER_CLICK_WAIT)
+                after_path = _save_debug(sb, "after_login_click")
+                _send_shot_sync(loop, channel, "After clicking login (5s later):", after_path)
+            else:
+                fail_path = _save_debug(sb, "login_not_found")
+                _send_shot_sync(loop, channel, "[LuckyLand][ERROR] Could not find login button.", fail_path)
+
+            _send_text_sync(
+                loop,
                 channel,
+                "✅ Debug complete. If modal didn’t open, try tweaking `LUCKYLAND_DPR` (e.g., 1.25).",
             )
-
-            if not clicked:
-                await channel.send("❌ LuckyLand: login button template never found.")
-                return
-
-            # We should now be on the login popup you screenshotted.
-            await channel.send("[LuckyLand] Login popup should be visible — filling credentials from .env…")
-            fill_result = await _fill_login_and_submit(sb, email, password, channel)
-            await channel.send(f"[LuckyLand] Login fields located / mode: {fill_result}")
-
-            # Wait a few seconds for the login request + transition
-            time.sleep(AFTER_CLICK_WAIT)
-            final_path = _save_debug(sb, "luckyland_after_login_submit")
-            await _send_shot(
-                channel,
-                "[LuckyLand] State a few seconds after submitting login:",
-                final_path,
-            )
-            await channel.send("✅ LuckyLand: login flow (canvas click + credential submit) complete.")
 
     except Exception as e:
-        await channel.send(f"[LuckyLand][ERROR] Exception: {e}")
+        _send_text_sync(loop, channel, f"[LuckyLand][ERROR] Exception: {e}")
+
+
+async def luckyland_uc(ctx, channel: discord.abc.Messageable):
+    """LuckyLand entrypoint for Discord bot (runs SeleniumBase UC+CDP in a worker thread)."""
+    if ":" not in LUCKYLAND_CRED:
+        await channel.send("[LuckyLand][ERROR] Missing LUCKYLAND='email:password' in .env")
+        return
+
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(EXECUTOR, _luckyland_worker, loop, channel)
