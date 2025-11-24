@@ -568,9 +568,9 @@ async def rolling_riches_casino(ctx, driver, channel):
             cd = _read_rr_countdown(driver)
             shot = await _driver_shot(driver, "ℹ️ Bonus unavailable — current state")
             if cd:
-                await _send_one_shot(channel, f"Rolling Riches: Bonus unavailable. Next bonus in: {cd}", shot)
+                await _send_one_shot(channel, f"[Rolling Riches] Bonus unavailable. Next bonus in: {cd}", shot)
             else:
-                await _send_one_shot(channel, "Rolling Riches: Bonus unavailable.", shot)
+                await _send_one_shot(channel, "[Rolling Riches] Bonus unavailable.", shot)
 
     except Exception as e:
         tb = "".join(traceback.format_exception_only(type(e), e)).strip()
