@@ -1,6 +1,6 @@
 # Drake Hooks + WaterTrooper
 # Casino Claim 2
-# LuckyLand API — cookies fix + canvas login button + auto-box canvas credential submit
+# LuckyLand API — cookies fix + canvas login button + auto-box canvas credential submit (slow typing)
 
 import os
 import time
@@ -362,7 +362,7 @@ async def _canvas_type_login_auto(
          based on screenshot dimensions.
       3) Draw bounding boxes + dots at click centers and send overlay.
       4) Map those centers to CSS coordinates and click them.
-      5) Type email/password via synthetic KeyboardEvents.
+      5) Type email/password via synthetic KeyboardEvents (slow, char-by-char).
       6) Press Enter to submit.
 
     E-Mail box is green, Password box is red in the overlay.
@@ -371,16 +371,17 @@ async def _canvas_type_login_auto(
     h_img, w_img = bgr.shape[:2]
     print(f"[LuckyLand] canvas login screenshot size: {w_img}x{h_img}")
 
-    # Rough layout from your screenshot; tuned as fractions so it scales
-    # horizontally & vertically with viewport/screenshot.
+    # Panel is roughly centered: use wide horizontal band.
     panel_left  = int(w_img * 0.25)
     panel_right = int(w_img * 0.75)
 
+    # Tuned from your overlay: email band and a slightly LOWER password band
     email_top    = int(h_img * 0.37)
     email_bottom = int(h_img * 0.46)
 
-    pass_top    = int(h_img * 0.50)
-    pass_bottom = int(h_img * 0.59)
+    # Move password box a bit lower than before
+    pass_top    = int(h_img * 0.53)
+    pass_bottom = int(h_img * 0.62)
 
     email_cx = (panel_left + panel_right) // 2
     email_cy = (email_top + email_bottom) // 2
@@ -434,37 +435,18 @@ async def _canvas_type_login_auto(
         f"viewport=({vw}x{vh})"
     )
 
-    # JS helpers to type text and press a single key
-    js_type = r"""
-      (function(text){
-        const target = document.activeElement || document.body;
-        for (let i = 0; i < text.length; i++) {
-          const ch = text[i];
-          const code = ch;
-          const keyCode = ch.charCodeAt(0);
-          const evtInit = {
-            key: ch,
-            code: code,
-            keyCode: keyCode,
-            which: keyCode,
-            bubbles: true,
-            cancelable: true
-          };
-          try {
-            target.dispatchEvent(new KeyboardEvent('keydown',  evtInit));
-            target.dispatchEvent(new KeyboardEvent('keyup',    evtInit));
-          } catch (e) {}
-        }
-      })(arguments[0]);
-    """
-
-    js_key = r"""
-      (function(key){
-        const target = document.activeElement || document.body;
-        let keyCode = 0;
-        if (key === 'Tab')   keyCode = 9;
-        if (key === 'Enter') keyCode = 13;
-        const evtInit = {
+    # JS helper to type a single character; we call it per-char from Python
+    js_type_char = r"""
+      (function(ch){
+        const targets = [
+          window,
+          document,
+          document.body,
+          document.activeElement || document.body
+        ];
+        const key = ch;
+        const keyCode = ch.charCodeAt(0);
+        const init = {
           key: key,
           code: key,
           keyCode: keyCode,
@@ -472,27 +454,59 @@ async def _canvas_type_login_auto(
           bubbles: true,
           cancelable: true
         };
-        try {
-          target.dispatchEvent(new KeyboardEvent('keydown', evtInit));
-          target.dispatchEvent(new KeyboardEvent('keyup',   evtInit));
-        } catch (e) {}
+        for (const t of targets) {
+          try { t.dispatchEvent(new KeyboardEvent('keydown', init)); } catch (e) {}
+          try { t.dispatchEvent(new KeyboardEvent('keyup',   init)); } catch (e) {}
+        }
       })(arguments[0]);
     """
 
-    # Click E-Mail field and type email
+    js_key = r"""
+      (function(key){
+        const targets = [
+          window,
+          document,
+          document.body,
+          document.activeElement || document.body
+        ];
+        let keyCode = 0;
+        if (key === 'Tab')   keyCode = 9;
+        if (key === 'Enter') keyCode = 13;
+        const init = {
+          key: key,
+          code: key,
+          keyCode: keyCode,
+          which: keyCode,
+          bubbles: true,
+          cancelable: true
+        };
+        for (const t of targets) {
+          try { t.dispatchEvent(new KeyboardEvent('keydown', init)); } catch (e) {}
+          try { t.dispatchEvent(new KeyboardEvent('keyup',   init)); } catch (e) {}
+        }
+      })(arguments[0]);
+    """
+
+    # Click E-Mail field and type email (slow)
     print(f"[LuckyLand] Clicking E-Mail field at CSS ({email_x_css},{email_y_css})")
     _click_at_css_point(sb, email_x_css, email_y_css)
-    time.sleep(0.5)
-    print("[LuckyLand] Typing email into canvas…")
-    sb.execute_script(js_type, email)
+    time.sleep(0.6)
+    print("[LuckyLand] Typing email into canvas (char-by-char)…")
+    for ch in email:
+        sb.execute_script(js_type_char, ch)
+        time.sleep(0.08)
+
     time.sleep(0.5)
 
-    # Click Password field and type password
+    # Click Password field and type password (slow)
     print(f"[LuckyLand] Clicking Password field at CSS ({pass_x_css},{pass_y_css})")
     _click_at_css_point(sb, pass_x_css, pass_y_css)
-    time.sleep(0.5)
-    print("[LuckyLand] Typing password into canvas…")
-    sb.execute_script(js_type, password)
+    time.sleep(0.6)
+    print("[LuckyLand] Typing password into canvas (char-by-char)…")
+    for ch in password:
+        sb.execute_script(js_type_char, ch)
+        time.sleep(0.08)
+
     time.sleep(0.5)
 
     # Press Enter to submit
