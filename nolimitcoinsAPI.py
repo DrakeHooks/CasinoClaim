@@ -173,7 +173,7 @@ async def nolimitcoins_flow(ctx, driver, channel):
         if cd:
             await channel.send(f"Next No Limit Coins Bonus Available in: {cd}")
         else:
-            await channel.send("NoLimitCoins: Timed Out. Perhaps you need to authenticate?")
+            await channel.send("[NoLimitCoins] Timed Out. Perhaps you need to authenticate?")
             await send_screenshot(channel, driver)
         return
 
