@@ -21,7 +21,7 @@ LOBBY_URL = "https://americanluck.com/lobby"
 
 POPUP_CLOSE_XP   = "/html/body/div[5]/div/button"
 GET_COINS_BTN_XP = "/html/body/div[1]/div[2]/header/div[2]/button[1]"
-COLLECT_BTN_XP   = "/html/body/div[7]/div/div/section[1]/div/div/div[1]/div/div[3]/button[1]"
+COLLECT_BTN_XP   = "/html/body/div[7]/div/div/section[1]/div/div/div[1]/div/div[3]/button"
 
 
 # ───────────────────────────────────────────────────────────
