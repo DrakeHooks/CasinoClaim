@@ -1,6 +1,6 @@
 # Drake Hooks + WaterTrooper
 # Casino Claim 2
-# LuckyLand API — cookies fix + canvas login button + auto-box credential submit (WebDriver typing)
+# LuckyLand API — cookies fix + canvas login button + auto-box credential submit (WebDriver typing + Login click, UC + CDP Mode)
 
 import os
 import time
@@ -456,8 +456,7 @@ async def _canvas_type_login_auto(
     )
 
     driver = sb.driver
-    # We don't actually need `body`, but if you already had it that's fine:
-    # body = driver.find_element(By.TAG_NAME, "body")
+    body = driver.find_element(By.TAG_NAME, "body")
 
     # Click E-Mail field and type email using WebDriver key events
     print(f"[LuckyLand] Clicking E-Mail field at CSS ({email_x_css},{email_y_css})")
@@ -506,6 +505,7 @@ async def _canvas_type_login_auto(
         "pass_center_css": (pass_x_css, pass_y_css),
         "login_center_css": (login_x_css, login_y_css),
     }
+
 
 # ────────────────────────────────────────────
 # Login popup: fill creds + submit
@@ -620,13 +620,12 @@ async def _fill_login_and_submit(
 
 async def luckyland_uc(ctx, channel: discord.abc.Messageable):
     """
-    LuckyLand flow:
-      1. Open LuckyLand.
+    LuckyLand flow (UC Mode + CDP Mode):
+      1. Open LuckyLand in UC+CDP Mode.
       2. Close cookies if present.
       3. (Optional) Click any pre-login image/button.
       4. Click purple 'Log into Existing Account' button on canvas.
-      5. When login popup appears, fill creds from .env and submit
-         (HTML inputs if present; otherwise canvas auto-box typing).
+      5. When login popup appears, fill creds from .env, click Login button.
       6. Screenshot a few seconds after submitting.
     """
     if ":" not in LUCKYLAND_CRED:
@@ -643,12 +642,15 @@ async def luckyland_uc(ctx, channel: discord.abc.Messageable):
         await channel.send("[LuckyLand][ERROR] Missing luckylandloginbtn.png template.")
         return
 
-    await channel.send("Starting LuckyLand (canvas login + auto-box credential submit)…")
+    await channel.send("Starting LuckyLand (UC + CDP Mode, canvas login + auto-box credential submit)…")
 
     try:
-        with SB(uc=True) as sb:
+        # UC Mode + CDP events enabled; CDP driver takes over after activate_cdp_mode()
+        with SB(uc=True, uc_cdp=True) as sb:
             sb.set_window_size(1920, 1080)
-            sb.uc_open(LOGIN_URL)
+            # Activate CDP Mode from UC Mode and go directly to LuckyLand
+            sb.activate_cdp_mode(LOGIN_URL)
+            sb.sleep(3.0)
             sb.wait_for_ready_state_complete()
             sb.scroll_to_top()
 
