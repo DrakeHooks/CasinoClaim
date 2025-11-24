@@ -1,6 +1,6 @@
 # Drake Hooks + WaterTrooper
 # Casino Claim 2
-# LuckyLand API — cookies fix + canvas login button + auto-box credential submit (WebDriver typing)
+# LuckyLand API — cookies fix + canvas login button + auto-box credential submit (WebDriver typing + Login click)
 
 import os
 import time
@@ -362,14 +362,16 @@ async def _canvas_type_login_auto(
     When the login popup is drawn on the canvas (no HTML inputs),
     we:
       1) Grab a screenshot.
-      2) Compute approximate rectangles for E-Mail and Password fields.
+      2) Compute approximate rectangles for E-Mail, Password, and Login button.
       3) Draw bounding boxes + dots and send overlay.
       4) Click E-Mail field and type email via WebDriver send_keys.
       5) Screenshot.
-      6) Click Password field and type password via WebDriver send_keys + Enter.
+      6) Click Password field and type password via WebDriver send_keys.
       7) Screenshot.
+      8) Click Login button via CSS-point click.
+      9) Screenshot.
 
-    E-Mail box is green, Password box is red in the overlay.
+    E-Mail box = green, Password box = red, Login button = magenta.
     """
     bgr = _grab_bgr(sb)
     h_img, w_img = bgr.shape[:2]
@@ -385,25 +387,36 @@ async def _canvas_type_login_auto(
     pass_top     = int(h_img * 0.53)
     pass_bottom  = int(h_img * 0.62)
 
+    # Login button band even lower
+    login_top    = int(h_img * 0.68)
+    login_bottom = int(h_img * 0.75)
+
     email_cx = (panel_left + panel_right) // 2
     email_cy = (email_top + email_bottom) // 2
 
     pass_cx = email_cx
     pass_cy = (pass_top + pass_bottom) // 2
 
-    # Draw overlay: green = E-Mail, red = Password
+    login_cx = email_cx
+    login_cy = (login_top + login_bottom) // 2
+
+    # Draw overlay: green = E-Mail, red = Password, magenta = Login button
     dbg = bgr.copy()
     cv2.rectangle(dbg, (panel_left, email_top), (panel_right, email_bottom), (0, 255, 0), 3)
     cv2.circle(dbg, (email_cx, email_cy), 8, (0, 255, 255), -1)
+
     cv2.rectangle(dbg, (panel_left, pass_top), (panel_right, pass_bottom), (0, 0, 255), 3)
     cv2.circle(dbg, (pass_cx, pass_cy), 8, (255, 255, 0), -1)
+
+    cv2.rectangle(dbg, (panel_left, login_top), (panel_right, login_bottom), (255, 0, 255), 3)
+    cv2.circle(dbg, (login_cx, login_cy), 8, (255, 255, 255), -1)
 
     overlay_path = "/tmp/luckyland_login_fields_overlay.png"
     cv2.imwrite(overlay_path, dbg)
     print(f"[LuckyLand] Login fields overlay saved to {overlay_path}")
     await _send_shot(
         channel,
-        "[LuckyLand] Canvas login fields overlay — green=E-Mail, red=Password, dots=click centers.",
+        "[LuckyLand] Canvas login fields overlay — green=E-Mail, red=Password, magenta=Login, dots=click centers.",
         overlay_path,
     )
 
@@ -431,9 +444,14 @@ async def _canvas_type_login_auto(
     pass_x_css = int(pass_cx * scale_x)
     pass_y_css = int(pass_cy * scale_y)
 
+    login_x_css = int(login_cx * scale_x)
+    login_y_css = int(login_cy * scale_y)
+
     print(
         f"[LuckyLand] Canvas login CSS centers: "
-        f"email=({email_x_css},{email_y_css}), pass=({pass_x_css},{pass_y_css}), "
+        f"email=({email_x_css},{email_y_css}), "
+        f"pass=({pass_x_css},{pass_y_css}), "
+        f"login=({login_x_css},{login_y_css}), "
         f"viewport=({vw}x{vh})"
     )
 
@@ -458,13 +476,26 @@ async def _canvas_type_login_auto(
     _click_at_css_point(sb, pass_x_css, pass_y_css)
     time.sleep(0.7)
 
-    print("[LuckyLand] Typing password via ActionChains and pressing Enter…")
-    ActionChains(driver).send_keys(password, Keys.ENTER).perform()
+    print("[LuckyLand] Typing password via ActionChains…")
+    ActionChains(driver).send_keys(password).perform()
     time.sleep(0.7)
 
     pass_shot = "/tmp/luckyland_after_password_type.png"
     sb.save_screenshot(pass_shot)
-    await _send_shot(channel, "[LuckyLand] Screenshot after typing password + Enter:", pass_shot)
+    await _send_shot(channel, "[LuckyLand] Screenshot after typing password:", pass_shot)
+
+    # Click Login button on canvas
+    print(f"[LuckyLand] Clicking Login button at CSS ({login_x_css},{login_y_css})")
+    _click_at_css_point(sb, login_x_css, login_y_css)
+    time.sleep(0.7)
+
+    post_login_click_path = "/tmp/luckyland_after_login_button_click.png"
+    sb.save_screenshot(post_login_click_path)
+    await _send_shot(
+        channel,
+        "[LuckyLand] Screenshot after clicking Login button:",
+        post_login_click_path,
+    )
 
     return {
         "mode": "canvas-auto",
@@ -472,6 +503,7 @@ async def _canvas_type_login_auto(
         "vh": vh,
         "email_center_css": (email_x_css, email_y_css),
         "pass_center_css": (pass_x_css, pass_y_css),
+        "login_center_css": (login_x_css, login_y_css),
     }
 
 
@@ -593,8 +625,7 @@ async def luckyland_uc(ctx, channel: discord.abc.Messageable):
       2. Close cookies if present.
       3. (Optional) Click any pre-login image/button.
       4. Click purple 'Log into Existing Account' button on canvas.
-      5. When login popup appears, fill creds from .env and submit
-         (HTML inputs if present; otherwise canvas auto-box typing).
+      5. When login popup appears, fill creds from .env, click Login button.
       6. Screenshot a few seconds after submitting.
     """
     if ":" not in LUCKYLAND_CRED:
