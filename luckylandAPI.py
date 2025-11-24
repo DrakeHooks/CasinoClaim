@@ -1,6 +1,6 @@
 # Drake Hooks + WaterTrooper
 # Casino Claim 2
-# LuckyLand API — cookies fix + canvas login button + auto-box canvas credential submit (slow typing)
+# LuckyLand API — cookies fix + canvas login button + auto-box credential submit (WebDriver typing)
 
 import os
 import time
@@ -12,6 +12,10 @@ from seleniumbase import SB
 
 import cv2
 import numpy as np
+
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.action_chains import ActionChains
 
 load_dotenv()
 
@@ -358,12 +362,12 @@ async def _canvas_type_login_auto(
     When the login popup is drawn on the canvas (no HTML inputs),
     we:
       1) Grab a screenshot.
-      2) Compute approximate rectangles for E-Mail and Password fields
-         based on screenshot dimensions.
-      3) Draw bounding boxes + dots at click centers and send overlay.
-      4) Map those centers to CSS coordinates and click them.
-      5) Type email/password via synthetic KeyboardEvents (slow, char-by-char).
-      6) Press Enter to submit.
+      2) Compute approximate rectangles for E-Mail and Password fields.
+      3) Draw bounding boxes + dots and send overlay.
+      4) Click E-Mail field and type email via WebDriver send_keys.
+      5) Screenshot.
+      6) Click Password field and type password via WebDriver send_keys + Enter.
+      7) Screenshot.
 
     E-Mail box is green, Password box is red in the overlay.
     """
@@ -375,13 +379,11 @@ async def _canvas_type_login_auto(
     panel_left  = int(w_img * 0.25)
     panel_right = int(w_img * 0.75)
 
-    # Tuned from your overlay: email band and a slightly LOWER password band
+    # Email band and slightly lower password band (tuned from overlays)
     email_top    = int(h_img * 0.37)
     email_bottom = int(h_img * 0.46)
-
-    # Move password box a bit lower than before
-    pass_top    = int(h_img * 0.53)
-    pass_bottom = int(h_img * 0.62)
+    pass_top     = int(h_img * 0.53)
+    pass_bottom  = int(h_img * 0.62)
 
     email_cx = (panel_left + panel_right) // 2
     email_cy = (email_top + email_bottom) // 2
@@ -435,83 +437,34 @@ async def _canvas_type_login_auto(
         f"viewport=({vw}x{vh})"
     )
 
-    # JS helper to type a single character; we call it per-char from Python
-    js_type_char = r"""
-      (function(ch){
-        const targets = [
-          window,
-          document,
-          document.body,
-          document.activeElement || document.body
-        ];
-        const key = ch;
-        const keyCode = ch.charCodeAt(0);
-        const init = {
-          key: key,
-          code: key,
-          keyCode: keyCode,
-          which: keyCode,
-          bubbles: true,
-          cancelable: true
-        };
-        for (const t of targets) {
-          try { t.dispatchEvent(new KeyboardEvent('keydown', init)); } catch (e) {}
-          try { t.dispatchEvent(new KeyboardEvent('keyup',   init)); } catch (e) {}
-        }
-      })(arguments[0]);
-    """
+    driver = sb.driver
+    body = driver.find_element(By.TAG_NAME, "body")
 
-    js_key = r"""
-      (function(key){
-        const targets = [
-          window,
-          document,
-          document.body,
-          document.activeElement || document.body
-        ];
-        let keyCode = 0;
-        if (key === 'Tab')   keyCode = 9;
-        if (key === 'Enter') keyCode = 13;
-        const init = {
-          key: key,
-          code: key,
-          keyCode: keyCode,
-          which: keyCode,
-          bubbles: true,
-          cancelable: true
-        };
-        for (const t of targets) {
-          try { t.dispatchEvent(new KeyboardEvent('keydown', init)); } catch (e) {}
-          try { t.dispatchEvent(new KeyboardEvent('keyup',   init)); } catch (e) {}
-        }
-      })(arguments[0]);
-    """
-
-    # Click E-Mail field and type email (slow)
+    # Click E-Mail field and type email using WebDriver key events
     print(f"[LuckyLand] Clicking E-Mail field at CSS ({email_x_css},{email_y_css})")
     _click_at_css_point(sb, email_x_css, email_y_css)
-    time.sleep(0.6)
-    print("[LuckyLand] Typing email into canvas (char-by-char)…")
-    for ch in email:
-        sb.execute_script(js_type_char, ch)
-        time.sleep(0.08)
+    time.sleep(0.7)
 
-    time.sleep(0.5)
+    print("[LuckyLand] Typing email via ActionChains…")
+    ActionChains(driver).send_keys(email).perform()
+    time.sleep(0.7)
 
-    # Click Password field and type password (slow)
+    email_shot = "/tmp/luckyland_after_email_type.png"
+    sb.save_screenshot(email_shot)
+    await _send_shot(channel, "[LuckyLand] Screenshot after typing email:", email_shot)
+
+    # Click Password field and type password
     print(f"[LuckyLand] Clicking Password field at CSS ({pass_x_css},{pass_y_css})")
     _click_at_css_point(sb, pass_x_css, pass_y_css)
-    time.sleep(0.6)
-    print("[LuckyLand] Typing password into canvas (char-by-char)…")
-    for ch in password:
-        sb.execute_script(js_type_char, ch)
-        time.sleep(0.08)
+    time.sleep(0.7)
 
-    time.sleep(0.5)
+    print("[LuckyLand] Typing password via ActionChains and pressing Enter…")
+    ActionChains(driver).send_keys(password, Keys.ENTER).perform()
+    time.sleep(0.7)
 
-    # Press Enter to submit
-    print("[LuckyLand] Sending Enter key to submit login…")
-    sb.execute_script(js_key, "Enter")
+    pass_shot = "/tmp/luckyland_after_password_type.png"
+    sb.save_screenshot(pass_shot)
+    await _send_shot(channel, "[LuckyLand] Screenshot after typing password + Enter:", pass_shot)
 
     return {
         "mode": "canvas-auto",
