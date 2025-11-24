@@ -199,7 +199,7 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
                     sb,
                     channel,
                     "americanluck_collect_missing.png",
-                    "American Luck: Could not find **Collect** button. "
+                    "[American Luck] Could not find **Collect** button. "
                     "Bonus may be unavailable, or COLLECT_BTN_XP needs update.",
                 )
 
