@@ -1,6 +1,6 @@
 # Drake Hooks + WaterTrooper
 # Casino Claim 2
-# LuckyLand API — cookies fix + canvas login button + canvas-based credential submit
+# LuckyLand API — cookies fix + canvas login button + auto-box canvas credential submit
 
 import os
 import time
@@ -348,28 +348,63 @@ async def _click_template_on_canvas(
 
 
 # ────────────────────────────────────────────
-# Canvas-based typing for login popup
+# Canvas-based auto-box typing for login popup
 # ────────────────────────────────────────────
 
-def _canvas_type_login(sb: SB, email: str, password: str) -> dict:
+async def _canvas_type_login_auto(
+    sb: SB, email: str, password: str, channel: discord.abc.Messageable
+) -> dict:
     """
     When the login popup is drawn on the canvas (no HTML inputs),
     we:
-      1) Click the approximate center of the E-Mail field.
-      2) Type the email via synthetic KeyboardEvents.
-      3) Press Tab to jump to the Password field.
-      4) Type the password.
-      5) Press Enter to submit.
+      1) Grab a screenshot.
+      2) Compute approximate rectangles for E-Mail and Password fields
+         based on screenshot dimensions.
+      3) Draw bounding boxes + dots at click centers and send overlay.
+      4) Map those centers to CSS coordinates and click them.
+      5) Type email/password via synthetic KeyboardEvents.
+      6) Press Enter to submit.
 
-    Email/password field centers are expressed as fractions of viewport.
-    Tuned for 1920x1080 but scaled dynamically.
+    E-Mail box is green, Password box is red in the overlay.
     """
-    # Fractions based on your screenshot (rough but centered)
-    EMAIL_X_FRACTION = 0.50
-    EMAIL_Y_FRACTION = 0.44
-    # We only need Tab to reach password, so no direct click on password box.
+    bgr = _grab_bgr(sb)
+    h_img, w_img = bgr.shape[:2]
+    print(f"[LuckyLand] canvas login screenshot size: {w_img}x{h_img}")
 
-    # Get viewport size in CSS pixels
+    # Rough layout from your screenshot; tuned as fractions so it scales
+    # horizontally & vertically with viewport/screenshot.
+    panel_left  = int(w_img * 0.25)
+    panel_right = int(w_img * 0.75)
+
+    email_top    = int(h_img * 0.37)
+    email_bottom = int(h_img * 0.46)
+
+    pass_top    = int(h_img * 0.50)
+    pass_bottom = int(h_img * 0.59)
+
+    email_cx = (panel_left + panel_right) // 2
+    email_cy = (email_top + email_bottom) // 2
+
+    pass_cx = email_cx
+    pass_cy = (pass_top + pass_bottom) // 2
+
+    # Draw overlay: green = E-Mail, red = Password
+    dbg = bgr.copy()
+    cv2.rectangle(dbg, (panel_left, email_top), (panel_right, email_bottom), (0, 255, 0), 3)
+    cv2.circle(dbg, (email_cx, email_cy), 8, (0, 255, 255), -1)
+    cv2.rectangle(dbg, (panel_left, pass_top), (panel_right, pass_bottom), (0, 0, 255), 3)
+    cv2.circle(dbg, (pass_cx, pass_cy), 8, (255, 255, 0), -1)
+
+    overlay_path = "/tmp/luckyland_login_fields_overlay.png"
+    cv2.imwrite(overlay_path, dbg)
+    print(f"[LuckyLand] Login fields overlay saved to {overlay_path}")
+    await _send_shot(
+        channel,
+        "[LuckyLand] Canvas login fields overlay — green=E-Mail, red=Password, dots=click centers.",
+        overlay_path,
+    )
+
+    # Map screenshot coords → CSS coords
     vw = float(
         sb.execute_script(
             "return window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth || 0;"
@@ -382,16 +417,24 @@ def _canvas_type_login(sb: SB, email: str, password: str) -> dict:
     )
 
     if vw <= 0 or vh <= 0:
-        return {"mode": "canvas", "error": "bad_viewport", "vw": vw, "vh": vh}
+        return {"mode": "canvas-auto", "error": "bad_viewport", "vw": vw, "vh": vh}
 
-    email_x = int(vw * EMAIL_X_FRACTION)
-    email_y = int(vh * EMAIL_Y_FRACTION)
+    scale_x = vw / float(w_img or 1)
+    scale_y = vh / float(h_img or 1)
 
-    print(f"[LuckyLand] Canvas login: clicking email at CSS ({email_x},{email_y})")
-    _click_at_css_point(sb, email_x, email_y)
-    time.sleep(0.5)
+    email_x_css = int(email_cx * scale_x)
+    email_y_css = int(email_cy * scale_y)
 
-    # JS helpers to type text and press a single key (Tab/Enter)
+    pass_x_css = int(pass_cx * scale_x)
+    pass_y_css = int(pass_cy * scale_y)
+
+    print(
+        f"[LuckyLand] Canvas login CSS centers: "
+        f"email=({email_x_css},{email_y_css}), pass=({pass_x_css},{pass_y_css}), "
+        f"viewport=({vw}x{vh})"
+    )
+
+    # JS helpers to type text and press a single key
     js_type = r"""
       (function(text){
         const target = document.activeElement || document.body;
@@ -436,31 +479,32 @@ def _canvas_type_login(sb: SB, email: str, password: str) -> dict:
       })(arguments[0]);
     """
 
-    # Type email
-    print("[LuckyLand] Canvas login: typing email…")
+    # Click E-Mail field and type email
+    print(f"[LuckyLand] Clicking E-Mail field at CSS ({email_x_css},{email_y_css})")
+    _click_at_css_point(sb, email_x_css, email_y_css)
+    time.sleep(0.5)
+    print("[LuckyLand] Typing email into canvas…")
     sb.execute_script(js_type, email)
-    time.sleep(0.4)
+    time.sleep(0.5)
 
-    # Tab to password field
-    print("[LuckyLand] Canvas login: sending Tab to reach password field…")
-    sb.execute_script(js_key, "Tab")
-    time.sleep(0.4)
-
-    # Type password
-    print("[LuckyLand] Canvas login: typing password…")
+    # Click Password field and type password
+    print(f"[LuckyLand] Clicking Password field at CSS ({pass_x_css},{pass_y_css})")
+    _click_at_css_point(sb, pass_x_css, pass_y_css)
+    time.sleep(0.5)
+    print("[LuckyLand] Typing password into canvas…")
     sb.execute_script(js_type, password)
-    time.sleep(0.4)
+    time.sleep(0.5)
 
     # Press Enter to submit
-    print("[LuckyLand] Canvas login: sending Enter to submit…")
+    print("[LuckyLand] Sending Enter key to submit login…")
     sb.execute_script(js_key, "Enter")
 
     return {
-        "mode": "canvas",
+        "mode": "canvas-auto",
         "vw": vw,
         "vh": vh,
-        "email_x": email_x,
-        "email_y": email_y,
+        "email_center_css": (email_x_css, email_y_css),
+        "pass_center_css": (pass_x_css, pass_y_css),
     }
 
 
@@ -468,10 +512,12 @@ def _canvas_type_login(sb: SB, email: str, password: str) -> dict:
 # Login popup: fill creds + submit
 # ────────────────────────────────────────────
 
-def _fill_login_and_submit(sb: SB, email: str, password: str) -> dict:
+async def _fill_login_and_submit(
+    sb: SB, email: str, password: str, channel: discord.abc.Messageable
+) -> dict:
     """
     First tries to find real HTML <input> elements for E-Mail / Password.
-    If none are found (canvas-only UI), falls back to _canvas_type_login().
+    If none are found (canvas-only UI), falls back to _canvas_type_login_auto().
     """
     js = r"""
       return (function(emailVal, passVal){
@@ -498,7 +544,8 @@ def _fill_login_and_submit(sb: SB, email: str, password: str) -> dict:
             hasEmail: false,
             hasPass : false,
             emailType: null,
-            passType : null
+            passType : null,
+            mode: 'html-none'
           };
         }
 
@@ -556,12 +603,11 @@ def _fill_login_and_submit(sb: SB, email: str, password: str) -> dict:
     except Exception as e:
         result = {"error": str(e), "mode": "html_js_error"}
 
-    # If no HTML inputs, fall back to canvas typing
+    # If no HTML inputs, fall back to canvas auto-box typing
     if not result.get("hasEmail") and not result.get("hasPass"):
-        print("[LuckyLand] No HTML inputs detected; switching to canvas typing mode.")
-        canvas_result = _canvas_type_login(sb, email, password)
-        # merge / annotate
-        out = {"mode": "canvas"}
+        print("[LuckyLand] No HTML inputs detected; switching to canvas auto-box typing mode.")
+        canvas_result = await _canvas_type_login_auto(sb, email, password, channel)
+        out = {"mode": "canvas-auto"}
         out.update(canvas_result)
         return out
 
@@ -581,7 +627,7 @@ async def luckyland_uc(ctx, channel: discord.abc.Messageable):
       3. (Optional) Click any pre-login image/button.
       4. Click purple 'Log into Existing Account' button on canvas.
       5. When login popup appears, fill creds from .env and submit
-         (HTML inputs if present; otherwise canvas typing).
+         (HTML inputs if present; otherwise canvas auto-box typing).
       6. Screenshot a few seconds after submitting.
     """
     if ":" not in LUCKYLAND_CRED:
@@ -598,7 +644,7 @@ async def luckyland_uc(ctx, channel: discord.abc.Messageable):
         await channel.send("[LuckyLand][ERROR] Missing luckylandloginbtn.png template.")
         return
 
-    await channel.send("Starting LuckyLand (canvas login + credential submit)…")
+    await channel.send("Starting LuckyLand (canvas login + auto-box credential submit)…")
 
     try:
         with SB(uc=True) as sb:
@@ -641,8 +687,8 @@ async def luckyland_uc(ctx, channel: discord.abc.Messageable):
                 return
 
             # We should now be on the login popup you screenshotted.
-            await channel.send("[LuckyLand] Detected login popup — filling credentials from .env…")
-            fill_result = _fill_login_and_submit(sb, email, password)
+            await channel.send("[LuckyLand] Login popup should be visible — filling credentials from .env…")
+            fill_result = await _fill_login_and_submit(sb, email, password, channel)
             await channel.send(f"[LuckyLand] Login fields located / mode: {fill_result}")
 
             # Wait a few seconds for the login request + transition
