@@ -1,6 +1,6 @@
 # Drake Hooks + WaterTrooper
 # Casino Claim 2
-# LuckyLand API — canvas login button click with OpenCV + bounding-box debug
+# LuckyLand API — cookies fix + canvas login button + credential submit
 
 import os
 import time
@@ -16,11 +16,11 @@ import numpy as np
 load_dotenv()
 
 LOGIN_URL = "https://luckylandslots.com/"
-LUCKYLAND_CRED = os.getenv("LUCKYLAND", "")  # "email:password" (not used yet, but kept for future)
+LUCKYLAND_CRED = os.getenv("LUCKYLAND", "")  # "email:password"
 
 # Template images (put these in ./images/ or repo root)
 COOKIES_IMG       = "luckyland_cookies.png"       # optional
-PRELOGIN_BTN_IMG  = "luckyland_loginbtn0.png"     # optional (if you use a prelogin button)
+PRELOGIN_BTN_IMG  = "luckyland_loginbtn0.png"     # optional
 LOGIN_BTN_IMG     = "luckylandloginbtn.png"       # REQUIRED (purple "Log into Existing Account" button)
 
 # Thresholds / timing
@@ -64,7 +64,7 @@ def _match_template(
 ) -> Optional[Tuple[Tuple[int, int], Tuple[int, int], float]]:
     """
     Returns (top_left, bottom_right, maxVal) if match >= thresh; otherwise None.
-    Coordinates are in screenshot pixels (screenshot width/height).
+    Coordinates are in screenshot pixels.
     """
     res = cv2.matchTemplate(bgr, tmpl, cv2.TM_CCOEFF_NORMED)
     _, maxVal, _, maxLoc = cv2.minMaxLoc(res)
@@ -162,7 +162,7 @@ def _click_at_css_point(sb: SB, x_css: int, y_css: int) -> dict:
 
 
 # ────────────────────────────────────────────
-# Cookie helpers (lightweight, just to get out of the way)
+# Cookie helpers
 # ────────────────────────────────────────────
 
 def _click_by_text(sb: SB, texts: List[str]) -> bool:
@@ -347,6 +347,99 @@ async def _click_template_on_canvas(
 
 
 # ────────────────────────────────────────────
+# Login popup: fill creds + submit
+# ────────────────────────────────────────────
+
+def _fill_login_and_submit(sb: SB, email: str, password: str) -> dict:
+    """
+    Finds the E-Mail + Password inputs (if they exist as HTML inputs),
+    fills them with .env creds, and submits the form.
+
+    - Searches all <input> elements and heuristically picks:
+        * emailEl: type=email or name/placeholder contains 'email' / 'mail'
+        * passEl : type=password or name/placeholder contains 'pass'
+    - Sets .value, dispatches 'input' events.
+    - If passEl.form exists, dispatches 'submit' and then form.submit().
+    - Also simulates pressing Enter on the password field for good measure.
+    """
+    js = r"""
+      return (function(emailVal, passVal){
+        const lower = s => (s || "").toLowerCase();
+        const inputs = Array.from(document.querySelectorAll('input'));
+        let emailEl = null;
+        let passEl  = null;
+
+        for (const el of inputs) {
+          const type = lower(el.type);
+          const name = lower(el.name);
+          const ph   = lower(el.placeholder);
+
+          if (!emailEl && (type === 'email' || name.includes('email') || ph.includes('mail'))) {
+            emailEl = el;
+          }
+          if (!passEl && (type === 'password' || name.includes('pass') || ph.includes('pass'))) {
+            passEl = el;
+          }
+        }
+
+        if (emailEl) {
+          emailEl.focus();
+          emailEl.value = emailVal;
+          emailEl.dispatchEvent(new Event('input', {bubbles:true}));
+          emailEl.dispatchEvent(new Event('change', {bubbles:true}));
+        }
+
+        if (passEl) {
+          passEl.focus();
+          passEl.value = passVal;
+          passEl.dispatchEvent(new Event('input', {bubbles:true}));
+          passEl.dispatchEvent(new Event('change', {bubbles:true}));
+        }
+
+        // Try to submit via form
+        if (passEl && passEl.form) {
+          try {
+            passEl.form.dispatchEvent(new Event('submit', {bubbles:true, cancelable:true}));
+          } catch (e) {}
+          try {
+            passEl.form.submit();
+          } catch (e2) {}
+        }
+
+        // Also simulate Enter key on password field
+        if (passEl) {
+          const evtInit = {
+            key: 'Enter',
+            code: 'Enter',
+            keyCode: 13,
+            which: 13,
+            bubbles: true,
+            cancelable: true
+          };
+          try {
+            passEl.dispatchEvent(new KeyboardEvent('keydown', evtInit));
+            passEl.dispatchEvent(new KeyboardEvent('keyup',   evtInit));
+          } catch (e) {}
+        }
+
+        return {
+          hasEmail: !!emailEl,
+          hasPass : !!passEl,
+          emailType: emailEl ? emailEl.type : null,
+          passType : passEl ? passEl.type : null
+        };
+      })(arguments[0], arguments[1]);
+    """
+    try:
+        result = sb.execute_script(js, email, password) or {}
+    except Exception as e:
+        result = {"error": str(e)}
+
+    print(f"[LuckyLand] _fill_login_and_submit result: {result}")
+    return result
+
+
+# ────────────────────────────────────────────
 # Main entry
 # ────────────────────────────────────────────
 
@@ -355,10 +448,17 @@ async def luckyland_uc(ctx, channel: discord.abc.Messageable):
     LuckyLand flow:
       1. Open LuckyLand.
       2. Close cookies if present.
-      3. (Optional) Click any pre-login image/button you already use.
-      4. When on the canvas screen you showed, detect and click the
-         'Log into Existing Account' button and screenshot after.
+      3. (Optional) Click any pre-login image/button.
+      4. Click purple 'Log into Existing Account' button on canvas.
+      5. When login popup appears, fill creds from .env and submit.
+      6. Screenshot a few seconds after submitting.
     """
+    if ":" not in LUCKYLAND_CRED:
+        await channel.send("[LuckyLand][ERROR] LUCKYLAND env var must be 'email:password'")
+        return
+
+    email, password = LUCKYLAND_CRED.split(":", 1)
+
     login_tmpl = _load_template(LOGIN_BTN_IMG)
     cookies_tmpl = _load_template(COOKIES_IMG)        # optional
     prelogin_tmpl = _load_template(PRELOGIN_BTN_IMG)  # optional
@@ -367,7 +467,7 @@ async def luckyland_uc(ctx, channel: discord.abc.Messageable):
         await channel.send("[LuckyLand][ERROR] Missing luckylandloginbtn.png template.")
         return
 
-    await channel.send("Starting LuckyLand (canvas login button automation)…")
+    await channel.send("Starting LuckyLand (canvas login + credential submit)…")
 
     try:
         with SB(uc=True) as sb:
@@ -379,8 +479,7 @@ async def luckyland_uc(ctx, channel: discord.abc.Messageable):
             # Handle cookies so we can actually see the game
             _close_luckyland_cookies(sb, cookies_tmpl)
 
-            # If you still have a pre-login image/button (HTML or canvas),
-            # you can use template matching here as well.
+            # Optional: pre-login click if you still need it
             if prelogin_tmpl is not None:
                 try:
                     await _click_template_on_canvas(
@@ -394,11 +493,10 @@ async def luckyland_uc(ctx, channel: discord.abc.Messageable):
                 except Exception as e:
                     print(f"[LuckyLand] Prelogin template click error: {e}")
 
-            # At this point you should be on the screen you sent (big logo + purple button).
+            # Click the purple "Log into Existing Account" canvas button
             await channel.send(
-                "[LuckyLand] Looking for the purple 'Log into Existing Account' button on canvas…"
+                "[LuckyLand] Looking for the purple 'Log into Existing Account' button…"
             )
-
             clicked = await _click_template_on_canvas(
                 sb,
                 login_tmpl,
@@ -407,18 +505,24 @@ async def luckyland_uc(ctx, channel: discord.abc.Messageable):
                 channel,
             )
 
-            if clicked:
-                # Give it a few seconds to transition to the login form
-                time.sleep(AFTER_CLICK_WAIT)
-                final_path = _save_debug(sb, "luckyland_final_state")
-                await _send_shot(
-                    channel,
-                    "[LuckyLand] Final state after waiting for login transition:",
-                    final_path,
-                )
-                await channel.send("✅ LuckyLand: login button click flow complete.")
-            else:
+            if not clicked:
                 await channel.send("❌ LuckyLand: login button template never found.")
+                return
+
+            # We should now be on the login popup you screenshotted.
+            await channel.send("[LuckyLand] Detected login popup — filling credentials from .env…")
+            fill_result = _fill_login_and_submit(sb, email, password)
+            await channel.send(f"[LuckyLand] Login fields located: {fill_result}")
+
+            # Wait a few seconds for the login request + transition
+            time.sleep(AFTER_CLICK_WAIT)
+            final_path = _save_debug(sb, "luckyland_after_login_submit")
+            await _send_shot(
+                channel,
+                "[LuckyLand] State a few seconds after submitting login:",
+                final_path,
+            )
+            await channel.send("✅ LuckyLand: login flow (canvas click + credential submit) complete.")
 
     except Exception as e:
         await channel.send(f"[LuckyLand][ERROR] Exception: {e}")
