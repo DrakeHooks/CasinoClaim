@@ -1,6 +1,6 @@
 # Drake Hooks + WaterTrooper
 # Casino Claim 2
-# LuckyLand API — cookies fix + canvas click with OpenCV bounding-box debug
+# LuckyLand API — canvas login button click with OpenCV + bounding-box debug
 
 import os
 import time
@@ -16,15 +16,12 @@ import numpy as np
 load_dotenv()
 
 LOGIN_URL = "https://luckylandslots.com/"
-LUCKYLAND_CRED = os.getenv("LUCKYLAND", "")  # "email:password"
+LUCKYLAND_CRED = os.getenv("LUCKYLAND", "")  # "email:password" (not used yet, but kept for future)
 
-# Default DPR fallback; we'll still try to read window.devicePixelRatio
-DPR_DEFAULT = float(os.getenv("LUCKYLAND_DPR", "1.25"))
-
-# Template images (place in ./images/ or repo root)
+# Template images (put these in ./images/ or repo root)
 COOKIES_IMG       = "luckyland_cookies.png"       # optional
-PRELOGIN_BTN_IMG  = "luckyland_loginbtn0.png"     # optional
-LOGIN_BTN_IMG     = "luckylandloginbtn.png"       # REQUIRED
+PRELOGIN_BTN_IMG  = "luckyland_loginbtn0.png"     # optional (if you use a prelogin button)
+LOGIN_BTN_IMG     = "luckylandloginbtn.png"       # REQUIRED (purple "Log into Existing Account" button)
 
 # Thresholds / timing
 COOKIES_THRESH    = 0.80
@@ -34,9 +31,8 @@ FIND_RETRIES      = 10
 FIND_DELAY        = 0.6
 AFTER_CLICK_WAIT  = 5.0
 
-
 # ────────────────────────────────────────────
-# Image + screenshot helpers
+# File / image helpers
 # ────────────────────────────────────────────
 
 def _img_search_paths(filename: str) -> List[str]:
@@ -54,7 +50,7 @@ def _load_template(filename: str) -> Optional[np.ndarray]:
         if os.path.exists(p):
             print(f"[LuckyLand] Loaded template {filename} from {p}")
             return cv2.imread(p, cv2.IMREAD_COLOR)
-    print(f"[LuckyLand] Template {filename} not found in expected paths")
+    print(f"[LuckyLand] Template {filename} not found")
     return None
 
 
@@ -68,11 +64,11 @@ def _match_template(
 ) -> Optional[Tuple[Tuple[int, int], Tuple[int, int], float]]:
     """
     Returns (top_left, bottom_right, maxVal) if match >= thresh; otherwise None.
-    Coordinates are in screenshot pixels.
+    Coordinates are in screenshot pixels (screenshot width/height).
     """
     res = cv2.matchTemplate(bgr, tmpl, cv2.TM_CCOEFF_NORMED)
     _, maxVal, _, maxLoc = cv2.minMaxLoc(res)
-    print(f"[LuckyLand] Template match score: {maxVal:.3f} (thresh={thresh})")
+    print(f"[LuckyLand] Template score={maxVal:.3f} (thresh={thresh})")
     if maxVal >= thresh:
         th, tw = tmpl.shape[:2]
         top_left = maxLoc
@@ -88,153 +84,90 @@ def _save_debug(sb: SB, name: str) -> str:
     return path
 
 
-async def _send_shot(channel, caption: str, path: str):
+async def _send_shot(channel: discord.abc.Messageable, caption: str, path: str):
     if os.path.exists(path):
         await channel.send(caption, file=discord.File(path))
     else:
-        await channel.send(f"{caption} (screenshot missing at {path})")
+        await channel.send(f"{caption} (screenshot missing: {path})")
 
 
 # ────────────────────────────────────────────
-# DPR + canvas click helpers
+# JS click-at-point helper (works on canvas)
 # ────────────────────────────────────────────
 
-def _get_dpr(sb: SB) -> float:
-    try:
-        dpr = sb.execute_script("return window.devicePixelRatio || 1;")
-        dpr = float(dpr)
-        print(f"[LuckyLand] window.devicePixelRatio = {dpr}")
-        return dpr
-    except Exception as e:
-        print(f"[LuckyLand] Failed to read devicePixelRatio, using default {DPR_DEFAULT}: {e}")
-        return DPR_DEFAULT
-
-
-_JS_CANVAS_CLICK = r"""
+_JS_CLICK_AT_POINT = r"""
 (function(xCss, yCss){
-  // Try to find the main game canvas
-  const canvas =
-    document.querySelector('#lis-main-canvas') ||
-    document.querySelector('canvas[id*="lis-main-canvas"]') ||
-    document.querySelector('canvas') ||
-    document.elementFromPoint(xCss, yCss);
-
-  if (!canvas) return { ok:false, why:"NO_CANVAS" };
-
-  const r = canvas.getBoundingClientRect();
-  const cx = xCss;
-  const cy = yCss;
+  const el = document.elementFromPoint(xCss, yCss);
+  if (!el) return { ok:false, why:"NO_ELEMENT" };
 
   const Ev = (window.PointerEvent || window.MouseEvent);
+  const base = {
+    bubbles: true,
+    cancelable: true,
+    view: window,
+    clientX: xCss,
+    clientY: yCss,
+    button: 0,
+    buttons: 1,
+    pointerType: 'mouse',
+    pointerId: 1,
+  };
 
-  const ev = (type, extra={}) =>
-    canvas.dispatchEvent(new Ev(
-      type,
-      Object.assign({
-        bubbles:true,
-        cancelable:true,
-        view:window,
-        clientX: cx,
-        clientY: cy,
-        pointerType:'mouse',
-        pointerId:1,
-        button: 0,
-        buttons: (type === 'mousedown' || type === 'pointerdown') ? 1 : 0
-      }, extra)
-    ));
+  function fire(type) {
+    try {
+      el.dispatchEvent(new Ev(type, base));
+    } catch (e) {
+      try {
+        el.dispatchEvent(new MouseEvent(type, base));
+      } catch (e2) {
+        // swallow
+      }
+    }
+  }
 
   try {
-    ev('pointermove');
-    ev('mousemove');
-    ev('pointerdown');
-    ev('mousedown');
-    ev('mouseup');
-    ev('pointerup');
-    ev('click');
+    fire('pointermove');
+    fire('mousemove');
+    fire('pointerdown');
+    fire('mousedown');
+    fire('mouseup');
+    fire('pointerup');
+    fire('click');
   } catch (e) {
-    return { ok:false, why:String(e) };
+    return { ok:false, why:String(e), tag:el.tagName, id:el.id || null, className:el.className || null };
   }
 
   return {
     ok:true,
-    canvasRect:[r.left|0,r.top|0,r.width|0,r.height|0],
-    element: canvas.tagName + (canvas.id ? '#'+canvas.id : '')
+    tag: el.tagName,
+    id: el.id || null,
+    className: el.className || null
   };
 })(arguments[0], arguments[1]);
 """
 
 
-def _canvas_click(sb: SB, x_css: int, y_css: int, dpr: float) -> dict:
+def _click_at_css_point(sb: SB, x_css: int, y_css: int) -> dict:
     """
-    x_css / y_css are CSS pixel coords (clientX/clientY).
-    dpr is used only for CDP "physical" mouse events.
+    Clicks at given CSS pixel coords by dispatching events to
+    document.elementFromPoint(x,y). Works even if it's a canvas.
     """
-    dev_x = x_css * dpr
-    dev_y = y_css * dpr
-
-    # Move physical pointer for hover states
     try:
-        sb.driver.execute_cdp_cmd(
-            "Input.dispatchMouseEvent",
-            {
-                "type": "mouseMoved",
-                "x": dev_x,
-                "y": dev_y,
-                "buttons": 0,
-                "pointerType": "mouse",
-            },
-        )
-    except Exception as e:
-        print(f"[DEBUG] CDP mouseMoved error: {e}")
-
-    # Canvas-targeted JS events
-    result = {}
-    try:
-        result = sb.execute_script(_JS_CANVAS_CLICK, x_css, y_css) or {}
+        result = sb.execute_script(_JS_CLICK_AT_POINT, int(x_css), int(y_css)) or {}
     except Exception as e:
         result = {"ok": False, "why": f"JS_ERR: {e}"}
-    print(f"[DEBUG] Canvas click JS result: {result}")
 
-    # Low-level press/release too
-    try:
-        sb.driver.execute_cdp_cmd(
-            "Input.dispatchMouseEvent",
-            {
-                "type": "mousePressed",
-                "x": dev_x,
-                "y": dev_y,
-                "button": "left",
-                "clickCount": 1,
-                "buttons": 1,
-                "pointerType": "mouse",
-            },
-        )
-        sb.driver.execute_cdp_cmd(
-            "Input.dispatchMouseEvent",
-            {
-                "type": "mouseReleased",
-                "x": dev_x,
-                "y": dev_y,
-                "button": "left",
-                "clickCount": 1,
-                "buttons": 0,
-                "pointerType": "mouse",
-            },
-        )
-    except Exception as e:
-        print(f"[DEBUG] CDP press/release error: {e}")
-
+    print(f"[DEBUG] Click-at-point result: {result}")
     return result
 
 
 # ────────────────────────────────────────────
-# Cookie banner helpers
+# Cookie helpers (lightweight, just to get out of the way)
 # ────────────────────────────────────────────
 
 def _click_by_text(sb: SB, texts: List[str]) -> bool:
     """
-    Clicks the first button-like element whose text contains any of the
-    given strings (case-insensitive).
+    Clicks first button-like element whose text contains any of the strings.
     """
     js = r"""
       const needles = arguments[0].map(t => t.toLowerCase());
@@ -261,18 +194,16 @@ def _click_by_text(sb: SB, texts: List[str]) -> bool:
         return False
 
 
-def _close_luckyland_cookies(sb: SB, cookies_tmpl: Optional[np.ndarray], dpr: float) -> None:
+def _close_luckyland_cookies(sb: SB, cookies_tmpl: Optional[np.ndarray]) -> None:
     """
-    Best-effort cookies closer tailored for LuckyLand:
-      1) If the left "Do Not Sell My Personal Information" panel is open,
-         prefer "Confirm my Choices" or "Accept All".
-      2) Otherwise, click bottom bar "Accept Cookies".
-      3) As a last resort, try the image template + canvas click.
-    We intentionally avoid anything with "Cookie Settings".
+    Tries to dismiss LuckyLand's cookie UI:
+      - "Confirm my Choices" (left panel)
+      - "Accept All" (left panel)
+      - "Accept Cookies" (bottom bar)
+    Falls back to template-based click if provided.
     """
     print("[LuckyLand] Attempting to close cookies…")
 
-    # 1) Panel-specific buttons
     if _click_by_text(sb, ["confirm my choices"]):
         print("[LuckyLand] Closed cookies via 'Confirm my Choices'")
         time.sleep(1.0)
@@ -283,13 +214,12 @@ def _close_luckyland_cookies(sb: SB, cookies_tmpl: Optional[np.ndarray], dpr: fl
         time.sleep(1.0)
         return
 
-    # 2) Bottom bar "Accept Cookies"
     if _click_by_text(sb, ["accept cookies"]):
-        print("[LuckyLand] Closed cookies via bottom bar 'Accept Cookies'")
+        print("[LuckyLand] Closed cookies via 'Accept Cookies'")
         time.sleep(1.0)
         return
 
-    # 3) Template-based click (optional)
+    # Optional: template-based click if you have a cookies button image
     if cookies_tmpl is not None:
         try:
             bgr = _grab_bgr(sb)
@@ -299,88 +229,114 @@ def _close_luckyland_cookies(sb: SB, cookies_tmpl: Optional[np.ndarray], dpr: fl
                 cx = (top_left[0] + bottom_right[0]) // 2
                 cy = (top_left[1] + bottom_right[1]) // 2
 
-                css_x = int(cx / dpr)
-                css_y = int(cy / dpr)
+                h_img, w_img = bgr.shape[:2]
+                vw = sb.execute_script(
+                    "return window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth || 0;"
+                )
+                vh = sb.execute_script(
+                    "return window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight || 0;"
+                )
+                scale_x = vw / w_img if w_img else 1
+                scale_y = vh / h_img if h_img else 1
+                css_x = int(cx * scale_x)
+                css_y = int(cy * scale_y)
 
-                # Draw bounding box debug
-                dbg = bgr.copy()
-                cv2.rectangle(dbg, top_left, bottom_right, (0, 255, 0), 3)
-                cv2.circle(dbg, (cx, cy), 8, (0, 0, 255), -1)
-                path = "/tmp/cookies_detect.png"
-                cv2.imwrite(path, dbg)
-                print("[LuckyLand] Cookies image template found; clicked via canvas.")
-                _canvas_click(sb, css_x, css_y, dpr)
+                print(f"[LuckyLand] Cookies tmpl click at CSS ({css_x},{css_y})")
+                _click_at_css_point(sb, css_x, css_y)
                 time.sleep(1.0)
                 return
         except Exception as e:
-            print(f"[LuckyLand] Image-based cookies close failed: {e}")
+            print(f"[LuckyLand] Cookies template click failed: {e}")
 
-    print("[LuckyLand] Could not positively close cookies banner (continuing anyway).")
+    print("[LuckyLand] Cookies banner may still be present; continuing anyway.")
 
 
 # ────────────────────────────────────────────
-# Template click with bounding-box debug
+# Template click with bounding-box overlay
 # ────────────────────────────────────────────
 
-async def _click_template_with_overlay(
+async def _click_template_on_canvas(
     sb: SB,
     tmpl: np.ndarray,
     thresh: float,
     label: str,
     channel: discord.abc.Messageable,
-    dpr: float,
 ) -> bool:
     """
-    Repeatedly tries to locate the template, draw a bounding box overlay,
-    send that overlay to Discord, then click exactly at the detected center
-    on the canvas. Also sends a screenshot immediately after the click.
+    1. Uses OpenCV to find the template in a full screenshot.
+    2. Draws a green rectangle + red dot at the detected center.
+    3. Sends that overlay screenshot to Discord.
+    4. Maps screenshot coordinates -> CSS coords using viewport size.
+    5. Clicks via document.elementFromPoint(x,y).
+    6. Takes another screenshot right after click and sends it.
+
+    Returns True if click was attempted at a matched location.
     """
     for attempt in range(1, FIND_RETRIES + 1):
         print(f"[LuckyLand] {label}: template attempt {attempt}/{FIND_RETRIES}")
         bgr = _grab_bgr(sb)
+        h_img, w_img = bgr.shape[:2]
+
         match = _match_template(bgr, tmpl, thresh)
-        if match:
-            top_left, bottom_right, score = match
-            cx = (top_left[0] + bottom_right[0]) // 2
-            cy = (top_left[1] + bottom_right[1]) // 2
+        if not match:
+            time.sleep(FIND_DELAY)
+            continue
 
-            css_x = int(cx / dpr)
-            css_y = int(cy / dpr)
+        top_left, bottom_right, score = match
+        cx_img = (top_left[0] + bottom_right[0]) // 2
+        cy_img = (top_left[1] + bottom_right[1]) // 2
 
-            # Draw overlay showing what was detected
-            dbg = bgr.copy()
-            cv2.rectangle(dbg, top_left, bottom_right, (0, 255, 0), 3)
-            cv2.circle(dbg, (cx, cy), 8, (0, 0, 255), -1)
-            overlay_path = f"/tmp/{label}_detect_overlay.png"
-            cv2.imwrite(overlay_path, dbg)
-            print(f"[LuckyLand] {label}: detection overlay saved to {overlay_path}")
+        # Get viewport size in CSS pixels
+        vw = sb.execute_script(
+            "return window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth || 0;"
+        )
+        vh = sb.execute_script(
+            "return window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight || 0;"
+        )
+        vw = float(vw or 1)
+        vh = float(vh or 1)
 
-            await _send_shot(
-                channel,
-                f"[LuckyLand] {label}: template detected (score={score:.3f}). "
-                f"Green box = match, red dot = click center.",
-                overlay_path,
-            )
+        scale_x = vw / float(w_img or 1)
+        scale_y = vh / float(h_img or 1)
 
-            # Perform the canvas click where we detected the center
-            print(f"[LuckyLand] {label}: clicking at CSS ({css_x}, {css_y})")
-            _canvas_click(sb, css_x, css_y, dpr)
+        css_x = int(cx_img * scale_x)
+        css_y = int(cy_img * scale_y)
 
-            # Screenshot immediately after click
-            click_path = f"/tmp/{label}_after_click.png"
-            sb.save_screenshot(click_path)
-            print(f"[LuckyLand] {label}: post-click screenshot saved to {click_path}")
-            await _send_shot(
-                channel,
-                f"[LuckyLand] {label}: screenshot immediately after click.",
-                click_path,
-            )
+        print(
+            f"[LuckyLand] {label}: screenshot center=({cx_img},{cy_img}), "
+            f"viewport=({vw}x{vh}), css=({css_x},{css_y}), score={score:.3f}"
+        )
 
-            return True
+        # Create overlay: green rectangle + red dot where we think the button is
+        dbg = bgr.copy()
+        cv2.rectangle(dbg, top_left, bottom_right, (0, 255, 0), 3)
+        cv2.circle(dbg, (cx_img, cy_img), 8, (0, 0, 255), -1)
+        overlay_path = f"/tmp/{label}_detect_overlay.png"
+        cv2.imwrite(overlay_path, dbg)
+        print(f"[LuckyLand] {label}: overlay saved to {overlay_path}")
 
-        time.sleep(FIND_DELAY)
+        await _send_shot(
+            channel,
+            f"[LuckyLand] {label}: detection overlay (green box = match, red dot = click center).",
+            overlay_path,
+        )
 
-    # Could not find template
+        # Click on that CSS point using JS
+        _click_at_css_point(sb, css_x, css_y)
+
+        # Screenshot immediately after click
+        click_path = f"/tmp/{label}_after_click.png"
+        sb.save_screenshot(click_path)
+        print(f"[LuckyLand] {label}: post-click screenshot saved to {click_path}")
+        await _send_shot(
+            channel,
+            f"[LuckyLand] {label}: screenshot immediately after click.",
+            click_path,
+        )
+
+        return True
+
+    # No match
     fail_path = _save_debug(sb, f"{label}_not_found")
     await _send_shot(
         channel,
@@ -395,19 +351,23 @@ async def _click_template_with_overlay(
 # ────────────────────────────────────────────
 
 async def luckyland_uc(ctx, channel: discord.abc.Messageable):
-    if ":" not in LUCKYLAND_CRED:
-        await channel.send("[LuckyLand][ERROR] Missing LUCKYLAND='email:password' in .env")
-        return
-
-    cookies_tmpl  = _load_template(COOKIES_IMG)          # optional
-    prelogin_tmpl = _load_template(PRELOGIN_BTN_IMG)     # optional
-    login_tmpl    = _load_template(LOGIN_BTN_IMG)        # required
+    """
+    LuckyLand flow:
+      1. Open LuckyLand.
+      2. Close cookies if present.
+      3. (Optional) Click any pre-login image/button you already use.
+      4. When on the canvas screen you showed, detect and click the
+         'Log into Existing Account' button and screenshot after.
+    """
+    login_tmpl = _load_template(LOGIN_BTN_IMG)
+    cookies_tmpl = _load_template(COOKIES_IMG)        # optional
+    prelogin_tmpl = _load_template(PRELOGIN_BTN_IMG)  # optional
 
     if login_tmpl is None:
         await channel.send("[LuckyLand][ERROR] Missing luckylandloginbtn.png template.")
         return
 
-    await channel.send("Starting LuckyLand (cookies fix + canvas debug)…")
+    await channel.send("Starting LuckyLand (canvas login button automation)…")
 
     try:
         with SB(uc=True) as sb:
@@ -416,51 +376,39 @@ async def luckyland_uc(ctx, channel: discord.abc.Messageable):
             sb.wait_for_ready_state_complete()
             sb.scroll_to_top()
 
-            dpr = _get_dpr(sb)
+            # Handle cookies so we can actually see the game
+            _close_luckyland_cookies(sb, cookies_tmpl)
 
-            # Wake canvas a bit (center of viewport)
-            try:
-                size = sb.get_window_size()
-                cx = int(size["width"] / 2)
-                cy = int(size["height"] / 2)
-            except Exception:
-                cx, cy = 960, 540
-            print(f"[LuckyLand] Waking canvas at ({cx}, {cy}) CSS")
-            _canvas_click(sb, cx, cy, dpr)
-
-            # Close cookie stuff
-            _close_luckyland_cookies(sb, cookies_tmpl, dpr)
-
-            # Optional pre-login button via simple template (no overlay needed)
+            # If you still have a pre-login image/button (HTML or canvas),
+            # you can use template matching here as well.
             if prelogin_tmpl is not None:
                 try:
-                    bgr = _grab_bgr(sb)
-                    match = _match_template(bgr, prelogin_tmpl, PRELOGIN_THRESH)
-                    if match:
-                        top_left, bottom_right, _ = match
-                        pcx = (top_left[0] + bottom_right[0]) // 2
-                        pcy = (top_left[1] + bottom_right[1]) // 2
-                        css_x = int(pcx / dpr)
-                        css_y = int(pcy / dpr)
-                        print(f"[LuckyLand] Prelogin button click at CSS ({css_x}, {css_y})")
-                        _canvas_click(sb, css_x, css_y, dpr)
-                        time.sleep(2.0)
+                    await _click_template_on_canvas(
+                        sb,
+                        prelogin_tmpl,
+                        PRELOGIN_THRESH,
+                        "luckyland_prelogin",
+                        channel,
+                    )
+                    time.sleep(3.0)
                 except Exception as e:
-                    print(f"[LuckyLand] Prelogin template error: {e}")
+                    print(f"[LuckyLand] Prelogin template click error: {e}")
 
-            # Now do the main login button with overlay + click debug
-            await channel.send("[LuckyLand] Searching for the purple 'Log into Existing Account' button…")
-            clicked = await _click_template_with_overlay(
+            # At this point you should be on the screen you sent (big logo + purple button).
+            await channel.send(
+                "[LuckyLand] Looking for the purple 'Log into Existing Account' button on canvas…"
+            )
+
+            clicked = await _click_template_on_canvas(
                 sb,
                 login_tmpl,
                 LOGIN_THRESH,
                 "luckyland_login",
                 channel,
-                dpr,
             )
 
             if clicked:
-                # Give some time to transition after the earlier post-click shot
+                # Give it a few seconds to transition to the login form
                 time.sleep(AFTER_CLICK_WAIT)
                 final_path = _save_debug(sb, "luckyland_final_state")
                 await _send_shot(
@@ -468,7 +416,7 @@ async def luckyland_uc(ctx, channel: discord.abc.Messageable):
                     "[LuckyLand] Final state after waiting for login transition:",
                     final_path,
                 )
-                await channel.send("✅ LuckyLand debug complete.")
+                await channel.send("✅ LuckyLand: login button click flow complete.")
             else:
                 await channel.send("❌ LuckyLand: login button template never found.")
 
