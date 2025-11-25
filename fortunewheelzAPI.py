@@ -301,7 +301,7 @@ async def fortunewheelz_flow(ctx, driver, channel):
             channel,
             driver,
             "fortunewheelz_login_timeout.png",
-            "Fortune Wheelz login timed out. Will try again next loop.",
+            "[Fortune Wheelz] Timed Out. Will try again next loop.",
         )
         return
 
