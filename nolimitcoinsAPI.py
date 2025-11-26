@@ -37,7 +37,7 @@ CLAIM_XPATHS = [
 ]
 
 # Read countdown from this DIV (provided path)
-COUNTDOWN_DIV_XPATH = "/html/body/div[1]/div/main/div/div[3]/div[5]/div[2]/div"
+COUNTDOWN_DIV_XPATH = "/html/body/div[1]/div/main/div/div[3]/div[4]/div[2]/div"
 
 # Optional overlay that can block clicks.
 OVERLAY_LOCATOR = (By.ID, "ModalDailyLogin")
