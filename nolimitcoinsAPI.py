@@ -191,7 +191,7 @@ async def nolimitcoins_flow(ctx, driver, channel):
     if cd:
         await channel.send(f"Next No Limit Coins Bonus Available in: {cd}")
     else:
-        await channel.send("NoLimitCoins: Couldn't find 'Collect' after clicking claim. Perhaps you need to authenticate?")
+        await channel.send("[NoLimitCoins] Could not access countdown. Perhaps the x-path has changed?")
         await send_screenshot(channel, driver)
 
 async def claim_nolimitcoins_bonus(ctx, driver, channel):
