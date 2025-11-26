@@ -129,7 +129,7 @@ async def spinquest_casino(ctx, driver, channel):
         screenshot = "spinquest_login_error.png"
         driver.save_screenshot(screenshot)
         await channel.send(
-            "SpinQuest login timed out, will retry later.",
+            "[SpinQuest] Timed out, will retry later.",
             file=discord.File(screenshot)
         )
         os.remove(screenshot)
