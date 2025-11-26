@@ -284,22 +284,7 @@ async def _run_modo(channel):
     if not ok:
         await check_modo_countdown(driver, bot, None, channel)
 
-async def _run_rollingriches(channel):
-    """
-    Run Rolling Riches in a background thread so it doesn't block the main loop.
-
-    Requires rollingrichesAPI.py to expose:
-        def rollingriches_uc_blocking(bot, channel_id: int, loop: asyncio.AbstractEventLoop) -> None:
-            ...
-    """
-    from rollingrichesAPI import rollingriches_uc_blocking
-    loop = asyncio.get_running_loop()
-    _exec_job_started()
-    try:
-        # run the blocking UC flow off the event loop
-        await loop.run_in_executor(_executor, rollingriches_uc_blocking, bot, channel.id, loop)
-    finally:
-        _exec_job_finished()
+async def _run_rollingriches(channel):  await rolling_riches_casino(None, driver, channel)
 async def _run_stake(channel):          await stake_claim(driver, bot, None, channel)
 async def _run_fortunewheelz(channel):  await fortunewheelz_flow(None, driver, channel)
 async def _run_spinquest(channel):      await spinquest_flow(None, driver, channel)
@@ -1121,19 +1106,7 @@ async def modo_cmd(ctx):
 async def rollingriches_cmd(ctx):
     await ctx.send("Checking Rolling Riches for bonus…")
     channel = bot.get_channel(DISCORD_CHANNEL)
-    if channel is None:
-        await ctx.send("⚠️ DISCORD_CHANNEL not found.")
-        return
-
-    from rollingrichesAPI import rollingriches_uc_blocking
-    loop = asyncio.get_running_loop()
-    _exec_job_started()
-    try:
-        await loop.run_in_executor(_executor, rollingriches_uc_blocking, bot, channel.id, loop)
-    finally:
-        _exec_job_finished()
-
-
+    await rolling_riches_casino(ctx, driver, channel)
 
 @bot.command(name="luckyland", aliases=["lucky land"])
 async def luckyland_cmd(ctx):

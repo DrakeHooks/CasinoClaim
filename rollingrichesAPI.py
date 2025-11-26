@@ -1,24 +1,22 @@
 # Drake Hooks + WaterTrooper
 # Casino Claim 2
-# Rolling Riches — robust Daily Bonus opener + UC thread runner
-# Changes for non-blocking main loop:
-# - All core logic is now sync (no async/await in the claim flow).
-# - New entrypoint: rollingriches_uc_blocking(bot, channel_id, loop)
-# - Uses its own SeleniumBase UC driver instead of the shared driver.
-# - Discord messages/files are scheduled back onto the main loop.
+# Rolling Riches — robust Daily Bonus opener + 2× pre-Riches refresh + CV popup closer
+# Changes:
+# - Stronger Daily Bonus open (text XPaths + JS text-scan + scroll) before CV fallback
+# - More screenshots around open attempts
+# - Template thresholds relaxed to 0.80 for this site’s light variations
 
 import os
 import re
 import time
+import asyncio
 import tempfile
 import traceback
-import asyncio
-
 import discord
 from dotenv import load_dotenv
 
 # ───────────────────────────────────────────────────────────
-# PyAutoGUI / OpenCV
+# ── PyAutoGUI / OpenCV ──────────────────────────────────────
 # ───────────────────────────────────────────────────────────
 
 import pyautogui
@@ -29,7 +27,7 @@ import cv2
 import numpy as np
 
 # ───────────────────────────────────────────────────────────
-# Selenium / SeleniumBase
+# ── Selenium ───────────────────────────────────────────────
 # ───────────────────────────────────────────────────────────
 
 from selenium.webdriver.common.by import By
@@ -42,14 +40,12 @@ from selenium.common.exceptions import (
     StaleElementReferenceException,
     ElementClickInterceptedException,
 )
-from seleniumbase import SB
 
 load_dotenv()
 
 # ───────────────────────────────────────────────────────────
 # Config and Constants
 # ───────────────────────────────────────────────────────────
-
 LOGIN_URL = "https://www.rollingriches.com/login"
 LOBBY_URL = "https://www.rollingriches.com/lobby"
 
@@ -83,38 +79,46 @@ POPUP_DETECT_THRESHOLD = float(os.environ.get("POPUP_DETECT_THRESHOLD", "0.80"))
 POPUP_CLOSE_THRESHOLD  = float(os.environ.get("POPUP_CLOSE_THRESHOLD",  "0.80"))
 
 # ───────────────────────────────────────────────────────────
-# Print/log helpers (sync)
+# ── Print-only helpers ─────────────────────────────────────
 # ───────────────────────────────────────────────────────────
-
-def _log(msg: str):
+async def _log(msg: str):
     print(msg, flush=True)
 
-def _driver_shot(driver, caption: str = "") -> str:
-    """Take a Selenium screenshot; return path or '' on failure."""
+async def _driver_shot(driver, caption=""):
     try:
         fd, path = tempfile.mkstemp(prefix="rr_driver_", suffix=".png", dir="/tmp")
         os.close(fd)
         driver.save_screenshot(path)
-        _log(f"{caption or '📸 Selenium'} saved: {path}\nURL: {driver.current_url}")
+        await _log(f"{caption or '📸 Selenium'} saved: {path}\nURL: {driver.current_url}")
         return path
     except Exception as e:
-        _log(f"⚠️ _driver_shot error: {e}")
+        await _log(f"⚠️ _driver_shot error: {e}")
         return ""
 
-def _pyauto_shot(caption: str = "") -> str:
-    """Full-screen screenshot via PyAutoGUI; return path."""
+async def _pyauto_shot(caption=""):
     try:
         fd, path = tempfile.mkstemp(prefix="rr_pyauto_", suffix=".png", dir="/tmp")
         os.close(fd)
         pyautogui.screenshot(path)
-        _log(f"{caption or '🖥️ Screen'} saved: {path}")
+        await _log(f"{caption or '🖥️ Screen'} saved: {path}")
         return path
     except Exception as e:
-        _log(f"⚠️ _pyauto_shot error: {e}")
+        await _log(f"⚠️ _pyauto_shot error: {e}")
         return ""
 
+async def _send_one_shot(channel: discord.abc.Messageable, text: str, image_path: str):
+    if not image_path or not os.path.exists(image_path):
+        await channel.send(text)
+        return
+    try:
+        await channel.send(text, file=discord.File(image_path))
+    finally:
+        try:
+            os.remove(image_path)
+        except Exception:
+            pass
+
 def _ensure_viewport(driver):
-    """Normalize viewport for consistent CV templates & DOM layout."""
     try:
         driver.set_window_position(0, 0)
         driver.set_window_size(1920, 1080)
@@ -129,9 +133,44 @@ def _ensure_viewport(driver):
         pass
 
 # ───────────────────────────────────────────────────────────
+# Background popup closer (DOM; silent)
+# ───────────────────────────────────────────────────────────
+async def _popup_closer_task(driver, stop_event: asyncio.Event,
+                             xpath: str = POPUP_CLOSE_XPATH,
+                             interval: float = 0.6):
+    while not stop_event.is_set():
+        try:
+            buttons = driver.find_elements(By.XPATH, xpath)
+            for btn in buttons:
+                try:
+                    if btn.is_displayed():
+                        try:
+                            driver.execute_script("arguments[0].click();", btn)
+                        except Exception:
+                            try:
+                                btn.click()
+                            except Exception:
+                                pass
+                        await asyncio.sleep(0.15)
+                        break
+                except (StaleElementReferenceException, ElementClickInterceptedException, NoSuchElementException):
+                    continue
+        except Exception:
+            pass
+        await asyncio.sleep(interval)
+
+async def _close_popup(driver):
+    try:
+        btn = WebDriverWait(driver, 2).until(EC.element_to_be_clickable((By.XPATH, POPUP_CLOSE_XPATH)))
+        driver.execute_script("arguments[0].click();", btn)
+        await asyncio.sleep(0.2)
+        await _log("🧹 Popup closed (if present).")
+    except Exception:
+        pass
+
+# ───────────────────────────────────────────────────────────
 # OpenCV helpers
 # ───────────────────────────────────────────────────────────
-
 def _screenshot_bgr() -> np.ndarray:
     im = pyautogui.screenshot()
     arr = np.array(im)
@@ -141,16 +180,8 @@ def _draw_box(img_bgr: np.ndarray, top_left: tuple, w: int, h: int, text: str = 
     out = img_bgr.copy()
     cv2.rectangle(out, top_left, (top_left[0] + w, top_left[1] + h), (0, 255, 0), 2)
     if text:
-        cv2.putText(
-            out,
-            text,
-            (top_left[0], max(0, top_left[1] - 6)),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.55,
-            (0, 255, 0),
-            2,
-            cv2.LINE_AA,
-        )
+        cv2.putText(out, text, (top_left[0], max(0, top_left[1]-6)),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0,255,0), 2, cv2.LINE_AA)
     return out
 
 def _save_debug(img_bgr: np.ndarray, prefix: str = "cv_debug") -> str:
@@ -159,15 +190,11 @@ def _save_debug(img_bgr: np.ndarray, prefix: str = "cv_debug") -> str:
     cv2.imwrite(path, img_bgr)
     return path
 
-def _match_template_multiscale(
-    screen_bgr: np.ndarray,
-    templ_bgr: np.ndarray,
-    method=cv2.TM_CCOEFF_NORMED,
-    scales=None,
-):
+def _match_template_multiscale(screen_bgr: np.ndarray, templ_bgr: np.ndarray,
+                               method=cv2.TM_CCOEFF_NORMED,
+                               scales=None):
     if scales is None:
         scales = [0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.15, 1.2]
-
     screen_gray = cv2.cvtColor(screen_bgr, cv2.COLOR_BGR2GRAY)
     templ_gray0 = cv2.cvtColor(templ_bgr, cv2.COLOR_BGR2GRAY)
 
@@ -176,8 +203,8 @@ def _match_template_multiscale(
         if s == 1.0:
             tmpl = templ_gray0
         else:
-            new_w = max(6, int(templ_bgr.shape[1] * s))
-            new_h = max(6, int(templ_bgr.shape[0] * s))
+            new_w = max(6, int(templ_bgr.shape[1]*s))
+            new_h = max(6, int(templ_bgr.shape[0]*s))
             tmpl = cv2.resize(templ_gray0, (new_w, new_h), interpolation=cv2.INTER_AREA)
         h, w = tmpl.shape[:2]
         if h < 6 or w < 6:
@@ -190,12 +217,10 @@ def _match_template_multiscale(
             best_scale = s
     return best_score, best_rect, best_scale
 
-def click_daily_bonus_by_template(
-    template_path: str,
-    threshold: float = 0.80,
-    extra_offsets=None,
-    move_duration: float = 0.25,
-):
+def click_daily_bonus_by_template(template_path: str,
+                                  threshold: float = 0.80,
+                                  extra_offsets=None,
+                                  move_duration: float = 0.25):
     if not os.path.exists(template_path):
         return False, -1.0, ""
 
@@ -209,36 +234,25 @@ def click_daily_bonus_by_template(
     dbg_path = ""
     if rect:
         tl = (rect[0], rect[1])
-        dbg_img = _draw_box(
-            screen_bgr,
-            tl,
-            rect[2],
-            rect[3],
-            f"{score:.3f}@{scale:.2f}",
-        )
+        dbg_img = _draw_box(screen_bgr, tl, rect[2], rect[3], f"{score:.3f}@{scale:.2f}")
         dbg_path = _save_debug(dbg_img, "daily_bonus_match")
 
     if rect and score >= threshold:
         x, y, w, h = rect
-        cx, cy = x + w // 2, y + h // 2
+        cx, cy = x + w//2, y + h//2
         pyautogui.moveTo(cx, cy, duration=move_duration)
         pyautogui.click()
         time.sleep(0.2)
         if extra_offsets:
             for dx, dy in extra_offsets:
-                pyautogui.moveTo(cx + dx, cy + dy, duration=0.15)
+                pyautogui.moveTo(cx+dx, cy+dy, duration=0.15)
                 pyautogui.click()
                 time.sleep(0.12)
         return True, score, dbg_path
 
     return False, score, dbg_path
 
-def _click_template_with_retries(
-    template_path: str,
-    tries: int = 3,
-    delay: float = 0.8,
-    threshold: float | None = None,
-):
+def _click_template_with_retries(template_path: str, tries: int = 3, delay: float = 0.8, threshold: float | None = None):
     last_dbg = ""
     last_conf = -1.0
     thr = TEMPLATE_THRESHOLD if threshold is None else threshold
@@ -255,17 +269,14 @@ def _click_template_with_retries(
 # ───────────────────────────────────────────────────────────
 # OpenCV popup detect & close with refresh fallback
 # ───────────────────────────────────────────────────────────
-
-def _close_rr_popup_via_cv(
-    driver,
-    popup_tmpl: str = RR_POPUP_TEMPLATE,
-    close_tmpl: str = RR_POPUPCLOSE_TEMPLATE,
-    detect_thr: float = POPUP_DETECT_THRESHOLD,
-    close_thr: float = POPUP_CLOSE_THRESHOLD,
-    tries: int = 3,
-) -> bool:
+async def _close_rr_popup_via_cv(driver,
+                                 popup_tmpl: str = RR_POPUP_TEMPLATE,
+                                 close_tmpl: str = RR_POPUPCLOSE_TEMPLATE,
+                                 detect_thr: float = POPUP_DETECT_THRESHOLD,
+                                 close_thr: float = POPUP_CLOSE_THRESHOLD,
+                                 tries: int = 3) -> bool:
     if not os.path.exists(popup_tmpl) or not os.path.exists(close_tmpl):
-        _log("ℹ️ RR popup templates missing; skipping CV close.")
+        await _log("ℹ️ RR popup templates missing; skipping CV close.")
         return False
 
     scr = _screenshot_bgr()
@@ -274,34 +285,25 @@ def _close_rr_popup_via_cv(
         return False
     pop_score, pop_rect, pop_scale = _match_template_multiscale(scr, pop_bgr)
     if not pop_rect or pop_score < detect_thr:
-        _log(f"ℹ️ CV popup not detected (score={pop_score:.3f}).")
+        await _log(f"ℹ️ CV popup not detected (score={pop_score:.3f}).")
         return False
 
     for i in range(tries):
-        ok, conf, dbg = _click_template_with_retries(
-            close_tmpl,
-            tries=1,
-            delay=0.3,
-            threshold=close_thr,
-        )
+        ok, conf, dbg = _click_template_with_retries(close_tmpl, tries=1, delay=0.3, threshold=close_thr)
         if dbg:
-            _log(
-                f"🧪 RR popup close match (try {i+1}/{tries}) "
-                f"conf={conf:.3f}, debug={dbg}"
-            )
+            await _log(f"🧪 RR popup close match (try {i+1}/{tries}) conf={conf:.3f}, debug={dbg}")
         if ok:
-            time.sleep(0.5)
-            _log("✅ RR popup closed via OpenCV.")
+            await asyncio.sleep(0.5)
+            await _log("✅ RR popup closed via OpenCV.")
             return True
         time.sleep(0.3)
 
-    _log("⚠️ RR popup CV close failed after retries.")
+    await _log("⚠️ RR popup CV close failed after retries.")
     return False
 
 # ───────────────────────────────────────────────────────────
 # Countdown helpers
 # ───────────────────────────────────────────────────────────
-
 def _normalize_hms_text(txt: str) -> str | None:
     if not txt:
         return None
@@ -314,18 +316,13 @@ def _normalize_hms_text(txt: str) -> str | None:
 def _read_rr_countdown(driver):
     XPATHS = [
         COUNTDOWN_XPATH,
-        "/html/body/div/div[3]/div/div[1]"
-        "//div[contains(text(),':')][1]",
-        "//div[contains(@class,'modal') or contains(@class,'popup') "
-        "or contains(@class,'drawer') or contains(@class,'dialog')]"
-        "//div[contains(text(),':')]",
+        "/html/body/div/div[3]/div/div[1]//div[contains(text(),':')][1]",
+        "//div[contains(@class,'modal') or contains(@class,'popup') or contains(@class,'drawer') or contains(@class,'dialog')]//div[contains(text(),':')]",
         "//*[contains(text(),':')]",
     ]
     for xp in XPATHS:
         try:
-            el = WebDriverWait(driver, 4).until(
-                EC.presence_of_element_located((By.XPATH, xp))
-            )
+            el = WebDriverWait(driver, 4).until(EC.presence_of_element_located((By.XPATH, xp)))
             hms = _normalize_hms_text((el.text or "").strip())
             if hms:
                 return hms
@@ -336,80 +333,57 @@ def _read_rr_countdown(driver):
 # ───────────────────────────────────────────────────────────
 # Auth helpers (6 tries)
 # ───────────────────────────────────────────────────────────
-
 def _is_logged_in(driver) -> bool:
     try:
-        WebDriverWait(driver, 1.0).until(
-            EC.presence_of_element_located((By.XPATH, HEADER_RICHES_BTN))
-        )
+        WebDriverWait(driver, 1.0).until(EC.presence_of_element_located((By.XPATH, HEADER_RICHES_BTN)))
         return True
     except Exception:
         return False
 
-def _close_popup(driver):
-    try:
-        btn = WebDriverWait(driver, 2).until(
-            EC.element_to_be_clickable((By.XPATH, POPUP_CLOSE_XPATH))
-        )
-        driver.execute_script("arguments[0].click();", btn)
-        time.sleep(0.2)
-        _log("🧹 Popup closed (if present).")
-    except Exception:
-        pass
-
-def _login_six_tries(driver, username: str, password: str) -> bool:
+async def _login_six_tries(driver, username: str, password: str) -> bool:
     for attempt in range(1, 7):
-        _log(f"🚪 Navigating to /login (attempt {attempt}/6)…")
+        await _log(f"🚪 Navigating to /login (attempt {attempt}/6)…")
         driver.get(LOGIN_URL)
-        time.sleep(4)
+        await asyncio.sleep(4)
 
         if _is_logged_in(driver):
-            _log("🔓 Already logged in (header button present).")
+            await _log("🔓 Already logged in (header button present).")
             return True
 
         try:
-            email = WebDriverWait(driver, 8).until(
-                EC.presence_of_element_located((By.ID, "email"))
-            )
-            pwd = driver.find_element(By.ID, "password")
-            email.clear()
-            email.send_keys(username)
-            pwd.clear()
-            pwd.send_keys(password)
-            pwd.send_keys(Keys.ENTER)
-            _log("🔑 Submitted login (attempt {attempt}/6). Waiting 10s then screenshot…")
+            email = WebDriverWait(driver, 8).until(EC.presence_of_element_located((By.ID, "email")))
+            pwd   = driver.find_element(By.ID, "password")
+            email.clear(); email.send_keys(username)
+            pwd.clear();   pwd.send_keys(password); pwd.send_keys(Keys.ENTER)
+            await _log(f"🔑 Submitted login (attempt {attempt}/6). Waiting 10s then screenshot…")
         except Exception as e:
-            _log(f"⚠️ Couldn’t submit login on attempt {attempt}: {e}")
+            await _log(f"⚠️ Couldn’t submit login on attempt {attempt}: {e}")
             continue
 
-        time.sleep(10)
-        _driver_shot(driver, f"📸 10s after submit (attempt {attempt}/6)")
-        _close_popup(driver)
+        await asyncio.sleep(10)
+        await _driver_shot(driver, f"📸 10s after submit (attempt {attempt}/6)")
+        await _close_popup(driver)
 
         if _is_logged_in(driver):
-            _log("✅ Login successful — header button detected.")
+            await _log("✅ Login successful — header button detected.")
             return True
 
-        time.sleep(3)
+        await asyncio.sleep(3)
         if _is_logged_in(driver):
-            _log("✅ Login successful (late hydrate).")
+            await _log("✅ Login successful (late hydrate).")
             return True
 
-        _log("↩️ Not logged in yet. Will retry…")
+        await _log("↩️ Not logged in yet. Will retry…")
 
-    _log("⛔ All 6 login attempts failed.")
-    _driver_shot(driver, "⛔ Final login state")
-    return False
+    await _log("⛔ All 6 login attempts failed.")
+    await _driver_shot(driver, "⛔ Final login state")
+    return
 
 # ───────────────────────────────────────────────────────────
-# Daily Bonus opener — DOM-first, then CV
+# Daily Bonus opener — NEW core piece
 # ───────────────────────────────────────────────────────────
-
 def _scroll_into_view_and_click(driver, el):
-    driver.execute_script(
-        "arguments[0].scrollIntoView({block:'center'});",
-        el,
-    )
+    driver.execute_script("arguments[0].scrollIntoView({block:'center'});", el)
     driver.execute_script("arguments[0].click();", el)
 
 def _find_clickable_ancestor(driver, el):
@@ -417,8 +391,9 @@ def _find_clickable_ancestor(driver, el):
     ancestor = el
     for _ in range(6):
         try:
-            if ancestor.tag_name.lower() in ("button", "a"):
+            if ancestor.tag_name.lower() in ("button","a"):
                 return ancestor
+            # if it has role=button or onclick
             try:
                 role = ancestor.get_attribute("role") or ""
             except Exception:
@@ -431,16 +406,14 @@ def _find_clickable_ancestor(driver, el):
             break
     return el
 
-def _open_daily_bonus_dom_first(driver) -> bool:
+async def _open_daily_bonus_dom_first(driver) -> bool:
     # 1) Try a handful of direct text XPaths
     for xp in XPATH_DAILY_BONUS_TEXTS:
         try:
-            el = WebDriverWait(driver, 2).until(
-                EC.presence_of_element_located((By.XPATH, xp))
-            )
+            el = WebDriverWait(driver, 2).until(EC.presence_of_element_located((By.XPATH, xp)))
             el = _find_clickable_ancestor(driver, el)
             _scroll_into_view_and_click(driver, el)
-            time.sleep(1.2)
+            await asyncio.sleep(1.2)
             return True
         except Exception:
             continue
@@ -464,7 +437,7 @@ def _open_daily_bonus_dom_first(driver) -> bool:
         elems = driver.execute_script(js) or []
         if elems:
             _scroll_into_view_and_click(driver, elems[0])
-            time.sleep(1.2)
+            await asyncio.sleep(1.2)
             return True
     except Exception:
         pass
@@ -472,252 +445,142 @@ def _open_daily_bonus_dom_first(driver) -> bool:
     return False
 
 # ───────────────────────────────────────────────────────────
-# Discord helpers for threaded runner
+# Main flow
 # ───────────────────────────────────────────────────────────
+async def rolling_riches_casino(ctx, driver, channel):
+    stop_popup = asyncio.Event()
+    popup_task = asyncio.create_task(_popup_closer_task(driver, stop_popup))
 
-def _schedule_coro(loop: asyncio.AbstractEventLoop, coro):
-    """Schedule a coroutine safely from the UC worker thread."""
-    loop.call_soon_threadsafe(asyncio.create_task, coro)
+    try:
+        creds = os.getenv("ROLLING_RICHES")
+        if not creds or ":" not in creds:
+            await _log("⚠️ ROLLING_RICHES not set (email:pass).")
+            return
+        username, password = creds.split(":", 1)
 
-async def _send_msg(bot: discord.Client, channel_id: int, text: str):
-    channel = bot.get_channel(channel_id)
-    if channel:
-        await channel.send(text)
+        _ensure_viewport(driver)
 
-async def _send_file(bot: discord.Client, channel_id: int, path: str, caption: str = ""):
-    channel = bot.get_channel(channel_id)
-    if not channel:
-        return
-    if not os.path.exists(path):
-        await channel.send(f"{caption} (screenshot missing: `{os.path.basename(path)}`)")
-        return
-    await channel.send(caption, file=discord.File(path))
+        # AUTH
+        ok = await _login_six_tries(driver, username, password)
+        if not ok:
+            return
 
-# ───────────────────────────────────────────────────────────
-# Main entrypoint — sync, for run_in_executor
-# ───────────────────────────────────────────────────────────
+        # Normalize to /lobby
+        if not driver.current_url.startswith(LOBBY_URL):
+            driver.get(LOBBY_URL)
+            await asyncio.sleep(2)
 
-def rollingriches_uc_blocking(
-    bot: discord.Client,
-    channel_id: int,
-    loop: asyncio.AbstractEventLoop,
-):
-    """
-    Sync runner for Rolling Riches.
+        # Two pre-Riches refreshes
+        for n in range(1, 3):
+            await _log(f"🔁 Pre-Riches refresh {n}/2…")
+            driver.refresh()
+            await asyncio.sleep(2.8)
+            await _close_popup(driver)
+        await _driver_shot(driver, "📸 After 2× pre-Riches refresh")
 
-    Called from main.py as:
-        await loop.run_in_executor(_executor, rollingriches_uc_blocking, bot, channel.id, loop)
-    """
+        # Open Your Riches
+        await _log("💰 Opening Your Riches panel…")
+        riches_btn = WebDriverWait(driver, 12).until(EC.element_to_be_clickable((By.XPATH, HEADER_RICHES_BTN)))
+        driver.execute_script("arguments[0].click();", riches_btn)
+        await asyncio.sleep(2.2)
+        await _driver_shot(driver, "📸 Your Riches panel")
 
-    creds = os.getenv("ROLLING_RICHES")
-    if not creds or ":" not in creds:
-        _log("⚠️ ROLLING_RICHES not set (email:pass).")
-        _schedule_coro(loop, _send_msg(bot, channel_id, "⚠️ `ROLLING_RICHES` credentials not configured."))
-        return
-    username, password = creds.split(":", 1)
+        # CV popup close (if any)
+        try_cv_close = await _close_rr_popup_via_cv(driver)
+        if not try_cv_close:
+            await _close_popup(driver)
 
-    _schedule_coro(loop, _send_msg(bot, channel_id, "🎲 Starting Rolling Riches (UC thread)…"))
+        # If still looks like the popup persists, one refresh fallback
+        if not try_cv_close and os.path.exists(RR_POPUP_TEMPLATE):
+            scr = _screenshot_bgr()
+            pop_bgr = cv2.imread(RR_POPUP_TEMPLATE, cv2.IMREAD_COLOR)
+            if pop_bgr is not None:
+                score, rect, _ = _match_template_multiscale(scr, pop_bgr)
+                if rect and score >= POPUP_DETECT_THRESHOLD:
+                    await _log("🔁 Refreshing page as popup-close fallback…")
+                    driver.refresh()
+                    await asyncio.sleep(3.5)
+                    await _close_popup(driver)
+                    # reopen Your Riches to restore panel
+                    riches_btn = WebDriverWait(driver, 12).until(EC.element_to_be_clickable((By.XPATH, HEADER_RICHES_BTN)))
+                    driver.execute_script("arguments[0].click();", riches_btn)
+                    await asyncio.sleep(2)
+                    await _driver_shot(driver, "📸 Your Riches after fallback refresh")
 
-    # Use SeleniumBase UC for its own browser instance
-    with SB(uc=True, test=True) as sb:
-        driver = sb.driver
+        # ── Strong DOM-first Daily Bonus open ──
+        await _log("🎯 Ensuring we are inside the Daily Bonus panel (DOM-first)…")
+        opened_dom = await _open_daily_bonus_dom_first(driver)
+        await _driver_shot(driver, "📸 After DOM-first Daily Bonus open attempt")
+
+        if not opened_dom:
+            await _log("⚠️ DOM open failed; switching to OpenCV template for Daily Bonus icon/text.")
+            ok, conf, debug_path = click_daily_bonus_by_template(
+                DAILY_BONUS_ICON, threshold=TEMPLATE_THRESHOLD, extra_offsets=[(24, 0)]
+            )
+            if debug_path:
+                await _log(f"🧪 Template match (daily bonus icon) conf={conf:.3f}, debug={debug_path}")
+            await asyncio.sleep(2.0)
+            await _driver_shot(driver, "📸 After CV Daily Bonus open attempt")
+
+        # Probe countdown / presence (don’t bail if missing)
+        cd_probe = _read_rr_countdown(driver)
+        if cd_probe:
+            await _log(f"✅ Daily Bonus section detected (countdown {cd_probe}).")
+        else:
+            await _log("ℹ️ Could not positively confirm Daily Bonus; proceeding with claim attempts.")
+
+        # ── Claim step 1: DOM or template ──
+        clicked_primary = False
         try:
-            _ensure_viewport(driver)
-
-            # ── Auth ──────────────────────────────────────────────────
-            ok = _login_six_tries(driver, username, password)
-            if not ok:
-                _schedule_coro(loop, _send_msg(bot, channel_id, "⛔ Rolling Riches login failed."))
-                shot = _driver_shot(driver, "⛔ Login failed")
-                if shot:
-                    _schedule_coro(
-                        loop,
-                        _send_file(bot, channel_id, shot, "📸 Rolling Riches login failure:"),
-                    )
-                return
-
-            # Normalize to /lobby
-            if not driver.current_url.startswith(LOBBY_URL):
-                driver.get(LOBBY_URL)
-                time.sleep(2)
-
-            # Two pre-Riches refreshes
-            for n in range(1, 3):
-                _log(f"🔁 Pre-Riches refresh {n}/2…")
-                driver.refresh()
-                time.sleep(2.8)
-                _close_popup(driver)
-            _driver_shot(driver, "📸 After 2× pre-Riches refresh")
-
-            # Open Your Riches
-            _log("💰 Opening Your Riches panel…")
-            riches_btn = WebDriverWait(driver, 12).until(
-                EC.element_to_be_clickable((By.XPATH, HEADER_RICHES_BTN))
-            )
-            driver.execute_script("arguments[0].click();", riches_btn)
-            time.sleep(2.2)
-            _driver_shot(driver, "📸 Your Riches panel")
-
-            # CV popup close (if any)
-            try_cv_close = _close_rr_popup_via_cv(driver)
-            if not try_cv_close:
-                _close_popup(driver)
-
-            # If popup still looks present, one refresh fallback
-            if not try_cv_close and os.path.exists(RR_POPUP_TEMPLATE):
-                scr = _screenshot_bgr()
-                pop_bgr = cv2.imread(RR_POPUP_TEMPLATE, cv2.IMREAD_COLOR)
-                if pop_bgr is not None:
-                    score, rect, _ = _match_template_multiscale(scr, pop_bgr)
-                    if rect and score >= POPUP_DETECT_THRESHOLD:
-                        _log("🔁 Refreshing page as popup-close fallback…")
-                        driver.refresh()
-                        time.sleep(3.5)
-                        _close_popup(driver)
-                        # reopen Your Riches to restore panel
-                        riches_btn = WebDriverWait(driver, 12).until(
-                            EC.element_to_be_clickable((By.XPATH, HEADER_RICHES_BTN))
-                        )
-                        driver.execute_script("arguments[0].click();", riches_btn)
-                        time.sleep(2)
-                        _driver_shot(driver, "📸 Your Riches after fallback refresh")
-
-            # ── Strong DOM-first Daily Bonus open ─────────────────────
-            _log("🎯 Ensuring we are inside the Daily Bonus panel (DOM-first)…")
-            opened_dom = _open_daily_bonus_dom_first(driver)
-            _driver_shot(driver, "📸 After DOM-first Daily Bonus open attempt")
-
-            if not opened_dom:
-                _log("⚠️ DOM open failed; switching to OpenCV template for Daily Bonus icon/text.")
-                ok_icon, conf_icon, debug_path = click_daily_bonus_by_template(
-                    DAILY_BONUS_ICON,
-                    threshold=TEMPLATE_THRESHOLD,
-                    extra_offsets=[(24, 0)],
-                )
-                if debug_path:
-                    _log(
-                        f"🧪 Template match (daily bonus icon) "
-                        f"conf={conf_icon:.3f}, debug={debug_path}"
-                    )
-                time.sleep(2.0)
-                _driver_shot(driver, "📸 After CV Daily Bonus open attempt")
-
-            # Probe countdown / presence (don’t bail if missing)
-            cd_probe = _read_rr_countdown(driver)
-            if cd_probe:
-                _log(f"✅ Daily Bonus section detected (countdown {cd_probe}).")
-            else:
-                _log("ℹ️ Could not positively confirm Daily Bonus; proceeding with claim attempts.")
-
-            # ── Claim step 1: primary claim ───────────────────────────
-            clicked_primary = False
-            try:
-                claim = WebDriverWait(driver, 4).until(
-                    EC.element_to_be_clickable((By.XPATH, XPATH_CLAIM_BTN))
-                )
-                driver.execute_script("arguments[0].click();", claim)
+            claim = WebDriverWait(driver, 4).until(EC.element_to_be_clickable((By.XPATH, XPATH_CLAIM_BTN)))
+            driver.execute_script("arguments[0].click();", claim)
+            clicked_primary = True
+            await asyncio.sleep(1.0)
+            await _log("🖱️ Clicked primary claim (DOM).")
+        except TimeoutException:
+            ok1, conf1, dbg1 = _click_template_with_retries(RR_CLAIM_TEMPLATE, tries=3, delay=0.8)
+            if dbg1:
+                await _log(f"🧪 Claim button template conf={conf1:.3f}, debug={dbg1}")
+            if ok1:
                 clicked_primary = True
-                time.sleep(1.0)
-                _log("🖱️ Clicked primary claim (DOM).")
-            except TimeoutException:
-                ok1, conf1, dbg1 = _click_template_with_retries(
-                    RR_CLAIM_TEMPLATE,
-                    tries=3,
-                    delay=0.8,
-                )
-                if dbg1:
-                    _log(
-                        f"🧪 Claim button template conf={conf1:.3f}, debug={dbg1}"
-                    )
-                if ok1:
-                    clicked_primary = True
-                    time.sleep(1.0)
-                    _log("🖱️ Clicked primary claim (template).")
+                await asyncio.sleep(1.0)
+                await _log("🖱️ Clicked primary claim (template).")
 
-            # ── Claim step 2: final confirm ───────────────────────────
-            claimed = False
-            if clicked_primary:
-                ok2, conf2, dbg2 = _click_template_with_retries(
-                    RR_FINAL_TEMPLATE,
-                    tries=4,
-                    delay=0.9,
-                )
-                if dbg2:
-                    _log(
-                        f"🧪 Final claim template conf={conf2:.3f}, debug={dbg2}"
-                    )
-                if ok2:
-                    claimed = True
-                    time.sleep(1.0)
-                    _log("✅ Final confirm clicked (template).")
+        # ── Claim step 2: final confirm ──
+        claimed = False
+        if clicked_primary:
+            ok2, conf2, dbg2 = _click_template_with_retries(RR_FINAL_TEMPLATE, tries=4, delay=0.9)
+            if dbg2:
+                await _log(f"🧪 Final claim template conf={conf2:.3f}, debug={dbg2}")
+            if ok2:
+                claimed = True
+                await asyncio.sleep(1.0)
+                await _log("✅ Final confirm clicked (template).")
 
-            # ── Outcome ───────────────────────────────────────────────
-            if claimed:
-                shot = _driver_shot(driver, "✅ Claimed — final state")
-                _schedule_coro(
-                    loop,
-                    _send_msg(bot, channel_id, "Rolling Riches Daily Bonus Claimed!"),
-                )
-                if shot:
-                    _schedule_coro(
-                        loop,
-                        _send_file(
-                            bot,
-                            channel_id,
-                            shot,
-                            "📸 Rolling Riches claim state:",
-                        ),
-                    )
-                cd = _read_rr_countdown(driver)
-                if cd:
-                    _log(f"🕒 Next bonus in: {cd}")
+        # ── Outcome ──
+        if claimed:
+            shot = await _driver_shot(driver, "✅ Claimed — final state")
+            await _send_one_shot(channel, "Rolling Riches Daily Bonus Claimed!", shot)
+            cd = _read_rr_countdown(driver)
+            if cd:
+                await _log(f"🕒 Next bonus in: {cd}")
+        else:
+            cd = _read_rr_countdown(driver)
+            shot = await _driver_shot(driver, "ℹ️ Bonus unavailable — current state")
+            if cd:
+                await _send_one_shot(channel, f"[Rolling Riches] Bonus unavailable. Next bonus in: {cd}", shot)
             else:
-                cd = _read_rr_countdown(driver)
-                shot = _driver_shot(driver, "ℹ️ Bonus unavailable — current state")
-                if cd:
-                    _schedule_coro(
-                        loop,
-                        _send_msg(
-                            bot,
-                            channel_id,
-                            f"[Rolling Riches] Bonus unavailable. Next bonus in: {cd}",
-                        ),
-                    )
-                else:
-                    _schedule_coro(
-                        loop,
-                        _send_msg(
-                            bot,
-                            channel_id,
-                            "[Rolling Riches] Bonus unavailable.",
-                        ),
-                    )
-                if shot:
-                    _schedule_coro(
-                        loop,
-                        _send_file(
-                            bot,
-                            channel_id,
-                            shot,
-                            "📸 Rolling Riches bonus state:",
-                        ),
-                    )
+                await _send_one_shot(channel, "[Rolling Riches] Bonus unavailable.", shot)
 
-        except Exception as e:
-            tb = "".join(traceback.format_exception_only(type(e), e)).strip()
-            _log(f"💥 Error: {tb}")
-            shot = _driver_shot(driver, "💥 Failure point")
-            _schedule_coro(
-                loop,
-                _send_msg(bot, channel_id, f"Rolling Riches: Error — {tb}"),
-            )
-            if shot:
-                _schedule_coro(
-                    loop,
-                    _send_file(
-                        bot,
-                        channel_id,
-                        shot,
-                        "📸 Rolling Riches error state:",
-                    ),
-                )
+    except Exception as e:
+        tb = "".join(traceback.format_exception_only(type(e), e)).strip()
+        await _log(f"💥 Error: {tb}")
+        shot = await _driver_shot(driver, "💥 Failure point")
+        await _send_one_shot(channel, f"Rolling Riches: Error — {tb}", shot)
+
+    finally:
+        try:
+            stop_popup.set()
+            await popup_task
+        except Exception:
+            pass
