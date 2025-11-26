@@ -43,7 +43,7 @@ COUNTDOWN_DIV_XPATH = "/html/body/div[1]/div/main/div/div[3]/div[5]/div[2]/div"
 OVERLAY_LOCATOR = (By.ID, "ModalDailyLogin")
 
 # Your exact Google chooser row (first account)
-GOOGLE_CHOOSER_PRIMARY_XPATH = "/html/body/div[2]/div[1]/div[2]/c-wiz/main/div[2]/div/div/div[1]/form/span/section/div/div/div/div/ul/li[1]/div"
+GOOGLE_CHOOSER_PRIMARY_XPATH = "/html/body/div[2]/div[1]/div[1]/div[2]/c-wiz/main/div[2]/div/div/div[1]/form/span/section/div/div/div/div/ul/li[1]/div"
 
 # Backup candidate XPaths for Google account row (handles minor A/B DOM shifts)
 GOOGLE_ACCOUNT_XPATHS = [
