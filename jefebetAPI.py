@@ -235,7 +235,7 @@ async def claim_jefebet_bonus(ctx, driver, channel):
 
     except Exception as e:
         print(f"[JefeBet] Error during claim: {e}")
-        await channel.send(f"JefeBet claim error: {e}")
+        await channel.send(f"JefeBet claim error")
 
     finally:
         print("[JefeBet] Checking for countdown timer…")
