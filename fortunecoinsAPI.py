@@ -120,7 +120,7 @@ def fortunecoins_uc_blocking(bot, channel_id: int, main_loop: asyncio.AbstractEv
             )
             with contextlib.suppress(Exception):
                 sb.press_keys("body", "ESCAPE")
-
+                time.sleep(5.0)
             # Open Rewards/Get Coins
             _try_click_any(
                 sb,
@@ -132,7 +132,7 @@ def fortunecoins_uc_blocking(bot, channel_id: int, main_loop: asyncio.AbstractEv
                 timeout_each=10,
             )
             sb.wait_for_ready_state_complete()
-            time.sleep(4.0)
+            time.sleep(10.0)
 
             # Click Collect
             collected = _try_click_any(
