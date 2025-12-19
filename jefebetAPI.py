@@ -79,12 +79,13 @@ async def ensure_post_login_popup_closed(driver) -> None:
     await asyncio.sleep(4)
     await check_and_close_popup(driver)
 
+# Sign in Button on Sign In Popup
 def _is_logged_in(driver) -> bool:
     """Detect if already logged in."""
     try:
         driver.find_element(
             By.XPATH,
-            "/html/body/app-root/app-main-header/div/div/div/div/header/div[1]/nav/div[2]/div/div[2]/nav/div/div[3]/button",
+            "/html/body/div[1]/div[2]/div/mat-dialog-container/div/div/app-login/div/div/div/div/div/form/button",
         )
         return True
     except NoSuchElementException:
@@ -142,13 +143,13 @@ async def jefebet_casino(ctx, driver, channel):
             print("[JefeBet] Already logged in, skipping login.")
             await claim_jefebet_bonus(ctx, driver, channel)
             return
-
+        # Log In Button to get to the Sign In Popup
         print("[JefeBet] Attempting to log in…")
         try:
             login_button = _clickable(
                 driver,
                 By.XPATH,
-                "/html/body/app-root/app-main-header/div/div/div/div/header/div[2]/div/button[2]",
+                "/html/body/app-root/app-main-header/div/div/div/div/headegh/div[2]/div/button[2]",
                 timeout=8,
             )
             login_button.click()

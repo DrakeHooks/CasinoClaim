@@ -30,8 +30,8 @@ X_COUNTDOWN_TEXT = (By.XPATH, "/html/body/section/div[2]/div[2]/div[2]/div[2]/di
 
 # Login / 2FA
 X_LOGIN_TAB = (By.ID, "tab-login")
-X_EMAIL     = (By.XPATH, "/html/body/div[1]/div/div[1]/div/div/div[1]/div/div[1]/div/div[2]/div[2]/div/div[1]/form[2]/div[1]/div/div/input")
-X_PASS      = (By.XPATH, "/html/body/div[1]/div/div[1]/div/div/div[1]/div/div[1]/div/div[2]/div[2]/div/div[1]/form[2]/div[2]/div/div/input")
+X_EMAIL     = (By.XPATH, "/html/body/div[1]/div/div[1]/div/div/div[1]/div/div/div/div[2]/div/div/div[1]/form[2]/div[1]/div/div[1]/input")
+X_PASS      = (By.XPATH, "/html/body/div[1]/div/div[1]/div/div/div[1]/div/div/div/div[2]/div/div/div[1]/form[2]/div[2]/div/div[1]/input")
 X_2FA_BTN   = (By.XPATH, "/html/body/section/div[1]/div/button")
 X_2FA_INPUT = (By.XPATH, "/html/body/section/div[1]/div/div/input")
 
