@@ -1,6 +1,6 @@
 # Drake Hooks + WaterTrooper
 # Casino Claim 2
-# JefeBet API
+# JefeBet API (login via /login)
 
 import os
 import asyncio
@@ -44,8 +44,21 @@ def _try_click_any_xpath(driver, xpaths: List[str], timeout_each=3) -> bool:
             continue
     return False
 
+# ────────────────────────────────────────────────────────────
+# Selectors / URLs
+# ────────────────────────────────────────────────────────────
+LOGIN_URL = "https://www.jefebet.com/login"
+HOME_URL = "https://www.jefebet.com/"
+
 POST_LOGIN_POPUP_XP = "/html/body/div[2]/div/div[2]/div[4]/a[2]"
 
+GET_COINS_XP = "/html/body/app-root/app-main-header/div/div/div/div/header/div[1]/nav/div[2]/div/div[2]/nav/div/div[3]/button"
+DAILY_BONUS_TAB_XP = '//*[@id="daily-bonus-tab"]'
+CLAIM_BTN_XP = "//button[contains(@class, 'btn') and contains(@class, 'btn-red')]"
+
+# ────────────────────────────────────────────────────────────
+# Popup Handling
+# ────────────────────────────────────────────────────────────
 async def check_and_close_popup(driver) -> bool:
     """Try to close the blocking popup if visible (best-effort)."""
     try:
@@ -73,20 +86,18 @@ async def ensure_post_login_popup_closed(driver) -> None:
     if closed:
         return
 
-    # Fallback: refresh and retry
     print("[JefeBet] Popup not clickable; refreshing as fallback…")
     driver.refresh()
     await asyncio.sleep(4)
     await check_and_close_popup(driver)
 
-# Sign in Button on Sign In Popup
+# ────────────────────────────────────────────────────────────
+# State / Formatting
+# ────────────────────────────────────────────────────────────
 def _is_logged_in(driver) -> bool:
     """Detect if already logged in."""
     try:
-        driver.find_element(
-            By.XPATH,
-            "/html/body/div[1]/div[2]/div/mat-dialog-container/div/div/app-login/div/div/div/div/div/form/button",
-        )
+        driver.find_element(By.XPATH, GET_COINS_XP)
         return True
     except NoSuchElementException:
         pass
@@ -133,38 +144,33 @@ async def jefebet_casino(ctx, driver, channel):
 
     try:
         print("[JefeBet] Navigating to site…")
-        driver.get("https://www.jefebet.com/")
+        driver.get(HOME_URL)
         await asyncio.sleep(6)
 
-        # (This popup is post-login, but best-effort in case site shows anything early)
+        # Best-effort early popup close (site sometimes shows overlays)
         await check_and_close_popup(driver)
 
         if _is_logged_in(driver):
             print("[JefeBet] Already logged in, skipping login.")
             await claim_jefebet_bonus(ctx, driver, channel)
             return
-        # Log In Button to get to the Sign In Popup
-        print("[JefeBet] Attempting to log in…")
+
+        # ───────────────────────────────────────────────────────
+        # NEW: Navigate directly to /login instead of clicking a login button
+        # ───────────────────────────────────────────────────────
+        print("[JefeBet] Navigating directly to /login…")
+        driver.get(LOGIN_URL)
+        await asyncio.sleep(5)
+
         try:
-            login_button = _clickable(
-                driver,
-                By.XPATH,
-                "/html/body/app-root/app-main-header/div/div/div/div/headegh/div[2]/div/button[2]",
-                timeout=8,
-            )
-            login_button.click()
-            await asyncio.sleep(1.0)
+            email_input = _present(driver, By.ID, "email", timeout=12)
+            password_input = _present(driver, By.ID, "password", timeout=12)
         except TimeoutException:
-            print("[JefeBet] Login button not found; trying claim anyway.")
-            if _is_logged_in(driver):
-                await claim_jefebet_bonus(ctx, driver, channel)
-                return
+            print("[JefeBet] Login form not found on /login.")
             await channel.send("JefeBet Authentication timed out, will try again later.")
             await send_screenshot(channel, driver)  # attach a screenshot for debugging
             return
 
-        email_input = _present(driver, By.ID, "email", timeout=10)
-        password_input = _present(driver, By.ID, "password", timeout=10)
         email_input.clear()
         email_input.send_keys(username)
         password_input.clear()
@@ -173,8 +179,14 @@ async def jefebet_casino(ctx, driver, channel):
         print("[JefeBet] Submitted credentials.")
         await asyncio.sleep(10)
 
-        # ── NEW: post-login popup handling with refresh fallback ───────────────
+        # Post-login popup handling with refresh fallback
         await ensure_post_login_popup_closed(driver)
+
+        if not _is_logged_in(driver):
+            print("[JefeBet] Login did not complete (still not logged in).")
+            await channel.send("JefeBet login failed (still not logged in).")
+            await send_screenshot(channel, driver)
+            return
 
         print("[JefeBet] Login successful, proceeding to claim.")
         await claim_jefebet_bonus(ctx, driver, channel)
@@ -207,27 +219,28 @@ async def claim_jefebet_bonus(ctx, driver, channel):
             await check_and_close_popup(driver)
 
         print("[JefeBet] Opening Get Coins menu…")
-        get_coins_xpath = (
-            "/html/body/app-root/app-main-header/div/div/div/div/header/div[1]/nav/div[2]/div/div[2]/nav/div/div[3]/button"
-        )
-        get_coins = _clickable(driver, By.XPATH, get_coins_xpath, timeout=10)
-        get_coins.click()
+        get_coins = _clickable(driver, By.XPATH, GET_COINS_XP, timeout=10)
+        try:
+            get_coins.click()
+        except ElementClickInterceptedException:
+            driver.execute_script("arguments[0].click();", get_coins)
         await asyncio.sleep(1.0)
 
         print("[JefeBet] Opening Daily Bonus tab…")
-        daily_bonus = _clickable(driver, By.XPATH, '//*[@id="daily-bonus-tab"]', timeout=10)
-        daily_bonus.click()
+        daily_bonus = _clickable(driver, By.XPATH, DAILY_BONUS_TAB_XP, timeout=10)
+        try:
+            daily_bonus.click()
+        except ElementClickInterceptedException:
+            driver.execute_script("arguments[0].click();", daily_bonus)
         await asyncio.sleep(1.0)
 
         try:
             print("[JefeBet] Attempting to click Claim button…")
-            claim_button = _clickable(
-                driver,
-                By.XPATH,
-                "//button[contains(@class, 'btn') and contains(@class, 'btn-red')]",
-                timeout=6,
-            )
-            claim_button.click()
+            claim_button = _clickable(driver, By.XPATH, CLAIM_BTN_XP, timeout=6)
+            try:
+                claim_button.click()
+            except ElementClickInterceptedException:
+                driver.execute_script("arguments[0].click();", claim_button)
             await asyncio.sleep(1.0)
             print("[JefeBet] Bonus claimed successfully!")
             await channel.send("JefeBet 6-Hour Bonus Claimed!")
@@ -236,7 +249,7 @@ async def claim_jefebet_bonus(ctx, driver, channel):
 
     except Exception as e:
         print(f"[JefeBet] Error during claim: {e}")
-        await channel.send(f"JefeBet claim error")
+        await channel.send(f"JefeBet claim error: {e}")
 
     finally:
         print("[JefeBet] Checking for countdown timer…")
