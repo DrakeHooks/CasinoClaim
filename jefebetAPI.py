@@ -173,8 +173,10 @@ async def jefebet_casino(ctx, driver, channel):
 
         email_input.clear()
         email_input.send_keys(username)
+        await asyncio.sleep(2)
         password_input.clear()
         password_input.send_keys(password)
+        await asyncio.sleep(2)
         password_input.send_keys(Keys.ENTER)
         print("[JefeBet] Submitted credentials.")
         await asyncio.sleep(10)
