@@ -25,9 +25,9 @@ SITE_URL = "https://spinquest.com"
 LOBBY_URL = "https://spinquest.com/casino/lobby"
 
 LOGIN_BUTTON_XPATH = ("/html/body/div[1]/div[1]/div[2]/div/nav/div[2]/div/button[1]")
-EMAIL_INPUT_ID = (":r6:-form-item")
-PASSWORD_INPUT_ID = (":r7:-form-item")
-LOGIN_SUBMIT_ID = (":r8:")
+EMAIL_INPUT_ID = (":ra:-form-item")
+PASSWORD_INPUT_ID = (":rb:-form-item")
+LOGIN_SUBMIT_ID = (":rc:")
 
 CLAIM_BUTTON_XPATHS = [
     "/html/body/div[1]/div[1]/div[2]/div/main/div/div[1]/div/div/div[1]/div[2]/div[3]/button",
