@@ -50,6 +50,12 @@ def _exec_job_finished():
     with _active_exec_lock:
         _active_exec_jobs = max(0, _active_exec_jobs - 1)
 
+# ───────────────────────────────────────────────────────────
+# NEW: Debug helpers (for !debug <casino>)
+# (helperAPI.py is your single place for screenshot logic)
+# ───────────────────────────────────────────────────────────
+from helperAPI import normalize_casino_key, run_with_periodic_screenshots
+
 
 
 # ───────────────────────────────────────────────────────────
@@ -262,7 +268,7 @@ class CasinoLoopEntry:
 
 # constants for main loop. change as you see fit or run !config in discord.
 LOOP_STAGGER_SECONDS = 30
-PER_CASINO_TIMEOUT_SEC = int(os.getenv("CASINO_TIMEOUT_SECONDS", "500"))  
+PER_CASINO_TIMEOUT_SEC = int(os.getenv("CASINO_TIMEOUT_SECONDS", "500"))
 MAIN_TICK_SLEEP = 10
 
 async def _run_luckybird(channel):      await luckybird_entry(None, driver, bot, channel)
@@ -455,6 +461,8 @@ MANUAL_CASINO_COMMANDS = {
     "dingdingding","modo","zula","sportzino","nolimitcoins","fortunecoins",
     "smilescasino","americanluck","yaycasino", "realprize", "jumbo", "spree",
     "chipnwin",
+    # NEW:
+    "debug",
 }
 
 @bot.check
@@ -892,7 +900,6 @@ async def reset_cmd(ctx, mode: str = ""):
     helper_script = (
         "set -euo pipefail; "
         f"docker rm -f {_q(target_svc)} || true; "
-        # pull to ensure the helper image (if using same) has latest compose plugin/clis
         f"docker compose{pn}{cf} build{nc} {_q(target_svc)}; "
         f"docker compose{pn}{cf} up -d --no-deps --remove-orphans {_q(target_svc)}"
     )
@@ -1201,6 +1208,115 @@ async def dingdingding_cmd(ctx):
         await check_dingdingding_countdown(driver, bot, ctx, channel)
 
 # ───────────────────────────────────────────────────────────
+# NEW: !debug <casino>
+# Runs the requested casino flow but wraps it with periodic screenshots.
+# Does NOT delete/modify any existing casino code.
+# ───────────────────────────────────────────────────────────
+@bot.command(name="debug")
+async def debug_cmd(ctx, *, casino: str):
+    """
+    Usage:
+      !debug spinquest
+      !debug jefebet
+
+    This command will:
+      - take a screenshot immediately
+      - keep taking screenshots every N seconds while the casino command runs
+      - take a final screenshot at end or on error
+    Screenshot files delete themselves after sending (handled in helperAPI).
+    """
+    key = normalize_casino_key(casino)
+    if not key:
+        await ctx.send("Usage: `!debug <casino>` (example: `!debug spinquest`)")
+        return
+
+    # Map normalized casino keys to an awaitable (the real flow you already have)
+    # NOTE: this does not replace your commands; it just calls the same underlying functions.
+    channel = bot.get_channel(DISCORD_CHANNEL)
+
+    runners = {
+        "luckybird":     lambda: luckybird_entry(ctx, driver, bot, channel),
+        "realprize":     lambda: realprize_uc(ctx, channel),
+        "zula":          lambda: zula_uc(ctx, channel),
+        "sportzino":     lambda: Sportzino(ctx, driver, channel),
+        "nolimitcoins":  lambda: nolimitcoins_flow(ctx, driver, channel),
+        "funrize":       lambda: funrize_flow(ctx, driver, channel),
+        "yaycasino":     lambda: yaycasino_uc(ctx, channel),
+        "globalpoker":   lambda: global_poker(ctx, driver, channel),
+        "jefebet":       lambda: jefebet_casino(ctx, driver, channel),
+        "smilescasino":  lambda: smilescasino_casino(ctx, driver, channel),
+        "jumbo":         lambda: jumbo_casino(ctx, driver, channel),
+        "spree":         lambda: spree_uc(ctx, channel),
+        "chipnwin":      lambda: chipnwin_casino(ctx, driver, channel),
+        "crowncoins":    lambda: crowncoins_casino(driver, bot, ctx, channel),
+        "americanluck":  lambda: americanluck_uc(ctx, channel),
+        "modo":          lambda: (claim_modo_bonus(driver, bot, ctx, channel) if True else None),
+        "rollingriches": lambda: rolling_riches_casino(ctx, driver, channel),
+        "luckyland":     lambda: luckyland_uc(ctx, channel),
+        "stake":         lambda: stake_claim(driver, bot, ctx, channel),
+        "fortunewheelz": lambda: fortunewheelz_flow(ctx, driver, channel),
+        "spinquest":     lambda: spinquest_flow(ctx, driver, channel),
+        "spinpals":      lambda: spinpals_flow(ctx, driver, channel),
+        "chumba":        lambda: chumba_cmd(ctx),  # wraps your existing chumba command logic
+        "chanced":       lambda: chanced_cmd(ctx),
+        "dingdingding":  lambda: dingdingding_cmd(ctx),
+    }
+
+    # Special-case aliases users might type
+    alias_map = {
+        "nlc": "nolimitcoins",
+        "gp": "globalpoker",
+        "fc": "fortunecoins",
+        "rr": "rollingriches",
+        "jb": "jefebet",
+        "jefe": "jefebet",
+        "yay": "yaycasino",
+        "rp": "realprize",
+        "lb": "luckybird",
+        "a_luck": "americanluck",
+        "aluck": "americanluck",
+    }
+
+    if key in alias_map:
+        key = alias_map[key]
+
+    if key not in runners:
+        await ctx.send(
+            f"❌ Unknown casino `{casino}`.\n"
+            "Try one of: " + ", ".join(sorted(runners.keys()))
+        )
+        return
+
+    # If user requested modo debug, we want the full flow (claim + countdown) like your modo_cmd
+    if key == "modo":
+        async def _modo_flow():
+            ok = await claim_modo_bonus(driver, bot, ctx, channel)
+            if not ok:
+                await check_modo_countdown(driver, bot, ctx, channel)
+        target_coro = _modo_flow()
+    else:
+        target_coro = runners[key]()
+
+    await ctx.send(f"🧪 Debugging `{key}` — sending periodic screenshots while it runs…")
+
+    interval = int(os.getenv("DEBUG_SCREENSHOT_INTERVAL", "4"))
+    max_shots = int(os.getenv("DEBUG_SCREENSHOT_MAX", "40"))
+
+    try:
+        await run_with_periodic_screenshots(
+            channel=ctx.channel,
+            driver=driver,
+            casino_key=key,
+            coro=target_coro,
+            interval_seconds=interval,
+            max_shots=max_shots,
+            label="debug",
+        )
+        await ctx.send(f"✅ Debug finished for `{key}`.")
+    except Exception as e:
+        await ctx.send(f"⚠️ Debug error for `{key}`: `{type(e).__name__}: {e}`")
+
+# ───────────────────────────────────────────────────────────
 # AUTH ROUTER (restores !auth commands, including !auth modo)
 # ───────────────────────────────────────────────────────────
 @bot.command(name="auth")
@@ -1334,7 +1450,7 @@ async def authenticate_command(ctx: commands.Context, site: str, method: str = N
                 except Exception: pass
         return
 
-    await ctx.send(f"❓ Authentication for `{site}` is not implemented. Run `!help` for supported sites.")
+    await ctx.send(f"❓ Authentication for `{site}` is not implemented. Run `!help` for supported sites. Run `!debug <casino>` for screenshot debugging.")
 
 # Handy shortcut specifically for Modo
 @bot.command(name="authmodo")
@@ -1372,6 +1488,10 @@ async def help_cmd(ctx):
 !fortunecoins, !nolimitcoins, !fortunewheelz, !stake, !dingdingding,
 !smilescasino, !yaycasino, !realprize, !luckyland, !jumbo, !spree,
 !chipnwin,
+
+---------------------------------------  
+🧪 **Debug:**  
+!debug <casino>   (ex: !debug spinquest)
 
 ---------------------------------------  
 ✅ **Auth Commands:**  
