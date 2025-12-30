@@ -1,7 +1,12 @@
 services:
   casino-bot:
     container_name: casino-bot
+
+    # Remote image (current) Use drakehooks/casinoclaim:testing for testing 
     image: drakehooks/casinoclaim:testing
+    # ── Local build option (comment out the line above and use this instead)
+    # image: casinoclaim-local:dev
+
     ports:
       - "5900:5900"
 
@@ -15,6 +20,7 @@ services:
       - chrome-profile:/data/chrome
       - chrome-profile:/data/fortunecoins
       - ./CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx:/temp/CAPTCHA-Solver.crx
+
     env_file:
       - .env
 
@@ -28,7 +34,8 @@ services:
 
   watchtower:
     container_name: watchtower
-    image: containrrr/watchtower:latest
+    # Active fork (instead of containrrr/watchtower)
+    image: ghcr.io/nicholas-fedor/watchtower:latest
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
