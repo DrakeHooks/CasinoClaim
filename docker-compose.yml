@@ -35,7 +35,7 @@ services:
   watchtower:
     container_name: watchtower
     # Active fork (instead of containrrr/watchtower)
-    image: ghcr.io/nicholas-fedor/watchtower:latest
+    image: nickfedor/watchtower:latest-dev
 
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
