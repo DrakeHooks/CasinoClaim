@@ -167,7 +167,7 @@ async def jefebet_casino(ctx, driver, channel):
             password_input = _present(driver, By.ID, "password", timeout=12)
         except TimeoutException:
             print("[JefeBet] Login form not found on /login.")
-            await channel.send("JefeBet Authentication timed out, will try again later.")
+            await channel.send("JefeBet Authentication timed out. Login Form Unavailable.")
             await send_screenshot(channel, driver)  # attach a screenshot for debugging
             return
 
@@ -195,7 +195,7 @@ async def jefebet_casino(ctx, driver, channel):
 
     except Exception as e:
         print(f"[JefeBet] Login timeout/error: {e}")
-        await channel.send("JefeBet Authentication timed out, will try again later.")
+        await channel.send("JefeBet Authentication timed out, You may need to clear existing sessions and userdata dir.")
         try:
             await send_screenshot(channel, driver)
         except Exception as ss_e:
