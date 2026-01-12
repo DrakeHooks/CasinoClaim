@@ -52,36 +52,39 @@ The bot is designed to check most casinos automatically in 2-hour intervals, wit
 
 
 # Supported Casinos ✅
-| Casino          | Auto Claim | Countdown Timer | Backend API | Bonus (SC)            | Trusted? (payment proof) |
-|-----------------|------------|-----------------|-----------------------------|------------------|---------|
-| LuckyBird       | ✓          | ✓              | No                          | $0.25 Daily - Increases with VIP | Yes     |
-| Global Poker    | ✓          | ✓              | No                          | $0.00-$4.00 Daily                | Yes     |
-| JefeBet         | ✓          | ✓              | No                          | $0.20 every 6 hours              | Yes     |
-| SpinQuest       | ✓          | ✓              | No                          | $1.00 Daily                      | Yes     |
-| FortuneWheelz   | ✓          | ✗              | No                          | $0.20 Average Daily              | Yes     |
-| Jumbo88         | ✓          | ✓              | No                          | Up to 5 SC Daily Spin             | Yes     |
-| NoLimitCoins    | ✗          | ✗              | No                          | $0.20 Average Daily              | Yes     |
-| Modo            | ✗          | ✗              | No                          | $0.30-$1.00 Daily                | Yes     |
-| Stake           | ✗          | ✗              | Yes                         | $1.00 Daily                      | Yes     |
-| Funrize         | ✓          | ✗              | No                          | $0.20 Average Daily              | Yes     |
-| Rolling Riches  | ✓          | ✗              | No                          | $0.20 Daily                      | Yes     |
-| American Luck   | ✓          | ✗              | No                          | $0.60 Average Daily              | Yes     |
-| Fortune Coins   | ✓          | ✗              | No                          | $0.46 Average Daily              | Yes     |
-| Zula            | ✓          | ✓              | No                          | $1.00 Daily                      | Yes     |
-| Sportzino       | ✓          | ✓              | No                          | $0.76 Average Daily              | Yes     |
-| Smiles Casino   | ✗          | ✗              | No                          | $0.07 Average Daily              | Yes     |
-| Yay Casino      | ✓          | ✗              | No                          | $0.50 Average Daily              | Yes     |
-| RealPrize       | IN DEVELOPMENT | ✗          | No                          | $0.30 Daily                      | Yes     |
-| LoneStar Casino | IN DEVELOPMENT | ✗          | No                          | $0.30 Daily                      | Yes     |
-| Luckyland Slots | IN DEVELOPMENT | ✗          | No                          | $0.30-$1.00  Daily               | Yes     |
-| Crown Coins     | IN DEVELOPMENT | ✓          | Yes                         | $0.00-$2.00 Varies Daily         | Yes     |
-| Goldnluck       | IN DEVELOPMENT | ✓          | No                          | $2.00 Daily                      | No      |
-| Chumba          | IN DEVELOPMENT | ✗          | No                          | $0.25-$3.00 Daily                | Yes     |
-| Chanced         | IN DEVELOPMENT | ✗          | No                          | $0.30-$1.00 Varies Daily         | Yes     |
-| iCasino         | IN DEVELOPMENT | ✗          | No                          | $1.70 Daily                      | Yes     |
-| Spin Pals       | IN DEVELOPMENT | ✓          | No                          | $1.00  Daily                     | Yes     |
-| Dara Casino     | IN DEVELOPMENT | ✗          | No                          | $1.00  Daily                     | Yes     |
-| Pulsz           | IN DEVELOPMENT | ✗          | No                          | $0.20-$3.00 Varies Daily         | Yes     |
+| Casino            | Auto Claim | Countdown Timer | Backend API | Bonus (SC)            | Trusted? (payment proof) |
+|-------------------|------------|-----------------|-----------------------------|------------------|---------|
+| LuckyBird         | ✓          | ✓              | No                          | $0.25 Daily - Increases with VIP | Yes     |
+| Global Poker      | ✓          | ✓              | No                          | $0.00-$4.00 Daily                | Yes     |
+| JefeBet           | ✓          | ✓              | No                          | $0.20 every 6 hours              | Yes     |
+| SpinQuest         | ✓          | ✓              | No                          | $1.00 Daily                      | Yes     |
+| FortuneWheelz     | ✓          | ✗              | No                          | $0.20 Average Daily              | Yes     |
+| Jumbo88           | ✓          | ✓              | No                          | Up to 5 SC Daily Spin            | Yes     |
+| NoLimitCoins      | ✗          | ✗              | No                          | $0.20 Average Daily              | Yes     |
+| Modo              | ✗          | ✗              | No                          | $0.30-$1.00 Daily                | Yes     |
+| Stake             | ✗          | ✗              | Yes                         | $1.00 Daily                      | Yes     |
+| Funrize           | ✓          | ✗              | No                          | $0.20 Average Daily              | Yes     |
+| Rolling Riches    | ✓          | ✗              | No                          | $0.20 Daily                      | Yes     |
+| American Luck     | ✓          | ✗              | No                          | $0.60 Average Daily              | Yes     |
+| Fortune Coins     | ✓          | ✗              | No                          | $0.46 Average Daily              | Yes     |
+| Sportzino         | ✓          | ✗              | No                          | $0.76 Average Daily              | Yes     |
+| Yay Casino        | ✓          | ✗              | No                          | $0.50 Average Daily              | Yes     |
+| Zula              | ✓          | ✗              | No                          | $1.00 Daily                      | Yes     |
+| Chipnwin          | ✓          | ✓              | No                          | $0.29 Average Daily              | Yes     |
+| Spree             | ✓          | ✓              | No                          | $0.30 Daily                      | Yes     |
+| Wild World Casino | ✓          | ✗              | No                          | $0.10 Daily                      | Yes     |
+| Smiles Casino     | IN DEVELOPMENT | ✗          | No                          | $0.07 Average Daily              | Yes     |
+| RealPrize         | IN DEVELOPMENT | ✗          | No                          | $0.30 Daily                      | Yes     |
+| LoneStar Casino   | IN DEVELOPMENT | ✗          | No                          | $0.30 Daily                      | Yes     |
+| Luckyland Slots   | IN DEVELOPMENT | ✗          | No                          | $0.30-$1.00  Daily               | Yes     |
+| Crown Coins       | IN DEVELOPMENT | ✓          | Yes                         | $0.00-$2.00 Varies Daily         | Yes     |
+| Goldnluck         | IN DEVELOPMENT | ✓          | No                          | $2.00 Daily                      | No      |
+| Chumba            | IN DEVELOPMENT | ✗          | No                          | $0.25-$3.00 Daily                | Yes     |
+| Chanced           | IN DEVELOPMENT | ✗          | No                          | $0.30-$1.00 Varies Daily         | Yes     |
+| iCasino           | IN DEVELOPMENT | ✗          | No                          | $1.70 Daily                      | Yes     |
+| Spin Pals         | IN DEVELOPMENT | ✓          | No                          | $1.00  Daily                     | Yes     |
+| Dara Casino       | IN DEVELOPMENT | ✗          | No                          | $1.00  Daily                     | Yes     |
+| Pulsz             | IN DEVELOPMENT | ✗          | No                          | $0.20-$3.00 Varies Daily         | Yes     |
 
 
 # Support 🔮 
