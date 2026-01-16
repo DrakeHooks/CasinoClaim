@@ -88,6 +88,7 @@ api_modules = [
     "spreeAPI",
     "chipnwinAPI",
     "wildworldAPI",
+    "lonestarAPI",
     "yaycasinoAPI",
     "luckylandAPI",
 ]
@@ -285,6 +286,7 @@ async def _run_jumbo(channel):          await jumbo_casino(None, driver, channel
 async def _run_spree(channel):          await spree_uc(None, channel)
 async def _run_chipnwin(channel):       await chipnwin_casino(None, driver, channel)
 async def _run_wildworld(channel):      await wildworld_casino(None, driver, channel)
+async def _run_lonestar(channel):       await lonestar_casino(None, driver, channel)
 async def _run_yaycasino(channel):      await yaycasino_uc(None, channel)
 async def _run_realprize(channel):      await realprize_uc(None, channel)
 async def _run_luckyland(channel):      await luckyland_uc(None, channel)
@@ -327,6 +329,7 @@ casino_loop_entries: List[CasinoLoopEntry] = [
 
     # 24h cadence group (no countdown/problematic)
     # CasinoLoopEntry("realprize",     "RealPrize",         _run_realprize,       1440),
+    CasinoLoopEntry("lonestar",      "LoneStar Casino",    _run_lonestar,       1440),
     CasinoLoopEntry("wildworld",     "WildWorld",           _run_wildworld,     1440),
     CasinoLoopEntry("funrize",       "Funrize",           _run_funrize,         1440),
     CasinoLoopEntry("rollingriches", "Rolling Riches",    _run_rollingriches,   1440),
@@ -463,7 +466,7 @@ MANUAL_CASINO_COMMANDS = {
     "fortunewheelz","stake","chanced","luckybird","globalpoker","crowncoins",
     "dingdingding","modo","zula","sportzino","nolimitcoins","fortunecoins",
     "smilescasino","americanluck","yaycasino", "realprize", "jumbo", "spree",
-    "chipnwin", "wildworld",
+    "chipnwin", "wildworld", "lonestar",
     # NEW:
     "debug",
 }
@@ -1109,6 +1112,11 @@ async def wildworld_cmd(ctx):
     await ctx.send("Checking Wild World Casino for bonus...")
     await wildworld_casino(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
 
+@bot.command(name="lonestar")
+async def lonestar_cmd(ctx):
+    await ctx.send("Checking LoneStar Casino for bonus...")
+    await lonestar_casino(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
+
 @bot.command(name="chipnwin")
 async def chipnwin_cmd(ctx):
     await ctx.send("Checking Chipnwin for bonus...")
@@ -1257,6 +1265,7 @@ async def debug_cmd(ctx, *, casino: str):
         "spree":         lambda: spree_uc(ctx, channel),
         "chipnwin":      lambda: chipnwin_casino(ctx, driver, channel),
         "wildworld":     lambda: wildworld_casino(ctx, driver, channel),
+        "lonestar":      lambda: lonestar_casino(ctx, driver, channel),
         "crowncoins":    lambda: crowncoins_casino(driver, bot, ctx, channel),
         "americanluck":  lambda: americanluck_uc(ctx, channel),
         "modo":          lambda: (claim_modo_bonus(driver, bot, ctx, channel) if True else None),
@@ -1496,7 +1505,7 @@ async def help_cmd(ctx):
 !rollingriches, !jefebet, !spinpals, !spinquest, !funrize, !sportzino,  
 !fortunecoins, !nolimitcoins, !fortunewheelz, !stake, !dingdingding,
 !smilescasino, !yaycasino, !realprize, !luckyland, !jumbo, !spree,
-!chipnwin, !wildworld,
+!chipnwin, !wildworld, !lonestar,
 
 ---------------------------------------  
 🧪 **Debug:**  
