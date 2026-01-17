@@ -22,8 +22,8 @@ load_dotenv()
 LONESTAR_CRED = os.getenv("LONESTAR")  # format "username:password"
 
 SITE_URL = "https://lonestarcasino.com"
+LOGIN_URL = "https://lonestarcasino.com/#!login"
 
-LOGIN_BUTTON_XPATH = ("/html/body/div[3]/nav/div/div[3]/div/ul/li[2]/div")
 LOGIN_EMAIL_ID = ("logemailnbtn")
 
 EMAIL_INPUT_ID = ("poplogin_email")
@@ -68,16 +68,14 @@ async def lonestar_casino(ctx, driver, channel):
         await claim_lonestar_bonus(ctx, driver, channel)
         return
 
+    # 1b) Navigate to login
+    print("[LoneStar Casino] Navigating to login...")
+    driver.get(LOGIN_URL)
+    await asyncio.sleep(10)
+
     # 1c) Login to site
     print("[LoneStar Casino] Attempting to login...")
     try:
-        try:
-            login = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, LOGIN_BUTTON_XPATH)))
-            login.click()
-            await asyncio.sleep(10)
-        except Exception:
-            print("[LoneStar Casino] Unable to click login button.")
-
         try:
             login_email = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, LOGIN_EMAIL_ID)))
             login_email.click()
@@ -122,7 +120,7 @@ async def lonestar_casino(ctx, driver, channel):
 # ───────────────────────────────────────────────────────────
 async def claim_lonestar_bonus(ctx, driver, channel):
         # 2a) Click the “Collect” button
-        print("[LoneStar Casino] Attempting to click Collect button...")
+        print("[LoneStar Casino] Attempting to claim daily bonus...")
         try:
             claim = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, CLAIM_BUTTON_ID)))
             claim.click()
