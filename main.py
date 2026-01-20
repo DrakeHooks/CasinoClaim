@@ -11,7 +11,7 @@ import asyncio
 import importlib
 from dataclasses import dataclass, field
 import datetime as dt
-from typing import Awaitable, Callable, List, Optional
+from typing import Awaitable, Callable, List, Optional, Dict, Tuple
 
 from dotenv import load_dotenv
 
@@ -55,8 +55,6 @@ def _exec_job_finished():
 # (helperAPI.py is your single place for screenshot logic)
 # ───────────────────────────────────────────────────────────
 from helperAPI import normalize_casino_key, run_with_periodic_screenshots
-
-
 
 # ───────────────────────────────────────────────────────────
 # Dynamic API imports (missing modules are OK)
@@ -208,6 +206,78 @@ def _build_driver_with_retry(opts: Options):
 driver = _build_driver_with_retry(options)
 
 # ───────────────────────────────────────────────────────────
+# NEW: pacing / spacing controls
+# Why: GlobalPoker working only in debug mode is a classic “timing” symptom.
+# Debug mode adds sleep (screenshots). So we add deterministic spacing:
+#   - startup grace after bot is ready
+#   - minimum gap between any casinos
+#   - extra gap specifically between JefeBet → GlobalPoker (and optionally others)
+# ───────────────────────────────────────────────────────────
+STARTUP_GRACE_SECONDS = int(os.getenv("STARTUP_GRACE_SECONDS", "25"))   # was effectively 10
+GLOBAL_MIN_GAP_SECONDS = int(os.getenv("GLOBAL_MIN_GAP_SECONDS", "6")) # baseline “let the site settle”
+POST_RUN_COOLDOWN_SECONDS = int(os.getenv("POST_RUN_COOLDOWN_SECONDS", "3"))
+
+# Pair-specific gaps (prev_key, next_key) -> seconds
+# You can tune without changing code:
+#   JEFEBET_TO_GLOBALPOKER_GAP_SECONDS=20
+PAIR_GAPS: Dict[Tuple[str, str], int] = {
+    ("jefebet", "globalpoker"): int(os.getenv("JEFEBET_TO_GLOBALPOKER_GAP_SECONDS", "20")),
+}
+
+# Optional per-casino cooldowns (after a casino finishes)
+# Example env override style:
+#   COOLDOWN_GLOBALPOKER_SECONDS=8
+PER_CASINO_COOLDOWN: Dict[str, int] = {
+    "globalpoker": int(os.getenv("COOLDOWN_GLOBALPOKER_SECONDS", "8")),
+    "jefebet":     int(os.getenv("COOLDOWN_JEFEBET_SECONDS", "4")),
+}
+
+_last_casino_key: Optional[str] = None
+_last_casino_finished_monotonic: float = 0.0
+
+async def _sleep_chunked(seconds: float):
+    """Sleep in small chunks so cancellation stays responsive."""
+    end = time.monotonic() + max(0.0, float(seconds))
+    while True:
+        remaining = end - time.monotonic()
+        if remaining <= 0:
+            return
+        await asyncio.sleep(min(0.5, remaining))
+
+async def _apply_spacing_before(next_key: str):
+    global _last_casino_key, _last_casino_finished_monotonic
+    now = time.monotonic()
+
+    # Baseline minimum gap between any casinos
+    baseline_due = _last_casino_finished_monotonic + GLOBAL_MIN_GAP_SECONDS
+    baseline_sleep = max(0.0, baseline_due - now)
+
+    # Pair-specific extra gap
+    pair_sleep = 0.0
+    if _last_casino_key:
+        extra = PAIR_GAPS.get((_last_casino_key, next_key), 0)
+        if extra > 0:
+            pair_due = _last_casino_finished_monotonic + extra
+            pair_sleep = max(0.0, pair_due - now)
+
+    total = max(baseline_sleep, pair_sleep)
+    if total > 0:
+        print(f"[Pace] Sleeping {total:.1f}s before {next_key} (prev={_last_casino_key})")
+        await _sleep_chunked(total)
+
+def _mark_casino_finished(key: str):
+    global _last_casino_key, _last_casino_finished_monotonic
+    _last_casino_key = key
+    _last_casino_finished_monotonic = time.monotonic()
+
+async def _apply_cooldown_after(key: str):
+    extra = PER_CASINO_COOLDOWN.get(key, 0)
+    total = POST_RUN_COOLDOWN_SECONDS + max(0, int(extra))
+    if total > 0:
+        print(f"[Pace] Cooldown {total}s after {key}")
+        await _sleep_chunked(total)
+
+# ───────────────────────────────────────────────────────────
 # Discord bot + 2FA capture plumbing
 # ───────────────────────────────────────────────────────────
 bot = commands.Bot(command_prefix="!", intents=intents, case_insensitive=True)
@@ -265,7 +335,6 @@ class CasinoLoopEntry:
     def schedule_next(self):
         self.next_run = dt.datetime.now(dt.timezone.utc) + dt.timedelta(minutes=self.interval_minutes)
 
-
 # constants for main loop. change as you see fit or run !config in discord.
 LOOP_STAGGER_SECONDS = 30
 PER_CASINO_TIMEOUT_SEC = int(os.getenv("CASINO_TIMEOUT_SECONDS", "500"))
@@ -287,7 +356,6 @@ async def _run_yaycasino(channel):      await yaycasino_uc(None, channel)
 async def _run_realprize(channel):      await realprize_uc(None, channel)
 async def _run_luckyland(channel):      await luckyland_uc(None, channel)
 
-
 # Modo runner used by loop (claim → countdown)
 async def _run_modo(channel):
     ok = await claim_modo_bonus(driver, bot, None, channel)
@@ -299,6 +367,7 @@ async def _run_stake(channel):          await stake_claim(driver, bot, None, cha
 async def _run_fortunewheelz(channel):  await fortunewheelz_flow(None, driver, channel)
 async def _run_spinquest(channel):      await spinquest_flow(None, driver, channel)
 async def _run_americanluck(channel):   await americanluck_uc(None, channel)
+
 async def _run_fortunecoins(channel):
     loop = asyncio.get_running_loop()
     from fortunecoinsAPI import fortunecoins_uc_blocking
@@ -334,7 +403,6 @@ casino_loop_entries: List[CasinoLoopEntry] = [
     CasinoLoopEntry("yaycasino",     "YayCasino",         _run_yaycasino,       1440),
     # CasinoLoopEntry("smilescasino",  "Smiles Casino",     _run_smilescasino,    1440),
     # CasinoLoopEntry("luckyland",     "LuckyLand",         _run_luckyland,       1440),
-
 ]
 
 def reset_loop_schedule():
@@ -355,6 +423,14 @@ async def run_main_loop(channel: discord.abc.Messageable):
             now = dt.datetime.now(dt.timezone.utc)
             for entry in casino_loop_entries:
                 if now >= entry.next_run:
+                    # NEW: deterministic spacing before each casino
+                    try:
+                        await _apply_spacing_before(entry.key)
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception as e:
+                        print(f"[Pace] spacing-before error: {e}")
+
                     try:
                         await asyncio.wait_for(entry.runner(channel), timeout=PER_CASINO_TIMEOUT_SEC)
                     except asyncio.TimeoutError:
@@ -366,6 +442,15 @@ async def run_main_loop(channel: discord.abc.Messageable):
                     except Exception as e:
                         print(f"[Loop] Error in {entry.display_name}: {e}")
                     finally:
+                        # NEW: mark completion + cooldown after each casino
+                        try:
+                            _mark_casino_finished(entry.key)
+                            await _apply_cooldown_after(entry.key)
+                        except asyncio.CancelledError:
+                            raise
+                        except Exception as e:
+                            print(f"[Pace] cooldown-after error: {e}")
+
                         entry.schedule_next()
             await asyncio.sleep(MAIN_TICK_SLEEP)
     except asyncio.CancelledError:
@@ -402,43 +487,6 @@ async def stop_main_loop() -> bool:
     return True
 
 # ───────────────────────────────────────────────────────────
-# Modo auth maintenance (only when loop is STOPPED)
-# ───────────────────────────────────────────────────────────
-# REFRESH_CHECK_MINUTES = int(os.getenv("MODO_REFRESH_CHECK_MINUTES", "60"))
-# modo_auth_lock = asyncio.Lock()  # serialize all modo auth attempts
-
-# async def run_modo_auth(channel):
-#     """Serialize calls to modoAPI.authenticate_modo to avoid concurrent UC sessions."""
-#     async with modo_auth_lock:
-#         try:
-#             await authenticate_modo(driver, bot, None, channel)
-#         except Exception as e:
-#             print(f"[Modo Auth] error: {e}")
-
-# async def modo_auth_maintenance():
-#     """
-#     Runs in the background, but only refreshes when:
-#       - the main loop is NOT running, and
-#       - the lock is free, and
-#       - refresh is due.
-#     This ensures manual !auth modo is responsive after !stop, and nothing collides.
-#     """
-#     await bot.wait_until_ready()
-#     channel = bot.get_channel(DISCORD_CHANNEL)
-#     while not bot.is_closed():
-#         try:
-#             if (not is_main_loop_running()
-#                 and 'modo_auth_needs_refresh' in globals()
-#                 and modo_auth_needs_refresh()
-#                 and not modo_auth_lock.locked()):
-#                 if channel:
-#                     await channel.send("♻️ Background: refreshing Modo auth…")
-#                 await run_modo_auth(channel)
-#         except Exception as e:
-#             print(f"[Modo Auth Maintenance] outer error: {e}")
-#         await asyncio.sleep(REFRESH_CHECK_MINUTES * 60)
-
-# ───────────────────────────────────────────────────────────
 # Commands
 # ───────────────────────────────────────────────────────────
 @bot.event
@@ -447,11 +495,14 @@ async def on_ready():
     channel = bot.get_channel(DISCORD_CHANNEL)
     if channel:
         await channel.send("Discord bot has started…")
-        await asyncio.sleep(10)
+
+        # NEW: longer configurable startup grace
+        # (lets Chrome finish restoring session + extensions load + CF cookies settle)
+        await channel.send(f"⏱️ Startup grace: {STARTUP_GRACE_SECONDS}s")
+        await _sleep_chunked(STARTUP_GRACE_SECONDS)
+
         if await start_main_loop(channel):
             await channel.send("🎰 Casino loop started with current configuration.")
-        # Start the background Modo refresher; it will only act when the loop is stopped.
-        # asyncio.create_task(modo_auth_maintenance())
     else:
         print("Invalid DISCORD_CHANNEL")
 
@@ -492,7 +543,6 @@ async def stop_loop_command(ctx: commands.Context):
     else:
         await ctx.send("Casino loop is not currently running.")
 
-
 @bot.command(name="cleardatadir")
 async def clear_data_dir(ctx: commands.Context):
     global driver  # <-- must be before any use of driver in this function
@@ -508,7 +558,6 @@ async def clear_data_dir(ctx: commands.Context):
         return
     ...
     # (everything else the same)
-
 
     await ctx.send(
         "🧹 **Clear Chrome data directory?**\n"
@@ -604,20 +653,16 @@ async def clear_data_dir(ctx: commands.Context):
     except Exception:
         pass
 
-
-
 # ───────────────────────────────────────────────────────────
 # !reset — clear profile, rebuild, and re-compose (supports "nocache")
 # Usage:
 #   !reset           -> docker compose build
 #   !reset nocache   -> docker compose build --no-cache
 # ───────────────────────────────────────────────────────────
-import os
 import shutil
-import asyncio
 import subprocess
 from asyncio.subprocess import PIPE
-from typing import List, Optional
+from typing import List
 
 try:
     import psutil  # optional; used to kill straggler chrome
@@ -745,57 +790,7 @@ def _detect_user_data_dir() -> Optional[str]:
 #   !reset nocache   -> build --no-cache; recreate TARGET_SERVICE only
 # Keeps watchtower running the whole time.
 # ───────────────────────────────────────────────────────────
-import os
-import asyncio
-import shutil
-import subprocess
-from asyncio.subprocess import PIPE
-from typing import Optional
-
-try:
-    import psutil, signal
-except Exception:
-    psutil = None
-    signal = None
-
-def _has_callable(name: str) -> bool:
-    return name in globals() and callable(globals()[name])
-
-def _maybe_is_main_loop_running() -> bool:
-    try:
-        if _has_callable("is_main_loop_running"):
-            return bool(globals()["is_main_loop_running"]())
-    except Exception:
-        pass
-    return False
-
-async def _maybe_stop_main_loop() -> None:
-    try:
-        if _has_callable("stop_main_loop"):
-            await globals()["stop_main_loop"]()
-    except Exception:
-        pass
-
-def _maybe_quit_driver() -> None:
-    for key in ("driver", "sb", "browser", "web_driver"):
-        if key in globals():
-            try:
-                obj = globals()[key]
-                if obj:
-                    getattr(obj, "quit", lambda: None)()
-            except Exception:
-                pass
-
-def _detect_user_data_dir() -> Optional[str]:
-    if "instance_dir" in globals():
-        v = str(globals()["instance_dir"]) or ""
-        if v.strip():
-            return v.strip()
-    for k in ("CHROME_INSTANCE_DIR", "CHROME_USER_DATA_DIR", "SB_USER_DATA_DIR"):
-        v = os.getenv(k, "").strip()
-        if v:
-            return v
-    return None
+from typing import Optional as _Optional
 
 def _q(s: str) -> str:
     return "'" + s.replace("'", "'\"'\"'") + "'"
@@ -964,8 +959,6 @@ async def reset_cmd(ctx, mode: str = ""):
     # 6) If we got here, both helper and fallback failed; keep the bot alive and show errors
     await ctx.send("❌ Reset helper and fallback both failed. Check the stderr above and your Docker setup.")
 
-
-
 def format_loop_config() -> str:
     status = "running" if is_main_loop_running() else "stopped"
     lines = ["🎛️ **Casino loop configuration**", f"Status: **{status}**", "Order and intervals:"]
@@ -1040,7 +1033,6 @@ async def luckybird_cmd(ctx):
     channel = bot.get_channel(DISCORD_CHANNEL)
     await luckybird_entry(ctx, driver, bot, channel)
 
-
 # manual command
 @bot.command(name="realprize", aliases=["real prize", "rp"])
 async def realprize_cmd(ctx):
@@ -1068,23 +1060,35 @@ async def funrize_cmd(ctx):
     await ctx.send("Checking Funrize for bonus…")
     await funrize_flow(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
 
-
 @bot.command(name="yaycasino", aliases=["yay", "yay casino"])
 async def yaycasino_cmd(ctx):
     await ctx.send("Checking YayCasino for bonus…")
     channel = bot.get_channel(DISCORD_CHANNEL)
     await yaycasino_uc(ctx, channel)
 
-
 @bot.command(name="globalpoker", aliases=["gp", "global poker"])
 async def globalpoker_cmd(ctx):
     await ctx.send("Checking GlobalPoker for bonus…")
-    await global_poker(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
+
+    # NEW: apply the same spacing logic in manual mode too
+    await _apply_spacing_before("globalpoker")
+    try:
+        await global_poker(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
+    finally:
+        _mark_casino_finished("globalpoker")
+        await _apply_cooldown_after("globalpoker")
 
 @bot.command(name="jefebet", aliases=["jefe", "jefebet casino", "jefe bet", "jb"])
 async def jefebet_cmd(ctx):
     await ctx.send("Checking JefeBet for bonus…")
-    await jefebet_casino(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
+
+    # NEW: apply spacing in manual mode too
+    await _apply_spacing_before("jefebet")
+    try:
+        await jefebet_casino(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
+    finally:
+        _mark_casino_finished("jefebet")
+        await _apply_cooldown_after("jefebet")
 
 @bot.command(name="smilescasino", aliases=["smiles", "smiles casino"])
 async def smilescasino_cmd(ctx):
@@ -1117,7 +1121,6 @@ async def americanluck_cmd(ctx):
     channel = bot.get_channel(DISCORD_CHANNEL)
     await americanluck_uc(ctx, channel)
 
-
 @bot.command(name="modo")
 async def modo_cmd(ctx):
     await ctx.send("Checking Modo for bonus…")
@@ -1137,8 +1140,6 @@ async def luckyland_cmd(ctx):
     await ctx.send("Checking LuckyLand for bonus…")
     channel = bot.get_channel(DISCORD_CHANNEL)
     await luckyland_uc(ctx, channel)
-
-
 
 @bot.command(name="stake")
 async def stake_cmd(ctx):
@@ -1230,8 +1231,6 @@ async def debug_cmd(ctx, *, casino: str):
         await ctx.send("Usage: `!debug <casino>` (example: `!debug spinquest`)")
         return
 
-    # Map normalized casino keys to an awaitable (the real flow you already have)
-    # NOTE: this does not replace your commands; it just calls the same underlying functions.
     channel = bot.get_channel(DISCORD_CHANNEL)
 
     runners = {
@@ -1255,14 +1254,13 @@ async def debug_cmd(ctx, *, casino: str):
         "luckyland":     lambda: luckyland_uc(ctx, channel),
         "stake":         lambda: stake_claim(driver, bot, ctx, channel),
         "fortunewheelz": lambda: fortunewheelz_flow(ctx, driver, channel),
-        "spinquest":     lambda: spinquest_flow(ctx, driver, channel),
-        "spinpals":      lambda: spinpals_flow(ctx, driver, channel),
-        "chumba":        lambda: chumba_cmd(ctx),  # wraps your existing chumba command logic
+        "spinquest":     lambda: spinquest_flow(ctx, driver, bot.get_channel(DISCORD_CHANNEL)),
+        "spinpals":      lambda: spinpals_flow(ctx, driver, bot.get_channel(DISCORD_CHANNEL)),
+        "chumba":        lambda: chumba_cmd(ctx),
         "chanced":       lambda: chanced_cmd(ctx),
         "dingdingding":  lambda: dingdingding_cmd(ctx),
     }
 
-    # Special-case aliases users might type
     alias_map = {
         "nlc": "nolimitcoins",
         "gp": "globalpoker",
@@ -1287,7 +1285,6 @@ async def debug_cmd(ctx, *, casino: str):
         )
         return
 
-    # If user requested modo debug, we want the full flow (claim + countdown) like your modo_cmd
     if key == "modo":
         async def _modo_flow():
             ok = await claim_modo_bonus(driver, bot, ctx, channel)
