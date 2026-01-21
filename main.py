@@ -161,6 +161,13 @@ def _apply_common_chrome_flags(opts: Options) -> None:
     opts.add_argument("--ignore-certificate-errors")
     opts.add_argument("--ignore-ssl-errors")
     opts.add_argument("disable-infobars")
+    # WebGL / GPU compatibility in headless/Xvfb environments
+    opts.add_argument("--enable-webgl")
+    opts.add_argument("--ignore-gpu-blocklist")
+    opts.add_argument("--use-gl=swiftshader")
+    opts.add_argument("--enable-unsafe-swiftshader")
+    opts.add_argument("--disable-gpu-driver-bug-workarounds")
+
     opts.add_argument(f"--remote-debugging-port={9222 + (os.getpid() % 1000)}")
     ua = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
           "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36")
