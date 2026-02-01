@@ -1,8 +1,6 @@
 # Drake Hooks
-# Casino Claim
+# Casino Claim 2
 # Global Poker API
-
-
 
 import re
 import os
@@ -12,10 +10,32 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException, NoAlertPresentException  # <-- added
 
 # Load environment variables from the .env file
 load_dotenv()
+
+# ───────────────────────────────────────────────────────────
+# NEW: Dismiss the WebGL/acceleration alert if it appears
+# (This is what is breaking the main loop with "unexpected alert open")
+# ───────────────────────────────────────────────────────────
+async def gp_dismiss_webgl_alert(driver, channel=None, label="GlobalPoker"):
+    """
+    Dismiss the WebGL/acceleration alert if it appears.
+    Returns True if an alert was dismissed.
+    """
+    try:
+        alert = driver.switch_to.alert
+        txt = (alert.text or "").strip()
+        alert.accept()
+        if channel:
+            await channel.send(f"[{label}] ⚠️ Dismissed browser alert: `{txt[:120]}`")
+        return True
+    except NoAlertPresentException:
+        return False
+    except Exception:
+        # never let alert handling crash the flow
+        return False
 
 # Helper function to retrieve the countdown element
 def get_countdown_element(driver):
@@ -31,14 +51,15 @@ def get_countdown_element(driver):
     except TimeoutException:
         return None
 
-
-
 # Function to log in to Global Poker, handling the case where the session is already active
 async def login_to_global_poker(driver, channel):
     try:
         driver.get("https://play.globalpoker.com/")
         await asyncio.sleep(5)
-        
+
+        # NEW: dismiss alert if it appears after navigation
+        await gp_dismiss_webgl_alert(driver, channel)
+
         # Check if login page is present by looking for the username field
         try:
             username_field = WebDriverWait(driver, 5).until(
@@ -67,6 +88,10 @@ async def login_to_global_poker(driver, channel):
             login_button.click()
             
             await asyncio.sleep(5)  # Give it some time to log in
+
+            # NEW: dismiss alert if it appears after login
+            await gp_dismiss_webgl_alert(driver, channel)
+
             print("Logged in to Global Poker successfully!")
         except TimeoutException:
             # If username field is not found, we assume the user is already logged in
@@ -81,6 +106,9 @@ async def login_to_global_poker(driver, channel):
 # Function to claim Global Poker bonus after clicking "Get Coins" button
 async def claim_global_poker_bonus(ctx, driver, channel):
     try:
+        # NEW: dismiss alert if it appears before we try clicking claim buttons
+        await gp_dismiss_webgl_alert(driver, channel)
+
         # List of possible claim button XPaths
         button_xpaths = [
             "/html/body/div[8]/div/div/div[2]/div[2]/div[2]/div/div[2]/div[2]/div[1]",
@@ -100,6 +128,10 @@ async def claim_global_poker_bonus(ctx, driver, channel):
                 claim_button = WebDriverWait(driver, 10).until(
                     EC.element_to_be_clickable((By.XPATH, button_xpath))
                 )
+
+                # NEW: dismiss alert right before click (if it pops mid-flow)
+                await gp_dismiss_webgl_alert(driver, channel)
+
                 claim_button.click()  # Click the button to claim the bonus
                 bonus_claimed = True
                 print(f"Clicked bonus button: {button_xpath}")
@@ -123,9 +155,16 @@ async def click_get_coins_button(driver, channel):
         first_button = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.XPATH, first_button_xpath))
         )
+
+        # NEW: dismiss alert right before click (if it blocks interaction)
+        await gp_dismiss_webgl_alert(driver, channel)
+
         first_button.click()
         print("GlobalPoker.com 'Get Coins' button clicked!")
         await asyncio.sleep(3)  # Wait for any UI transitions
+
+        # NEW: dismiss alert if it appears after clicking
+        await gp_dismiss_webgl_alert(driver, channel)
 
     except TimeoutException:
         print("[Global Poker] 'Get Coins' button not found! Check TOS or button XPATHS!")
@@ -138,8 +177,14 @@ async def global_poker(ctx, driver, channel):
     if not logged_in:
         return
 
+    # NEW: dismiss alert after login, before proceeding
+    await gp_dismiss_webgl_alert(driver, channel)
+
     # After login, click "Get Coins" button to proceed
     await click_get_coins_button(driver, channel)
+
+    # NEW: dismiss alert after opening Get Coins area
+    await gp_dismiss_webgl_alert(driver, channel)
 
     # After clicking "Get Coins", check if a countdown exists
     countdown_element = get_countdown_element(driver)

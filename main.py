@@ -80,7 +80,6 @@ api_modules = [
     "chumbaAPI",
     "crowncoinsAPI",
     "zulaAPI",
-    "luckybirdAPI",
     "sportzinoAPI",
     "nolimitcoinsAPI",
     "smilescasinoAPI",
@@ -162,6 +161,13 @@ def _apply_common_chrome_flags(opts: Options) -> None:
     opts.add_argument("--ignore-certificate-errors")
     opts.add_argument("--ignore-ssl-errors")
     opts.add_argument("disable-infobars")
+    # WebGL / GPU compatibility in headless/Xvfb environments
+    opts.add_argument("--enable-webgl")
+    opts.add_argument("--ignore-gpu-blocklist")
+    opts.add_argument("--use-gl=swiftshader")
+    opts.add_argument("--enable-unsafe-swiftshader")
+    opts.add_argument("--disable-gpu-driver-bug-workarounds")
+
     opts.add_argument(f"--remote-debugging-port={9222 + (os.getpid() % 1000)}")
     ua = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
           "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36")
@@ -273,7 +279,6 @@ LOOP_STAGGER_SECONDS = 30
 PER_CASINO_TIMEOUT_SEC = int(os.getenv("CASINO_TIMEOUT_SECONDS", "500"))
 MAIN_TICK_SLEEP = 10
 
-async def _run_luckybird(channel):      await luckybird_entry(None, driver, bot, channel)
 async def _run_zula(channel):           await zula_uc(None, channel)
 async def _run_sportzino(channel):      await Sportzino(None, driver, channel)
 async def _run_nlc(channel):            await nolimitcoins_flow(None, driver, channel)
@@ -313,10 +318,9 @@ async def _run_fortunecoins(channel):
         _exec_job_finished()
 
 casino_loop_entries: List[CasinoLoopEntry] = [
-    CasinoLoopEntry("luckybird",     "LuckyBird",         _run_luckybird,       120),
-    CasinoLoopEntry("globalpoker",   "GlobalPoker",       _run_globalpoker,     120),
     CasinoLoopEntry("jefebet",       "JefeBet",           _run_jefebet,         120),
     CasinoLoopEntry("spinquest",     "SpinQuest",         _run_spinquest,       120),
+    CasinoLoopEntry("globalpoker",   "GlobalPoker",       _run_globalpoker,     120),
     CasinoLoopEntry("jumbo",         "Jumbo",             _run_jumbo,           120),
     CasinoLoopEntry("spree",         "Spree",             _run_spree,           120),
     CasinoLoopEntry("chipnwin",      "Chipnwin",          _run_chipnwin,        120),
@@ -463,7 +467,7 @@ async def on_ready():
 
 MANUAL_CASINO_COMMANDS = {
     "chumba","rollingriches","jefebet","spinpals","spinquest","funrize",
-    "fortunewheelz","stake","chanced","luckybird","globalpoker","crowncoins",
+    "fortunewheelz","stake","chanced","globalpoker","crowncoins",
     "dingdingding","modo","zula","sportzino","nolimitcoins","fortunecoins",
     "smilescasino","americanluck","yaycasino", "realprize", "jumbo", "spree",
     "chipnwin", "wildworld", "lonestar",
@@ -1040,11 +1044,6 @@ async def restart(ctx):
     os._exit(0)
 
 # Manual casino commands
-@bot.command(name="luckybird", aliases=["lb", "lucky bird"])
-async def luckybird_cmd(ctx):
-    await ctx.send("Checking LuckyBird for bonus…")
-    channel = bot.get_channel(DISCORD_CHANNEL)
-    await luckybird_entry(ctx, driver, bot, channel)
 
 
 # manual command
@@ -1251,7 +1250,7 @@ async def debug_cmd(ctx, *, casino: str):
     channel = bot.get_channel(DISCORD_CHANNEL)
 
     runners = {
-        "luckybird":     lambda: luckybird_entry(ctx, driver, bot, channel),
+
         "realprize":     lambda: realprize_uc(ctx, channel),
         "zula":          lambda: zula_uc(ctx, channel),
         "sportzino":     lambda: Sportzino(ctx, driver, channel),
@@ -1290,7 +1289,6 @@ async def debug_cmd(ctx, *, casino: str):
         "jefe": "jefebet",
         "yay": "yaycasino",
         "rp": "realprize",
-        "lb": "luckybird",
         "a_luck": "americanluck",
         "aluck": "americanluck",
     }
@@ -1429,19 +1427,7 @@ async def authenticate_command(ctx: commands.Context, site: str, method: str = N
                 except Exception: pass
         return
 
-    # 6) LuckyBird
-    if norm_site == "luckybird":
-        await ctx.send("Authenticating LuckyBird…")
-        ok = await authenticate_luckybird(driver, bot, ctx, channel)
-        if not ok:
-            snap = "luckybird_auth_failed.png"
-            try:
-                driver.save_screenshot(snap)
-                await ctx.send("LuckyBird authentication failed.", file=discord.File(snap))
-            finally:
-                try: os.remove(snap)
-                except Exception: pass
-        return
+
 
     # 7) NoLimitCoins
     if norm_site in {"nolimitcoins", "nlc", "nolimit", "nolimitcoins", "no limit coins"}:
@@ -1501,7 +1487,7 @@ async def help_cmd(ctx):
     await ctx.send("""Commands are not recommended while the casino loop is running.
 
 🎰 **Casino Commands:**  
-!chanced, !luckybird, !globalpoker, !crowncoins, !chumba, !modo, !zula,  
+!chanced, !globalpoker, !crowncoins, !chumba, !modo, !zula,  
 !rollingriches, !jefebet, !spinpals, !spinquest, !funrize, !sportzino,  
 !fortunecoins, !nolimitcoins, !fortunewheelz, !stake, !dingdingding,
 !smilescasino, !yaycasino, !realprize, !luckyland, !jumbo, !spree,
