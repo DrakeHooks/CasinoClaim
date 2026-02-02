@@ -292,8 +292,8 @@ async def _run_spree(channel):          await spree_uc(None, channel)
 async def _run_chipnwin(channel):       await chipnwin_casino(None, driver, channel)
 async def _run_wildworld(channel):      await wildworld_casino(None, driver, channel)
 async def _run_lonestar(channel):       await lonestar_casino(None, driver, channel)
+async def _run_realprize(channel):      await realprize_casino(None, driver, channel)
 async def _run_yaycasino(channel):      await yaycasino_uc(None, channel)
-async def _run_realprize(channel):      await realprize_uc(None, channel)
 async def _run_luckyland(channel):      await luckyland_uc(None, channel)
 
 
@@ -332,16 +332,16 @@ casino_loop_entries: List[CasinoLoopEntry] = [
     # CasinoLoopEntry("stake",         "Stake",             _run_stake,           120),
 
     # 24h cadence group (no countdown/problematic)
-    # CasinoLoopEntry("realprize",     "RealPrize",         _run_realprize,       1440),
-    CasinoLoopEntry("lonestar",      "LoneStar Casino",    _run_lonestar,       1440),
-    CasinoLoopEntry("wildworld",     "WildWorld",           _run_wildworld,     1440),
-    CasinoLoopEntry("funrize",       "Funrize",           _run_funrize,         1440),
-    CasinoLoopEntry("rollingriches", "Rolling Riches",    _run_rollingriches,   1440),
-    CasinoLoopEntry("americanluck",  "American Luck",      _run_americanluck,   1440),
-    CasinoLoopEntry("fortunecoins",  "Fortune Coins",     _run_fortunecoins,    1440),
-    CasinoLoopEntry("zula",          "Zula Casino",       _run_zula,            1440),
-    CasinoLoopEntry("sportzino",     "Sportzino",         _run_sportzino,       1440),
-    CasinoLoopEntry("yaycasino",     "YayCasino",         _run_yaycasino,       1440),
+    CasinoLoopEntry("realprize",     "Real Prize",         _run_realprize,       1440),
+    CasinoLoopEntry("lonestar",      "LoneStar Casino",    _run_lonestar,        1440),
+    CasinoLoopEntry("wildworld",     "WildWorld",           _run_wildworld,      1440),
+    CasinoLoopEntry("funrize",       "Funrize",           _run_funrize,          1440),
+    CasinoLoopEntry("rollingriches", "Rolling Riches",    _run_rollingriches,    1440),
+    CasinoLoopEntry("americanluck",  "American Luck",      _run_americanluck,    1440),
+    CasinoLoopEntry("fortunecoins",  "Fortune Coins",     _run_fortunecoins,     1440),
+    CasinoLoopEntry("zula",          "Zula Casino",       _run_zula,             1440),
+    CasinoLoopEntry("sportzino",     "Sportzino",         _run_sportzino,        1440),
+    CasinoLoopEntry("yaycasino",     "YayCasino",         _run_yaycasino,        1440),
     # CasinoLoopEntry("smilescasino",  "Smiles Casino",     _run_smilescasino,    1440),
     # CasinoLoopEntry("luckyland",     "LuckyLand",         _run_luckyland,       1440),
 
@@ -1049,8 +1049,8 @@ async def restart(ctx):
 # manual command
 @bot.command(name="realprize", aliases=["real prize", "rp"])
 async def realprize_cmd(ctx):
-    await ctx.send("Checking RealPrize for bonus…")
-    await realprize_uc(ctx, bot.get_channel(DISCORD_CHANNEL))
+    await ctx.send("Checking Real Prize for bonus…")
+    await realprize_casino(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
 
 @bot.command(name="zula", aliases=["zula casino", "zulacasino"])
 async def zula_cmd(ctx):
@@ -1251,7 +1251,7 @@ async def debug_cmd(ctx, *, casino: str):
 
     runners = {
 
-        "realprize":     lambda: realprize_uc(ctx, channel),
+        "realprize":     lambda: realprize_casino(ctx, driver, channel),
         "zula":          lambda: zula_uc(ctx, channel),
         "sportzino":     lambda: Sportzino(ctx, driver, channel),
         "nolimitcoins":  lambda: nolimitcoins_flow(ctx, driver, channel),
