@@ -352,7 +352,7 @@ async def claim_chipnwin_bonus(ctx, driver, channel):
         await channel.send(f"Next Chipnwin bonus available in: {countdown}")
     else:
         # fallback message if their UI changes
-        await channel.send("Chipnwin: claim not available (could not read countdown).")
+        await channel.send("[Chipnwin] claim not available (could not read countdown).")
 
 
 # ───────────────────────────────────────────────────────────
@@ -368,7 +368,7 @@ async def check_chipnwin_countdown(ctx, driver, channel):
     if countdown:
         await channel.send(f"Next Chipnwin bonus available in: {countdown}")
     else:
-        await channel.send("Chipnwin: could not read countdown.")
+        await channel.send("[Chipnwin] could not read countdown, or you need to accept ToS.")
 
 
 # ───────────────────────────────────────────────────────────
@@ -392,4 +392,4 @@ async def spin_chipnwin_wheel(ctx, driver, channel):
     if spin_btn and _safe_click(driver, spin_btn):
         await channel.send("Chipnwin Wheel Spun!")
     else:
-        await channel.send("Chipnwin: spin not available (or could not click).")
+        await channel.send("[Chipnwin] spin not available (or could not click).")
