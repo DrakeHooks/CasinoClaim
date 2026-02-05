@@ -52,11 +52,13 @@ TEMPLATE_CANDIDATES = [
     "/mnt/data/39b319f1-3392-4ab9-92dd-7f1f314eb64f.png",
 ]
 
+
 def _existing_template_path() -> str:
     for p in TEMPLATE_CANDIDATES:
         if os.path.exists(p):
             return p
     return TEMPLATE_CANDIDATES[0]  # fall back to the canonical name
+
 
 # ───────────────────────────────────────────────────────────
 # Screenshot helpers (consistent with your other APIs)
@@ -71,6 +73,7 @@ async def _send_post_claim(sb: SB, channel: discord.abc.Messageable, path: str, 
                 os.remove(path)
         except Exception:
             pass
+
 
 async def _send_status_shot(sb: SB, channel: discord.abc.Messageable, caption: str, prefix: str):
     fd, tmp_path = tempfile.mkstemp(prefix=f"{prefix}_", suffix=".png", dir="/tmp")
@@ -89,6 +92,7 @@ async def _send_status_shot(sb: SB, channel: discord.abc.Messageable, caption: s
                 os.remove(tmp_path)
         except Exception:
             pass
+
 
 # ───────────────────────────────────────────────────────────
 # OpenCV-based on-screen template match and click
@@ -119,86 +123,121 @@ def _find_template_on_screen(template_path: str, threshold: float = 0.88):
         return (center_x, center_y)
     return None
 
+
 def _click_at(x: int, y: int):
     pyautogui.moveTo(x, y, duration=0.08)
     pyautogui.click()
 
+
 # ───────────────────────────────────────────────────────────
-# Login helpers (login only if needed)
+# Helper: What counts as "login URL"?
 # ───────────────────────────────────────────────────────────
 def _looks_like_login_url(url: str) -> bool:
     # RealPrize uses hash-bang for login route.
     return url is not None and "realprize.com/#!login" in url
 
-def _ensure_logged_in(sb: SB, username: str, password: str) -> bool:
+
+# ───────────────────────────────────────────────────────────
+# DEBUG LOGIN FLOW (with step-by-step screenshots)
+# ───────────────────────────────────────────────────────────
+async def _debug_login_flow(
+    sb: SB,
+    channel: discord.abc.Messageable,
+    username: str,
+    password: str,
+    context: str,
+) -> bool:
     """
-    Try to open the lobby. If we land on the login route (or form is visible), sign in.
-    Returns True if we appear logged in and at lobby; else False.
+    Perform the login sequence with heavy debug:
+      - Screenshot before typing
+      - Screenshot after typing
+      - Screenshot after clicking login
+      - Screenshot after redirect back to lobby
+    `context` is just a string tag for prefixes ("route_login", "modal_login", etc).
+    Returns True if we appear logged in (not stuck on login URL); else False.
     """
     try:
-        sb.uc_open_with_reconnect(LOBBY_URL, 3)
-        sb.wait_for_ready_state_complete()
-    except Exception:
-        pass
+        await _send_status_shot(
+            sb,
+            channel,
+            f"RealPrize {context}: On login form before typing credentials.",
+            f"realprize_{context}_before_typing",
+        )
 
-    cur = sb.get_current_url() or ""
-    if _looks_like_login_url(cur):
-        # Definitely on login
+        # Type creds
+        sb.type(f"input[id='{EMAIL_ID}']", username, timeout=12)
+        sb.type(f"input[id='{PASSWORD_ID}']", password, timeout=12)
+
+        await _send_status_shot(
+            sb,
+            channel,
+            f"RealPrize {context}: After typing credentials, before submitting.",
+            f"realprize_{context}_after_typing",
+        )
+
+        # Try primary login button
+        submitted = False
         try:
-            sb.type(f"input[id='{EMAIL_ID}']", username, timeout=12)
-            sb.type(f"input[id='{PASSWORD_ID}']", password, timeout=12)
+            sb.click(f"#{LOGIN_BTN_ID}", timeout=4)
+            submitted = True
+            print("[RealPrize] Clicked login button by ID.")
+        except Exception as e:
+            print(f"[RealPrize] Failed to click login button by ID: {e}")
 
-            submitted = False
+        # Fallback XPath
+        if not submitted:
             try:
-                sb.click(f"#{LOGIN_BTN_ID}", timeout=4)
+                sb.click_xpath(LOGIN_BTN_XPATH_FALLBACK, timeout=6)
                 submitted = True
-            except Exception:
-                pass
-            if not submitted:
-                try:
-                    sb.click_xpath(LOGIN_BTN_XPATH_FALLBACK, timeout=6)
-                    submitted = True
-                except Exception:
-                    submitted = False
+                print("[RealPrize] Clicked login button via fallback XPath.")
+            except Exception as e:
+                print(f"[RealPrize] Failed to click login button via XPath: {e}")
 
-            if not submitted:
-                print("[RealPrize] Could not submit login form.")
-                return False
+        await _send_status_shot(
+            sb,
+            channel,
+            f"RealPrize {context}: After attempting to submit login.",
+            f"realprize_{context}_after_submit",
+        )
 
-            sb.wait(5)
+        if not submitted:
+            await channel.send("RealPrize debug: could not submit login form at all.")
+            return False
+
+        # Give time to process login
+        sb.wait(5)
+        try:
             sb.open(LOBBY_URL)
             sb.wait_for_ready_state_complete()
-            time.sleep(2)
         except Exception as e:
-            print(f"[RealPrize] Login error: {e}")
-            return False
-    else:
-        # Might still be on a page that has the login form rendered in a modal.
-        # If so, attempt to detect email/password fields to decide.
-        try:
-            if sb.is_element_visible(f"input[id='{EMAIL_ID}']", timeout=2) and \
-               sb.is_element_visible(f"input[id='{PASSWORD_ID}']", timeout=2):
-                sb.type(f"input[id='{EMAIL_ID}']", username)
-                sb.type(f"input[id='{PASSWORD_ID}']", password)
-                try:
-                    sb.click(f"#{LOGIN_BTN_ID}", timeout=3)
-                except Exception:
-                    try:
-                        sb.click_xpath(LOGIN_BTN_XPATH_FALLBACK, timeout=4)
-                    except Exception:
-                        return False
-                sb.wait(5)
-                sb.open(LOBBY_URL)
-                sb.wait_for_ready_state_complete()
-                time.sleep(2)
-        except Exception:
-            pass
+            print(f"[RealPrize] Error navigating to lobby after login: {e}")
 
-    # If we’re still stuck on login, fail.
-    final_url = sb.get_current_url() or ""
-    if _looks_like_login_url(final_url):
+        time.sleep(2)
+
+        final_url = sb.get_current_url() or ""
+        await _send_status_shot(
+            sb,
+            channel,
+            f"RealPrize {context}: After redirect to lobby. final_url={final_url}",
+            f"realprize_{context}_after_redirect",
+        )
+
+        if _looks_like_login_url(final_url):
+            await channel.send("RealPrize debug: still on login URL after login attempt.")
+            return False
+
+        return True
+
+    except Exception as e:
+        print(f"[RealPrize] Exception inside _debug_login_flow ({context}): {e}")
+        await _send_status_shot(
+            sb,
+            channel,
+            f"RealPrize {context}: exception during login: {e}",
+            f"realprize_{context}_exception",
+        )
         return False
-    return True
+
 
 # ───────────────────────────────────────────────────────────
 # Main flow
@@ -215,12 +254,77 @@ async def realprize_uc(ctx, channel: discord.abc.Messageable):
 
     try:
         with SB(uc=True, headed=True) as sb:
-            # Open lobby and login only if needed
-            if not _ensure_logged_in(sb, username, password):
-                await _send_status_shot(sb, channel, "RealPrize: login failed (or session expired).", "realprize_login_failed")
+            # ── STEP 1: Open lobby URL ────────────────────────
+            try:
+                sb.uc_open_with_reconnect(LOBBY_URL, 3)
+                sb.wait_for_ready_state_complete()
+            except Exception as e:
+                print(f"[RealPrize] Error opening lobby: {e}")
+
+            await _send_status_shot(
+                sb,
+                channel,
+                "RealPrize STEP 1: After opening lobby URL.",
+                "realprize_step1_open_lobby",
+            )
+
+            cur = sb.get_current_url() or ""
+            print(f"[RealPrize] Current URL after lobby open: {cur}")
+            is_login_route = _looks_like_login_url(cur)
+
+            # ── STEP 2: Detect login page vs modal ────────────
+            login_modal_visible = False
+            try:
+                if sb.is_element_visible(f"input[id='{EMAIL_ID}']", timeout=3) and \
+                   sb.is_element_visible(f"input[id='{PASSWORD_ID}']", timeout=3):
+                    login_modal_visible = True
+            except Exception:
+                login_modal_visible = False
+
+            await _send_status_shot(
+                sb,
+                channel,
+                f"RealPrize STEP 2: URL={cur} | is_login_route={is_login_route} | login_modal_visible={login_modal_visible}",
+                "realprize_step2_url_and_modal_state",
+            )
+
+            # ── STEP 3: Run debug login flow if needed ────────
+            logged_in = True
+
+            if is_login_route:
+                # Hard login route (#!login)
+                logged_in = await _debug_login_flow(
+                    sb, channel, username, password, context="route_login"
+                )
+            elif login_modal_visible:
+                # Lobby but login modal showing
+                logged_in = await _debug_login_flow(
+                    sb, channel, username, password, context="modal_login"
+                )
+            else:
+                # Looks like we might already be logged in; still capture state.
+                await _send_status_shot(
+                    sb,
+                    channel,
+                    "RealPrize STEP 3: No explicit login form detected; assuming already logged in.",
+                    "realprize_step3_assume_logged_in",
+                )
+                final_url = sb.get_current_url() or ""
+                print(f"[RealPrize] Assuming logged in; final_url={final_url}")
+                # If we somehow are actually on login URL here, treat as not logged in.
+                if _looks_like_login_url(final_url):
+                    logged_in = False
+
+            if not logged_in:
+                await _send_status_shot(
+                    sb,
+                    channel,
+                    "RealPrize: login failed or still on login page after attempts.",
+                    "realprize_login_failed",
+                )
                 return
 
-            # Focus the window so PyAutoGUI clicks the right place
+            # ── STEP 4: Focus window & prep for OpenCV click ──
             try:
                 sb.activate_html_elements()  # harmless; ensures doc is interactive
             except Exception:
@@ -230,16 +334,23 @@ async def realprize_uc(ctx, channel: discord.abc.Messageable):
             except Exception:
                 pass
 
-            # Give the lobby a moment—popup should present quickly after page ready
             sb.wait_for_ready_state_complete()
             time.sleep(2.0)
 
-            # Try multiple scans over a short window in case of late popup animation
+            await _send_status_shot(
+                sb,
+                channel,
+                "RealPrize STEP 4: Lobby after login (before scanning for CLAIM popup).",
+                "realprize_step4_lobby_post_login",
+            )
+
+            # ── STEP 5: Scan for CLAIM popup via OpenCV ───────
             claimed = False
             start = time.time()
             while time.time() - start < 8.0:
                 loc = _find_template_on_screen(template_path, threshold=0.88)
                 if loc:
+                    await channel.send(f"RealPrize debug: CLAIM template found at {loc}, clicking…")
                     _click_at(*loc)
                     claimed = True
                     break
@@ -251,7 +362,12 @@ async def realprize_uc(ctx, channel: discord.abc.Messageable):
                 print("[RealPrize] Claimed via OpenCV click.")
             else:
                 # No image detected; still send a screenshot with 'unavailable'
-                await _send_status_shot(sb, channel, "RealPrize: bonus unavailable (no CLAIM button detected).", "realprize_unavailable")
+                await _send_status_shot(
+                    sb,
+                    channel,
+                    "RealPrize: bonus unavailable (no CLAIM button detected).",
+                    "realprize_unavailable",
+                )
                 print("[RealPrize] CLAIM button not found; reported unavailable.")
 
     except Exception as e:
@@ -259,6 +375,11 @@ async def realprize_uc(ctx, channel: discord.abc.Messageable):
         # Best-effort screenshot from a fresh SB if possible
         try:
             with SB(uc=True, headed=True) as sb2:
-                await _send_status_shot(sb2, channel, "RealPrize: error during automation.", "realprize_error")
+                await _send_status_shot(
+                    sb2,
+                    channel,
+                    "RealPrize: error during automation.",
+                    "realprize_error",
+                )
         except Exception:
             await channel.send("RealPrize: error during automation.")
