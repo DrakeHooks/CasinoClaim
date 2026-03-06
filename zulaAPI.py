@@ -221,9 +221,9 @@ async def zula_uc(ctx, channel: discord.abc.Messageable):
             collected = _try_click_any(
                 sb,
                 [
-                    "/html/body/div[5]/div/div[1]/div/div/div[2]/div[1]/div[2]/div[1]/div/button",
-                    "/html/body/div[6]/div/div[1]/div/div/div[2]/div[1]/div[2]/div[1]/div/button",
-                    "/html/body/div[4]/div/div[1]/div/div/div[2]/div[1]/div[2]/div[1]/div/button",
+                    "/html/body/div[6]/div/div[2]/div[1]/div/div[1]/div/div[3]/div/button",
+                    "/html/body/div[5]/div/div[2]/div[1]/div/div[1]/div/div[3]/div/button",
+                    "/html/body/div[4]/div/div[2]/div[1]/div/div[1]/div/div[3]/div/button"
                     "//button[contains(.,'Collect') and not(@disabled)]",
                     "//button[.//span[contains(.,'Collect')] and not(@disabled)]",
                     "//button[contains(.,'Claim') and not(@disabled)]",
