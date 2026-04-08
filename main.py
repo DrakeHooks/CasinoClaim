@@ -322,7 +322,6 @@ casino_loop_entries: List[CasinoLoopEntry] = [
     CasinoLoopEntry("globalpoker",   "GlobalPoker",       _run_globalpoker,     120),
     CasinoLoopEntry("jumbo",         "Jumbo",             _run_jumbo,           120),
     CasinoLoopEntry("spree",         "Spree",             _run_spree,           120),
-    CasinoLoopEntry("chipnwin",      "Chipnwin",          _run_chipnwin,        120),
     CasinoLoopEntry("fortunewheelz", "Fortune Wheelz",    _run_fortunewheelz,   120),
     CasinoLoopEntry("nolimitcoins",  "NoLimitCoins",      _run_nlc,             120),
     CasinoLoopEntry("spinquest",     "SpinQuest",         _run_spinquest,       120),
@@ -342,6 +341,8 @@ casino_loop_entries: List[CasinoLoopEntry] = [
     CasinoLoopEntry("zula",          "Zula Casino",       _run_zula,             1440),
     CasinoLoopEntry("sportzino",     "Sportzino",         _run_sportzino,        1440),
     CasinoLoopEntry("yaycasino",     "YayCasino",         _run_yaycasino,        1440),
+    CasinoLoopEntry("chipnwin",      "Chipnwin",          _run_chipnwin,     1440),
+
     # CasinoLoopEntry("smilescasino",  "Smiles Casino",     _run_smilescasino,    1440),
     # CasinoLoopEntry("luckyland",     "LuckyLand",         _run_luckyland,       1440),
 
