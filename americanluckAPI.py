@@ -195,7 +195,7 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
                     sb,
                     channel,
                     "americanluck_login_failed.png",
-                    "American Luck: Login failed or bonus unavailable.",
+                    "[American Luck] Login failed or bonus unavailable.",
                 )
                 return
 
@@ -210,7 +210,7 @@ async def americanluck_uc(ctx, channel: discord.abc.Messageable):
                     sb,
                     channel,
                     "americanluck_getcoins_missing.png",
-                    "American Luck: Could not open **Get Coins**. "
+                    "[American Luck] Could not open **Get Coins**. "
                     "Layout may have changed or bonus is unavailable.",
                 )
                 return
