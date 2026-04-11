@@ -12,8 +12,9 @@ import re
 import os
 import asyncio
 import discord
+import tempfile
 from dotenv import load_dotenv
-
+from seleniumbase import SB
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
@@ -87,6 +88,31 @@ def _is_logged_in(driver) -> bool:
         return True
     except NoSuchElementException:
         return False
+
+
+async def _send_status_shot(sb: SB, channel: discord.abc.Messageable, caption: str, prefix: str):
+    """
+    One-off screenshot for 'unavailable' or 'error' states.
+    Creates a temp file, attaches it, and cleans up.
+    """
+    fd, tmp_path = tempfile.mkstemp(prefix=f"{prefix}_", suffix=".png", dir="/tmp")
+    os.close(fd)
+    try:
+        sb.save_screenshot(tmp_path)
+        await channel.send(caption, file=discord.File(tmp_path))
+    except Exception:
+        # Fallback to text-only if screenshot fails
+        try:
+            await channel.send(caption)
+        except Exception:
+            pass
+    finally:
+        try:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except Exception:
+            pass
+
 
 
 def _clean_countdown(raw: str) -> str:
@@ -344,6 +370,11 @@ async def claim_chipnwin_bonus(ctx, driver, channel):
 
     if claimed:
         await channel.send("Chipnwin Daily Bonus Claimed!")
+        claim_screenshot = "chipnwin_claim.png"
+        driver.save_screenshot(claim_screenshot)
+        await channel.send(
+            file=discord.File(claim_screenshot)
+        )
         return
 
     # If not claimed, report countdown (since it should always exist)
@@ -393,3 +424,7 @@ async def spin_chipnwin_wheel(ctx, driver, channel):
         await channel.send("Chipnwin Wheel Spun!")
     else:
         await channel.send("[Chipnwin] spin not available (or could not click).")
+
+
+
+
