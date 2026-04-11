@@ -236,8 +236,8 @@ async def zula_uc(ctx, channel: discord.abc.Messageable):
                 await _send_post_claim(sb, channel, "zula_claimed.png", "Zula Daily Bonus Claimed!")
                 print("[Zula] Claimed successfully.")
             else:
-                print("[Zula] No claim available (likely already claimed).")
-                await _send_status_shot(sb, channel, "Zula: countdown not available (or auth failed).", "zula_unavailable")
+                print("[Zula] Bonus Unavailable (likely already claimed).")
+                await _send_status_shot(sb, channel, "[Zula] Bonus Unavailable (or auth failed).", "zula_unavailable")
 
     except Exception as e:
         print(f"[Zula][ERROR] Exception during automation: {e}")

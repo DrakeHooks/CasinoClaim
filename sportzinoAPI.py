@@ -233,7 +233,7 @@ async def Sportzino(ctx, driver, channel: discord.abc.Messageable):
             else:
                 print("[Sportzino] No claim available (likely already claimed).")
                 await _send_screenshot(sb, channel, "sportzino_unavailable.png",
-                                       "Sportzino: no claim available (likely already claimed).")
+                                       "[Sportzino] Bonus Unavailable (likely already claimed).")
                 return
 
     except Exception as e:

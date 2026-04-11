@@ -172,7 +172,7 @@ def fortunecoins_uc_blocking(bot, channel_id: int, main_loop: asyncio.AbstractEv
                         sb.save_screenshot(snap)
                     _send_file_threadsafe(main_loop, ch, snap, "Fortune Wins Daily Bonus Claimed!")
                 else:
-                    _send_text_threadsafe(main_loop, ch, "Fortune Wins: bonus unavailable (likely already collected).")
+                    _send_text_threadsafe(main_loop, ch, "[Fortune Wins] Bonus Unavailable (likely already collected).")
 
     except Exception:
         if ch:

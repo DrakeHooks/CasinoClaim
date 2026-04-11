@@ -179,7 +179,7 @@ async def yaycasino_uc(ctx, channel: discord.abc.Messageable):
 
             if not submitted:
                 print("[YayCasino][ERROR] Could not submit login.")
-                await _send_status_shot(sb, channel, "YayCasino: countdown not available (or auth failed).", "yaycasino_unavailable")
+                await _send_status_shot(sb, channel, "[YayCasino] Bonus Unavailable (or auth failed).", "yaycasino_unavailable")
                 return
 
 
@@ -237,12 +237,12 @@ async def yaycasino_uc(ctx, channel: discord.abc.Messageable):
                 print("[YayCasino] Claimed successfully.")
             else:
                 print("[YayCasino] No claim available (likely already claimed).")
-                await _send_status_shot(sb, channel, "YayCasino: bonus not available (or auth failed).", "yaycasino_unavailable")
+                await _send_status_shot(sb, channel, "[YayCasino] Bonus Unavailable (or auth failed).", "yaycasino_unavailable")
 
     except Exception as e:
         print(f"[YayCasino][ERROR] Exception during automation: {e}")
         try:
             with SB(uc=True, headed=True) as sb_fallback:
-                await _send_status_shot(sb_fallback, channel, "YayCasino: bonus not available (or auth failed).", "yaycasino_error")
+                await _send_status_shot(sb_fallback, channel, "[YayCasino] Bonus Unavailable (or auth failed).", "yaycasino_error")
         except Exception:
-            await channel.send("[YayCasino] bonus not available (or auth failed).")
+            await channel.send("[YayCasino] Bonus Unavailable (or auth failed).")
