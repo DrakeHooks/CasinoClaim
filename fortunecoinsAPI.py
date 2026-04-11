@@ -1,9 +1,9 @@
 # Drake Hooks + WaterTrooper
 # Casino Claim 2
-# Fortune Coins API (SeleniumBase UC) — thread-offloaded sync runner
+# Fortune Wins API (SeleniumBase UC) — thread-offloaded sync runner
 # Exposes:
-#   def fortunecoins_uc_blocking(bot, channel_id: int, main_loop):  # call from executor
-#   async def fortunecoins_uc(ctx, channel):  # optional thin async wrapper if you want it
+#   def fortunewins_uc_blocking(bot, channel_id: int, main_loop):  # call from executor
+#   async def fortunewins_uc(ctx, channel):  # optional thin async wrapper if you want it
 
 import os
 import time
@@ -74,7 +74,7 @@ def _try_click_any(sb: SB, xpaths, timeout_each=10) -> bool:
 # ───────────────────────────────────────────────────────────
 def fortunecoins_uc_blocking(bot, channel_id: int, main_loop: asyncio.AbstractEventLoop):
     """
-    Runs the entire Fortune Coins flow synchronously in a worker thread.
+    Runs the entire Fortune Wins flow synchronously in a worker thread.
     Posts messages back to the main Discord loop thread-safely.
     Keeps SeleniumBase's sb.uc_gui_click_captcha() intact.
     """
@@ -86,24 +86,24 @@ def fortunecoins_uc_blocking(bot, channel_id: int, main_loop: asyncio.AbstractEv
 
     ch = bot.get_channel(channel_id)
     if ch:
-        _send_text_threadsafe(main_loop, ch, "Launching **Fortune Coins** (UC)…")
+        _send_text_threadsafe(main_loop, ch, "Launching **Fortune Wins** (UC)…")
 
     try:
         # headed=True so GUI-captcha can operate a visible display (Xvfb)
         with SB(uc=True, headed=True) as sb:
             # Login
-            sb.uc_open_with_reconnect("https://fortunecoins.com/login", 4)
+            sb.uc_open_with_reconnect("https://fortunewins.com/login", 4)
             sb.wait_for_ready_state_complete()
             sb.type("input[id='emailAddress']", FC_EMAIL)
             time.sleep(1.5)
             sb.type("input[id='password']", FC_PASSWORD)
 
-            # You wanted to keep the GUI helper — keep it, but we're in a thread now.
+            # GUI helper, but we're in a thread now.
             with contextlib.suppress(Exception):
                 sb.uc_gui_click_captcha()
                 time.sleep(1.0)
 
-            _force_click_xpath(sb, "/html/body/div[1]/div[5]/div/div/div/div[2]/form/div[4]/button", timeout=12)
+            _force_click_xpath(sb, "/html/body/div[1]/div[2]/div[5]/div/section/div[2]/div/div/div[2]/form/div[4]/button", timeout=12)
             time.sleep(5.0)
             sb.refresh_page()
             sb.wait_for_ready_state_complete()
@@ -131,6 +131,15 @@ def fortunecoins_uc_blocking(bot, channel_id: int, main_loop: asyncio.AbstractEv
                 ],
                 timeout_each=10,
             )
+
+            #Free Coins Section 
+            _try_click_any(
+                sb,
+                [
+                    "/html/body/div[5]/div/div/div/div/div[2]/button[2]",
+                ],
+                timeout_each=10,
+            )
             sb.wait_for_ready_state_complete()
             time.sleep(10.0)
 
@@ -138,10 +147,9 @@ def fortunecoins_uc_blocking(bot, channel_id: int, main_loop: asyncio.AbstractEv
             collected = _try_click_any(
                 sb,
                 [
-                    "/html/body/div[5]/div/div[1]/div/div/div[2]/div/div[1]/div[2]/div[1]/div/div[3]/button[1]",
-                    "/html/body/div[4]/div/div[1]/div/div/div[2]/div/div[2]/div[2]/div[1]/div/div[3]/button[1]",
-                    "/html/body/div[4]/div/div[1]/div/div/div[2]/div/div[1]/div[2]/div[1]/div/div[3]/button[1]",
-                    "/html/body/div[6]/div/div[1]/div/div/div[2]/div/div[1]/div[2]/div[1]/div/div[3]/button[1]"
+                    "/html/body/div[5]/div/div/div/div/div[3]/div/div[1]/div[2]/div[1]/div/div[3]/button[2]",
+                    "/html/body/div[4]/div/div/div/div/div[3]/div/div[1]/div[2]/div[1]/div/div[3]/button[2]",
+                    "/html/body/div[6]/div/div/div/div/div[3]/div/div[1]/div[2]/div[1]/div/div[3]/button[2]",
                 ],
                 timeout_each=8,
             )
@@ -159,16 +167,16 @@ def fortunecoins_uc_blocking(bot, channel_id: int, main_loop: asyncio.AbstractEv
 
             if ch:
                 if collected:
-                    snap = "fc_uc_claimed.png"
+                    snap = "fw_uc_claimed.png"
                     with contextlib.suppress(Exception):
                         sb.save_screenshot(snap)
-                    _send_file_threadsafe(main_loop, ch, snap, "Fortune Coins Daily Bonus Claimed!")
+                    _send_file_threadsafe(main_loop, ch, snap, "Fortune Wins Daily Bonus Claimed!")
                 else:
-                    _send_text_threadsafe(main_loop, ch, "Fortune Coins: bonus unavailable (likely already collected).")
+                    _send_text_threadsafe(main_loop, ch, "Fortune Wins: bonus unavailable (likely already collected).")
 
     except Exception:
         if ch:
-            _send_text_threadsafe(main_loop, ch, "⚠️ Fortune Coins (UC) error")
+            _send_text_threadsafe(main_loop, ch, "⚠️ Fortune Wins (UC) error")
 
 # ───────────────────────────────────────────────────────────
 # Optional thin async wrapper (kept for compatibility; not used by executor path)

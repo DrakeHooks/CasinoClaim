@@ -1166,9 +1166,9 @@ async def fortunewheelz_cmd(ctx):
     await ctx.send("Checking Fortune Wheelz for bonus…")
     await fortunewheelz_flow(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
 
-@bot.command(name="fortunecoins", aliases=["fortune coins", "fc"])
+@bot.command(name="fortunewins", aliases=["fortune wins", "fw","fortune coins", "fc"])
 async def fortunecoins_cmd(ctx):
-    await ctx.send("Checking Fortune Coins for bonus…")
+    await ctx.send("Checking Fortune Wins for bonus…")
     channel = bot.get_channel(DISCORD_CHANNEL)
     loop = asyncio.get_running_loop()
     from fortunecoinsAPI import fortunecoins_uc_blocking
