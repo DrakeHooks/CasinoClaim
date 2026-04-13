@@ -1166,9 +1166,9 @@ async def fortunewheelz_cmd(ctx):
     await ctx.send("Checking Fortune Wheelz for bonus…")
     await fortunewheelz_flow(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
 
-@bot.command(name="fortunecoins", aliases=["fortunecoins", "fortune coins", "fortunewins", "fortune wins", "fw", "fc"])
+@bot.command(name="fortunewins", aliases=["fortune wins", "fw","fortune coins", "fc"])
 async def fortunecoins_cmd(ctx):
-    await ctx.send("Checking Fortune Coins for bonus…")
+    await ctx.send("Checking Fortune Wins for bonus…")
     channel = bot.get_channel(DISCORD_CHANNEL)
     loop = asyncio.get_running_loop()
     from fortunecoinsAPI import fortunecoins_uc_blocking
@@ -1272,7 +1272,6 @@ async def debug_cmd(ctx, *, casino: str):
         "rollingriches": lambda: rolling_riches_casino(ctx, driver, channel),
         "luckyland":     lambda: luckyland_uc(ctx, channel),
         "stake":         lambda: stake_claim(driver, bot, ctx, channel),
-        "fortunecoins":  lambda: fortunecoins_cmd(ctx),
         "fortunewheelz": lambda: fortunewheelz_flow(ctx, driver, channel),
         "spinquest":     lambda: spinquest_flow(ctx, driver, channel),
         "spinpals":      lambda: spinpals_flow(ctx, driver, channel),
@@ -1286,9 +1285,6 @@ async def debug_cmd(ctx, *, casino: str):
         "nlc": "nolimitcoins",
         "gp": "globalpoker",
         "fc": "fortunecoins",
-        "fw": "fortunecoins",
-        "fortunecoins": "fortunecoins",
-        "fortunewins": "fortunecoins",
         "rr": "rollingriches",
         "jb": "jefebet",
         "jefe": "jefebet",
