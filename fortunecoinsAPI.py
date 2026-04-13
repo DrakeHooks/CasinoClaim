@@ -15,8 +15,32 @@ import asyncio
 
 load_dotenv()
 
-FC_EMAIL = os.getenv("FORTUNECOINSEMAIL", "")
-FC_PASSWORD = os.getenv("FORTUNECOINSPASSWORD", "")
+def _first_env(*names: str) -> str:
+    """
+    Return the first non-empty environment variable from the provided names.
+    Accepts both Fortune Coins and Fortune Wins naming conventions.
+    """
+    for name in names:
+        value = os.getenv(name, "").strip()
+        if value:
+            return value
+    return ""
+# ───────────────────────────────────────────────────────────
+# Accepts old fortunecoins creds or new fortunewins creds
+# ───────────────────────────────────────────────────────────
+FC_EMAIL = _first_env(
+    "FORTUNECOINSEMAIL",
+    "FORTUNECOINS_EMAIL",
+    "FORTUNEWINSEMAIL",
+    "FORTUNEWINS_EMAIL",
+)
+
+FC_PASSWORD = _first_env(
+    "FORTUNECOINSPASSWORD",
+    "FORTUNECOINS_PASSWORD",
+    "FORTUNEWINSPASSWORD",
+    "FORTUNEWINS_PASSWORD",
+)
 
 # ───────────────────────────────────────────────────────────
 # Discord helpers (safe to call from a worker thread)
@@ -81,7 +105,7 @@ def fortunecoins_uc_blocking(bot, channel_id: int, main_loop: asyncio.AbstractEv
     if not FC_EMAIL or not FC_PASSWORD:
         ch = bot.get_channel(channel_id)
         if ch:
-            _send_text_threadsafe(main_loop, ch, "❌ Missing `FORTUNECOINSEMAIL` or `FORTUNECOINSPASSWORD` in your .env.")
+            _send_text_threadsafe(main_loop, ch, "❌ Missing Fortune Coins/Fortune Wins credentials in your `.env`. Supported keys: `FORTUNECOINSEMAIL` / `FORTUNECOINSPASSWORD`, `FORTUNECOINS_EMAIL` / `FORTUNECOINS_PASSWORD`, `FORTUNEWINSEMAIL` / `FORTUNEWINSPASSWORD`, or `FORTUNEWINS_EMAIL` / `FORTUNEWINS_PASSWORD`.")
         return
 
     ch = bot.get_channel(channel_id)
@@ -172,7 +196,18 @@ def fortunecoins_uc_blocking(bot, channel_id: int, main_loop: asyncio.AbstractEv
                         sb.save_screenshot(snap)
                     _send_file_threadsafe(main_loop, ch, snap, "Fortune Wins Daily Bonus Claimed!")
                 else:
-                    _send_text_threadsafe(main_loop, ch, "[Fortune Wins] Bonus Unavailable (likely already collected).")
+                    snap = "fw_uc_unavailable.png"
+                    with contextlib.suppress(Exception):
+                        sb.save_screenshot(snap)
+                    if os.path.exists(snap):
+                        _send_file_threadsafe(
+                            main_loop,
+                            ch,
+                            snap,
+                            "[Fortune Wins] Bonus Unavailable (likely already collected).",
+                        )
+                    else:
+                        _send_text_threadsafe(main_loop, ch, "[Fortune Wins] Bonus Unavailable (likely already collected).")
 
     except Exception:
         if ch:
