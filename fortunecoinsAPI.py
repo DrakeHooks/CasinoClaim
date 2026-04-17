@@ -160,6 +160,7 @@ def fortunecoins_uc_blocking(bot, channel_id: int, main_loop: asyncio.AbstractEv
             _try_click_any(
                 sb,
                 [
+                    "/html/body/div[5]/div/div/div/div/div[2]/button",
                     "/html/body/div[5]/div/div/div/div/div[2]/button[2]",
                 ],
                 timeout_each=10,
