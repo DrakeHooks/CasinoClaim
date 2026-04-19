@@ -1,9 +1,8 @@
 # Drake Hooks + WaterTrooper
 # Casino Claim 2
 # Real Prize API
-# Version 3.1
-# Updated 2026.04.18
-# Notes:
+# Version 3.2
+# Updated 2026.04.19
 
 import re
 import os
@@ -14,7 +13,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementClickInterceptedException
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
 # ───────────────────────────────────────────────────────────
 # Config & Constants
@@ -24,20 +23,18 @@ REALPRIZE_CRED = os.getenv("REALPRIZE")  # format "username:password"
 
 SITE_URL = "https://realprize.com"
 
-LOGIN_BUTTON_XPATH = ("//a[@class='site-header__login-btn btn-login']")
+LOGIN_BUTTON_XPATH = "//a[@class='site-header__login-btn btn-login']"
+LOGIN_EMAIL_ID = "logemailnbtn"
+EMAIL_INPUT_XPATH = "//input[@id='poplogin_email']"
+PASSWORD_INPUT_XPATH = "//input[@id='poplogin_password']"
+LOGIN_SUBMIT_XPATH = "//button[@id='poploginbtn']"
 
-LOGIN_EMAIL_ID = ("logemailnbtn")
-EMAIL_INPUT_XPATH = ("//input[@id='poplogin_email']")
-PASSWORD_INPUT_XPATH = ("//input[@id='poplogin_password']")
-LOGIN_SUBMIT_XPATH = ("//button[@id='poploginbtn']")
-
-DAILYBONUS_BUTTON_XPATH = ("//div[@class='daily_button']")
+DAILYBONUS_BUTTON_XPATH = "//div[@class='daily_button']"
 
 # ───────────────────────────────────────────────────────────
-# 0) Real Prize Helpers
+# Helpers
 # ───────────────────────────────────────────────────────────
 def _is_logged_in(driver) -> bool:
-    """Detect if already logged in."""
     try:
         driver.find_element(By.XPATH, "//div[@class='gcnum']")
         return True
@@ -50,7 +47,7 @@ def _is_logged_in(driver) -> bool:
         return False
 
 # ───────────────────────────────────────────────────────────
-# 1) Login & then hand off to claim
+# Login Flow
 # ───────────────────────────────────────────────────────────
 async def realprize_casino(ctx, driver, channel):
     if not REALPRIZE_CRED:
@@ -59,75 +56,116 @@ async def realprize_casino(ctx, driver, channel):
 
     username, password = REALPRIZE_CRED.split(":", 1)
 
-    # 1a) Navigate to site
     print("[Real Prize] Navigating to site...")
     driver.get(SITE_URL)
     await asyncio.sleep(10)
 
     if _is_logged_in(driver):
-        print("[Real Prize] Already logged in, skipping login.")
+        print("[Real Prize] Already logged in.")
         await claim_realprize_bonus(ctx, driver, channel)
         return
 
-    # 1b) Login to site
-    print("[Real Prize] Attempting to login...")
+    print("[Real Prize] Attempting login...")
+
     try:
         try:
-            login = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, LOGIN_BUTTON_XPATH)))
+            login = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, LOGIN_BUTTON_XPATH))
+            )
             login.click()
-            await asyncio.sleep(10)
+            await asyncio.sleep(5)
         except Exception:
-            print("[Real Prize] Unable to click login button.")
+            print("[Real Prize] Login button failed")
 
         try:
-            login_email = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, LOGIN_EMAIL_ID)))
+            login_email = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.ID, LOGIN_EMAIL_ID))
+            )
             login_email.click()
-            await asyncio.sleep(5)
+            await asyncio.sleep(3)
         except Exception:
-            print("[Real Prize] Unable to click login with email button.")
+            print("[Real Prize] Email login button failed")
 
         try:
-            email = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, EMAIL_INPUT_XPATH)))
+            email = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, EMAIL_INPUT_XPATH))
+            )
             email.send_keys(username)
-            await asyncio.sleep(5)
         except Exception:
-            print("[Real Prize] Unable to enter email.")
+            print("[Real Prize] Email input failed")
 
         try:
-            pw = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, PASSWORD_INPUT_XPATH)))
+            pw = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, PASSWORD_INPUT_XPATH))
+            )
             pw.send_keys(password)
-            await asyncio.sleep(5)
         except Exception:
-            print("[Real Prize] Unable to enter password.")
+            print("[Real Prize] Password input failed")
 
         try:
-            empw_ln_btn = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, LOGIN_SUBMIT_XPATH)))
-            empw_ln_btn.click()
-            print("[Real Prize] Submitted credentials.")
+            submit = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, LOGIN_SUBMIT_XPATH))
+            )
+            submit.click()
             await asyncio.sleep(10)
         except Exception:
-            print("[Real Prize] Unable to click login submit button.")
+            print("[Real Prize] Submit failed")
 
-        # Now that we're logged in, try claiming
         await claim_realprize_bonus(ctx, driver, channel)
 
     except TimeoutException as e:
         screenshot = "realprize_login_error.png"
         driver.save_screenshot(screenshot)
-        await channel.send("Real Prize login timed out, will retry later.",file=discord.File(screenshot))
+
+        await channel.send(
+            "❌ Real Prize login timed out.",
+            file=discord.File(screenshot)
+        )
+
         os.remove(screenshot)
         print("Login timeout:", e)
 
 # ───────────────────────────────────────────────────────────
-# 2) Click Claim Button
+# Claim Bonus
 # ───────────────────────────────────────────────────────────
 async def claim_realprize_bonus(ctx, driver, channel):
-        # 2a) Click the “Collect” button
-        print("[Real Prize] Attempting to claim daily bonus...")
+    print("[Real Prize] Attempting claim...")
+
+    try:
+        claim = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, DAILYBONUS_BUTTON_XPATH))
+        )
+
+        # normal click
         try:
-            claim = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, DAILYBONUS_BUTTON_XPATH)))
             claim.click()
-            await asyncio.sleep(5)
-            await channel.send("Real Prize Daily Bonus Claimed!")
         except Exception:
-            print("[Real Prize] Unable to claim daily bonus.")
+            # fallback JS click (very important for these sites)
+            driver.execute_script("arguments[0].click();", claim)
+
+        await asyncio.sleep(5)
+
+        # 📸 success screenshot
+        screenshot = "realprize_claim.png"
+        driver.save_screenshot(screenshot)
+
+        await channel.send(
+            "Real Prize Daily Bonus Claimed!",
+            file=discord.File(screenshot)
+        )
+
+        os.remove(screenshot)
+
+    except Exception as e:
+        print("[Real Prize] Claim failed:", e)
+
+        # 📸 error screenshot
+        screenshot = "realprize_claim_error.png"
+        driver.save_screenshot(screenshot)
+
+        await channel.send(
+            "[Real Prize] daily bonus unavailable.",
+            file=discord.File(screenshot)
+        )
+
+        os.remove(screenshot)

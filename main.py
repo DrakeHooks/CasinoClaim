@@ -1,5 +1,5 @@
 # Drake Hooks
-# Casino Claim 2
+# Casino Claim 3
 # Never Miss a Casino Bonus Again! A discord app for claiming social casino bonuses.
 
 import os
@@ -268,6 +268,7 @@ class CasinoLoopEntry:
     display_name: str
     runner: Callable[[discord.abc.Messageable], Awaitable[None]]
     interval_minutes: float
+    enabled: bool = True
     next_run: dt = field(default_factory=lambda: dt.datetime.now(dt.timezone.utc))
 
     def schedule_next(self):
@@ -353,6 +354,10 @@ def reset_loop_schedule():
     for i, entry in enumerate(casino_loop_entries):
         entry.next_run = base + dt.timedelta(seconds=i * LOOP_STAGGER_SECONDS)
 
+def find_loop_entry(casino: str) -> Optional[CasinoLoopEntry]:
+    casino = (casino or "").strip().lower()
+    return next((e for e in casino_loop_entries if e.key.lower() == casino), None)
+
 main_loop_task: Optional[asyncio.Task] = None
 main_loop_running = False
 
@@ -365,6 +370,8 @@ async def run_main_loop(channel: discord.abc.Messageable):
         while main_loop_running:
             now = dt.datetime.now(dt.timezone.utc)
             for entry in casino_loop_entries:
+                if not entry.enabled:
+                    continue
                 if now >= entry.next_run:
                     try:
                         await asyncio.wait_for(entry.runner(channel), timeout=PER_CASINO_TIMEOUT_SEC)
@@ -979,11 +986,19 @@ async def reset_cmd(ctx, mode: str = ""):
 
 def format_loop_config() -> str:
     status = "running" if is_main_loop_running() else "stopped"
-    lines = ["🎛️ **Casino loop configuration**", f"Status: **{status}**", "Order and intervals:"]
+    lines = ["🎛️ **Casino loop configuration**", f"Status: **{status}**", "Order, state, and intervals:"]
     for i, e in enumerate(casino_loop_entries, 1):
-        lines.append(f"{i}. {e.display_name} (`{e.key}`) – every {e.interval_minutes:.1f} minutes")
-    lines += ["", "Use `!config interval <casino> <minutes>` to change an interval.",
-              "Use `!config order <casino1> <casino2> ...>` to set a new run order."]
+        state = "enabled" if e.enabled else "disabled"
+        lines.append(
+            f"{i}. {e.display_name} (`{e.key}`) – **{state}** – every {e.interval_minutes:.1f} minutes"
+        )
+    lines += [
+        "",
+        "Use `!config interval <casino> <minutes>` to change an interval.",
+        "Use `!config enable <casino>` to enable a casino in the loop.",
+        "Use `!config disable <casino>` to disable a casino in the loop.",
+        "Use `!config order <casino1> <casino2> ...>` to set a new run order.",
+    ]
     return "\n".join(lines)
 
 from discord.ext import commands as dcommands
@@ -994,7 +1009,7 @@ bot.add_command(_config)
 
 @_config.command(name="interval")
 async def config_interval(ctx: dcommands.Context, casino: str, minutes: float):
-    target = next((e for e in casino_loop_entries if e.key.lower() == casino.lower()), None)
+    target = find_loop_entry(casino)
     if not target:
         await ctx.send(f"Casino `{casino}` is not part of the automated loop.")
         return
@@ -1004,6 +1019,31 @@ async def config_interval(ctx: dcommands.Context, casino: str, minutes: float):
     target.interval_minutes = minutes
     target.next_run = dt.datetime.now(dt.timezone.utc)
     await ctx.send(f"Updated {target.display_name} to run every {minutes:.1f} minutes.")
+
+@_config.command(name="enable")
+async def config_enable(ctx: dcommands.Context, casino: str):
+    target = find_loop_entry(casino)
+    if not target:
+        await ctx.send(f"Casino `{casino}` is not part of the automated loop.")
+        return
+    if target.enabled:
+        await ctx.send(f"{target.display_name} is already enabled.")
+        return
+    target.enabled = True
+    target.next_run = dt.datetime.now(dt.timezone.utc)
+    await ctx.send(f"✅ Enabled {target.display_name} in the automated loop.")
+
+@_config.command(name="disable")
+async def config_disable(ctx: dcommands.Context, casino: str):
+    target = find_loop_entry(casino)
+    if not target:
+        await ctx.send(f"Casino `{casino}` is not part of the automated loop.")
+        return
+    if not target.enabled:
+        await ctx.send(f"{target.display_name} is already disabled.")
+        return
+    target.enabled = False
+    await ctx.send(f"⏸️ Disabled {target.display_name} in the automated loop.")
 
 @_config.command(name="order")
 async def config_order(ctx: dcommands.Context, *casinos: str):
@@ -1019,7 +1059,6 @@ async def config_order(ctx: dcommands.Context, *casinos: str):
     casino_loop_entries[:] = [lookup[k] for k in desired]
     reset_loop_schedule()
     await ctx.send("Casino loop order updated.\n" + format_loop_config())
-
 @bot.command(name="ping")
 async def ping(ctx): await ctx.send("Pong")
 
@@ -1508,7 +1547,7 @@ async def help_cmd(ctx):
 
 ---------------------------------------  
 ⚙️ **General:**  
-!ping, !restart, !help, !start, !stop, !about, !config, !reset
+!ping, !restart, !help, !start, !stop, !about, !config, !reset\nExamples: `!config disable spinquest`, `!config enable spinquest`
 """)
 
 # ───────────────────────────────────────────────────────────
