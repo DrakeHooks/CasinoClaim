@@ -111,13 +111,13 @@ async def claim_global_poker_bonus(ctx, driver, channel):
 
         # List of possible claim button XPaths
         button_xpaths = [
-            "/html/body/div[11]/div/div/div[2]/div[2]/div[2]/div/div[2]/div[2]/div[1]",
-            "/html/body/div[11]/div/div/div[2]/div[2]/div[2]/div/div[2]/div[2]/div[2]",
-            "/html/body/div[11]/div/div/div[2]/div[2]/div[2]/div/div[2]/div[2]/div[3]",
-            "/html/body/div[11]/div/div/div[2]/div[2]/div[2]/div/div[2]/div[2]/div[4]",
-            "/html/body/div[11]/div/div/div[2]/div[2]/div[2]/div/div[2]/div[2]/div[5]",
-            "/html/body/div[11]/div/div/div[2]/div[2]/div[2]/div/div[2]/div[2]/div[6]",
-            "/html/body/div[11]/div/div/div[2]/div[2]/div[2]/div/div[2]/div[2]/div[7]"
+            "/html/body/div[9]/div/div/div[2]/div[2]/div[2]/div/div[2]/div[2]/div[1]",
+            "/html/body/div[9]/div/div/div[2]/div[2]/div[2]/div/div[2]/div[2]/div[2]",
+            "/html/body/div[9]/div/div/div[2]/div[2]/div[2]/div/div[2]/div[2]/div[3]",
+            "/html/body/div[9]/div/div/div[2]/div[2]/div[2]/div/div[2]/div[2]/div[4]",
+            "/html/body/div[9]/div/div/div[2]/div[2]/div[2]/div/div[2]/div[2]/div[5]",
+            "/html/body/div[9]/div/div/div[2]/div[2]/div[2]/div/div[2]/div[2]/div[6]",
+            "/html/body/div[9]/div/div/div[2]/div[2]/div[2]/div/div[2]/div[2]/div[7]"
         ]
 
         # Loop through the possible claim buttons and attempt to click each one
