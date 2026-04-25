@@ -215,6 +215,7 @@ async def Sportzino(ctx, driver, channel: discord.abc.Messageable):
                 sb,
                 [
                     # Common modal/button guesses
+                    "/html/body/div[1]/div[1]/div/div/div[2]/div[2]/div[2]/div[1]/div/div[3]/div/div[1]/button",
                     "/html/body/div[5]/div/div[1]/div/div/div[2]/div[2]/div[2]/div[1]/div/div[3]/div/div[1]/button",
                     "/html/body/div[4]/div/div[1]/div/div/div[2]/div[2]/div[2]/div[1]/div/div[3]/div/div[1]/button",
                     "//button[contains(.,'Collect') and not(@disabled)]",
