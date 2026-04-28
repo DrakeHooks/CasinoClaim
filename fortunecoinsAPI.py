@@ -1,32 +1,39 @@
 # Drake Hooks + WaterTrooper
 # Casino Claim 2
-# Fortune Wins API (SeleniumBase UC) — thread-offloaded sync runner
-# Exposes:
-#   def fortunewins_uc_blocking(bot, channel_id: int, main_loop):  # call from executor
-#   async def fortunewins_uc(ctx, channel):  # optional thin async wrapper if you want it
+# Fortune Wins API - SeleniumBase UC
 #
-# Notes:
-# - Accepts either Fortune Coins or Fortune Wins credentials from .env
-# - Much more reliable "FREE COINS" tab click logic
-# - Last-resort keyboard fallback: TAB x4, then ENTER
+# Exposes:
+#   def fortunewins_uc_blocking(bot, channel_id: int, main_loop)
+#   async def fortunewins_uc(ctx, channel)
+#
+# Backwards-compatible aliases:
+#   fortunecoins_uc_blocking(...)
+#   fortunecoins_uc(...)
 
 import os
 import time
-import contextlib
 import asyncio
+import contextlib
+from pathlib import Path
 
+import discord
 from dotenv import load_dotenv
 from seleniumbase import SB
-import discord
+
 
 load_dotenv()
 
 
-def _first_env(*names: str) -> str:
-    """
-    Return the first non-empty environment variable from the provided names.
-    Accepts both Fortune Coins and Fortune Wins naming conventions.
-    """
+LOGIN_URL = "https://fortunewins.com/login"
+SCREENSHOT_DIR = Path("screenshots")
+SCREENSHOT_DIR.mkdir(exist_ok=True)
+
+
+# ─────────────────────────────────────────────────────────────
+# ENV
+# ─────────────────────────────────────────────────────────────
+
+def first_env(*names: str) -> str:
     for name in names:
         value = os.getenv(name, "").strip()
         if value:
@@ -34,246 +41,195 @@ def _first_env(*names: str) -> str:
     return ""
 
 
-# ───────────────────────────────────────────────────────────
-# Accept old fortunecoins creds or new fortunewins creds
-# ───────────────────────────────────────────────────────────
-FC_EMAIL = _first_env(
-    "FORTUNECOINSEMAIL",
-    "FORTUNECOINS_EMAIL",
+FW_EMAIL = first_env(
     "FORTUNEWINSEMAIL",
     "FORTUNEWINS_EMAIL",
+    "FORTUNECOINSEMAIL",
+    "FORTUNECOINS_EMAIL",
 )
 
-FC_PASSWORD = _first_env(
-    "FORTUNECOINSPASSWORD",
-    "FORTUNECOINS_PASSWORD",
+FW_PASSWORD = first_env(
     "FORTUNEWINSPASSWORD",
     "FORTUNEWINS_PASSWORD",
+    "FORTUNECOINSPASSWORD",
+    "FORTUNECOINS_PASSWORD",
 )
 
 
-# ───────────────────────────────────────────────────────────
-# Discord helpers (safe to call from a worker thread)
-# ───────────────────────────────────────────────────────────
-def _send_text_threadsafe(
-    main_loop: asyncio.AbstractEventLoop,
-    channel: discord.abc.Messageable,
-    text: str,
-):
-    fut = asyncio.run_coroutine_threadsafe(channel.send(text), main_loop)
+# ─────────────────────────────────────────────────────────────
+# DISCORD HELPERS
+# ─────────────────────────────────────────────────────────────
+
+def send_text(main_loop: asyncio.AbstractEventLoop, channel: discord.abc.Messageable, text: str):
+    future = asyncio.run_coroutine_threadsafe(channel.send(text), main_loop)
     with contextlib.suppress(Exception):
-        fut.result(timeout=20)
+        future.result(timeout=20)
 
 
-def _send_file_threadsafe(
+def send_file(
     main_loop: asyncio.AbstractEventLoop,
     channel: discord.abc.Messageable,
     path: str,
     caption: str,
 ):
-    async def _do():
+    async def _send():
         try:
             await channel.send(caption, file=discord.File(path))
         finally:
             with contextlib.suppress(Exception):
                 os.remove(path)
 
-    fut = asyncio.run_coroutine_threadsafe(_do(), main_loop)
+    future = asyncio.run_coroutine_threadsafe(_send(), main_loop)
     with contextlib.suppress(Exception):
-        fut.result(timeout=60)
+        future.result(timeout=60)
 
 
-# ───────────────────────────────────────────────────────────
-# Generic Selenium helpers
-# ───────────────────────────────────────────────────────────
-def _wait_small(seconds: float):
+def notify(main_loop, channel, message: str):
+    if channel:
+        send_text(main_loop, channel, message)
+
+
+def screenshot_and_send(sb, main_loop, channel, filename: str, caption: str):
+    if not channel:
+        return
+
+    path = str(SCREENSHOT_DIR / filename)
+
+    with contextlib.suppress(Exception):
+        sb.save_screenshot(path)
+
+    if os.path.exists(path):
+        send_file(main_loop, channel, path, caption)
+    else:
+        send_text(main_loop, channel, caption)
+
+
+# ─────────────────────────────────────────────────────────────
+# BASIC SELENIUM HELPERS
+# ─────────────────────────────────────────────────────────────
+
+def sleep(seconds: float):
     time.sleep(seconds)
 
 
-def _xpath_exists(sb: SB, xpath: str) -> bool:
+def wait_ready(sb):
+    with contextlib.suppress(Exception):
+        sb.wait_for_ready_state_complete()
+
+
+def visible(sb, selector: str, timeout: int = 8) -> bool:
     try:
-        return bool(sb.is_element_present(xpath))
+        sb.wait_for_element_visible(selector, timeout=timeout)
+        return True
     except Exception:
         return False
 
 
-def _css_exists(sb: SB, selector: str) -> bool:
+def click_css(sb, selector: str, timeout: int = 8) -> bool:
     try:
-        return bool(sb.is_element_present(selector))
+        sb.wait_for_element_visible(selector, timeout=timeout)
+        sb.scroll_to(selector)
+        sleep(0.3)
+        sb.click(selector)
+        return True
     except Exception:
         return False
 
 
-def _safe_scroll_into_view(sb: SB, selector_or_xpath: str, by_xpath: bool = False):
-    try:
-        if by_xpath:
-            el = sb.find_element(selector_or_xpath, by="xpath")
-        else:
-            el = sb.find_element(selector_or_xpath)
-        sb.execute_script(
-            """
-            arguments[0].scrollIntoView({
-                block: 'center',
-                inline: 'center',
-                behavior: 'instant'
-            });
-            """,
-            el,
-        )
-        _wait_small(0.4)
-    except Exception:
-        pass
-
-
-def _real_click_element(sb: SB, element) -> bool:
-    """
-    Tries several increasingly forceful click styles on a specific element.
-    """
+def js_click_element(sb, element) -> bool:
     try:
         sb.execute_script(
             """
-            arguments[0].scrollIntoView({
-                block: 'center',
-                inline: 'center',
-                behavior: 'instant'
+            const el = arguments[0];
+            el.scrollIntoView({ block: "center", inline: "center" });
+
+            ["pointerdown", "mousedown", "pointerup", "mouseup", "click"].forEach(type => {
+                el.dispatchEvent(new MouseEvent(type, {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window
+                }));
             });
+
+            try { el.click(); } catch (e) {}
             """,
             element,
         )
-    except Exception:
-        pass
-
-    click_scripts = [
-        # Native click
-        "arguments[0].click();",
-        # Mouse event sequence
-        """
-        const el = arguments[0];
-        ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(type => {
-            el.dispatchEvent(new MouseEvent(type, {
-                bubbles: true,
-                cancelable: true,
-                view: window
-            }));
-        });
-        """,
-    ]
-
-    # First attempt: Selenium native click
-    with contextlib.suppress(Exception):
-        element.click()
         return True
-
-    # Then JS methods
-    for script in click_scripts:
-        try:
-            sb.execute_script(script, element)
-            return True
-        except Exception:
-            continue
-
-    return False
-
-
-def _force_click_xpath(sb: SB, xpath: str, timeout: float = 12) -> bool:
-    try:
-        sb.wait_for_element_visible(xpath, by="xpath", timeout=timeout)
     except Exception:
         return False
 
-    _safe_scroll_into_view(sb, xpath, by_xpath=True)
 
-    for mode in ("click_xpath", "slow_click_xpath", "js_click_xpath", "direct_js"):
-        try:
-            if mode == "click_xpath":
-                sb.click(xpath, by="xpath", timeout=2)
-            elif mode == "slow_click_xpath":
-                el = sb.find_element(xpath, by="xpath")
-                _real_click_element(sb, el)
-            elif mode == "js_click_xpath":
-                el = sb.find_element(xpath, by="xpath")
-                sb.execute_script("arguments[0].click();", el)
-            else:
-                el = sb.find_element(xpath, by="xpath")
-                sb.execute_script(
-                    """
-                    ['pointerdown','mousedown','pointerup','mouseup','click'].forEach(type => {
-                        arguments[0].dispatchEvent(new MouseEvent(type, {
-                            bubbles: true,
-                            cancelable: true,
-                            view: window
-                        }));
-                    });
-                    """,
-                    el,
-                )
-            return True
-        except Exception:
-            continue
-
-    return False
+def click_xpath(sb, xpath: str, timeout: int = 8) -> bool:
+    try:
+        sb.wait_for_element_visible(xpath, by="xpath", timeout=timeout)
+        element = sb.find_element(xpath, by="xpath")
+        return js_click_element(sb, element)
+    except Exception:
+        return False
 
 
-def _try_click_any_xpath(sb: SB, xpaths, timeout_each=8) -> bool:
-    for xp in xpaths:
-        if _force_click_xpath(sb, xp, timeout=timeout_each):
+def click_any_xpath(sb, xpaths, timeout: int = 5) -> bool:
+    for xpath in xpaths:
+        if click_xpath(sb, xpath, timeout=timeout):
             return True
     return False
 
 
-def _click_first_visible_css(sb: SB, selectors, timeout_each=6) -> bool:
-    for selector in selectors:
-        try:
-            sb.wait_for_element_visible(selector, timeout=timeout_each)
-            _safe_scroll_into_view(sb, selector, by_xpath=False)
-            el = sb.find_element(selector)
-            if _real_click_element(sb, el):
-                return True
-        except Exception:
-            continue
-    return False
-
-
-def _js_find_button_by_text_and_click(sb: SB, text_snippets) -> bool:
+def click_by_text(sb, text_options, selectors="button, [role='button'], a, div, span") -> bool:
     """
-    Find a visible button-like element whose text contains any provided snippet.
+    Clicks the first visible element whose text contains one of the given strings.
     """
     script = """
-    const snippets = arguments[0].map(s => String(s).toUpperCase());
-    const els = Array.from(document.querySelectorAll('button, [role="button"], div, span, a'));
+    const wanted = arguments[0].map(t => String(t).trim().toUpperCase());
+    const selectors = arguments[1];
 
-    function isVisible(el) {
+    const els = Array.from(document.querySelectorAll(selectors));
+
+    function visible(el) {
         const style = window.getComputedStyle(el);
         const rect = el.getBoundingClientRect();
+
         return (
-            style.display !== 'none' &&
-            style.visibility !== 'hidden' &&
-            style.opacity !== '0' &&
+            style.display !== "none" &&
+            style.visibility !== "hidden" &&
+            style.opacity !== "0" &&
             rect.width > 0 &&
             rect.height > 0
         );
     }
 
-    const candidates = els.filter(el => {
-        if (!isVisible(el)) return false;
-        const text = (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim().toUpperCase();
+    const matches = els.filter(el => {
+        if (!visible(el)) return false;
+
+        const text = (el.innerText || el.textContent || "")
+            .replace(/\\s+/g, " ")
+            .trim()
+            .toUpperCase();
+
         if (!text) return false;
-        return snippets.some(s => text.includes(s));
+
+        return wanted.some(w => text.includes(w));
     });
 
-    // Prefer actual buttons first
-    candidates.sort((a, b) => {
-        const aScore = (a.tagName === 'BUTTON' ? 10 : 0) + (a.className.includes('coin-store-tab') ? 10 : 0);
-        const bScore = (b.tagName === 'BUTTON' ? 10 : 0) + (b.className.includes('coin-store-tab') ? 10 : 0);
-        return bScore - aScore;
+    if (!matches.length) return false;
+
+    matches.sort((a, b) => {
+        const score = el => {
+            let s = 0;
+            if (el.tagName === "BUTTON") s += 20;
+            if ((el.className || "").toString().toLowerCase().includes("active")) s += 5;
+            if ((el.className || "").toString().toLowerCase().includes("tab")) s += 5;
+            return s;
+        };
+        return score(b) - score(a);
     });
 
-    if (!candidates.length) return false;
+    const el = matches[0];
 
-    const el = candidates[0];
-    el.scrollIntoView({block: 'center', inline: 'center', behavior: 'instant'});
+    el.scrollIntoView({ block: "center", inline: "center" });
 
-    ['pointerdown','mousedown','pointerup','mouseup','click'].forEach(type => {
+    ["pointerdown", "mousedown", "pointerup", "mouseup", "click"].forEach(type => {
         el.dispatchEvent(new MouseEvent(type, {
             bubbles: true,
             cancelable: true,
@@ -282,450 +238,448 @@ def _js_find_button_by_text_and_click(sb: SB, text_snippets) -> bool:
     });
 
     try { el.click(); } catch (e) {}
+
     return true;
     """
+
     try:
-        return bool(sb.execute_script(script, list(text_snippets)))
+        return bool(sb.execute_script(script, list(text_options), selectors))
     except Exception:
         return False
 
 
-def _activate_modal_for_keyboard(sb: SB):
-    """
-    Try to focus the modal / document body so tabbing moves within the popup.
-    """
-    scripts = [
-        """
-        const modal = document.querySelector('.coin-store-popup-container');
-        if (modal) {
-            modal.setAttribute('tabindex', '-1');
-            modal.focus();
-            return true;
-        }
-        return false;
-        """,
-        """
-        document.body.focus();
-        return true;
-        """,
-    ]
-    for script in scripts:
-        with contextlib.suppress(Exception):
-            sb.execute_script(script)
-            _wait_small(0.25)
+# ─────────────────────────────────────────────────────────────
+# REACT-SAFE INPUT FIX
+# ─────────────────────────────────────────────────────────────
 
-
-def _keyboard_tab_enter_fallback(sb: SB, tabs: int = 4) -> bool:
+def set_react_input(sb, selector: str, value: str, timeout: int = 15) -> bool:
     """
-    Last resort fallback requested by you:
-    hit TAB 4 times and ENTER.
+    Fortune Wins uses React-controlled inputs.
+    Plain sb.type() can visually fail or not update React state.
+
+    This uses the native HTMLInputElement value setter and dispatches
+    input/change events so React sees the value.
     """
     try:
-        _activate_modal_for_keyboard(sb)
-        _wait_small(0.4)
-        for _ in range(tabs):
-            sb.press_keys("body", "\ue004")  # TAB
-            _wait_small(0.25)
-        sb.press_keys("body", "\ue007")  # ENTER
-        _wait_small(1.0)
-        return True
-    except Exception:
-        return False
+        sb.wait_for_element_visible(selector, timeout=timeout)
 
+        ok = sb.execute_script(
+            """
+            const selector = arguments[0];
+            const value = arguments[1];
 
-def _free_coins_tab_active(sb: SB) -> bool:
-    """
-    Detect whether FREE COINS tab is active / selected.
-    """
-    checks = [
-        """
-        const tabs = Array.from(document.querySelectorAll('button.coin-store-tab'));
-        const tab = tabs.find(el => (el.innerText || el.textContent || '').toUpperCase().includes('FREE COINS'));
-        if (!tab) return false;
-        const cls = tab.className || '';
-        const aria = tab.getAttribute('aria-selected') || '';
-        const pressed = tab.getAttribute('aria-pressed') || '';
-        const style = window.getComputedStyle(tab);
-        return (
-            cls.toLowerCase().includes('active') ||
-            aria === 'true' ||
-            pressed === 'true' ||
-            style.fontWeight === '700' ||
-            style.fontWeight === '800' ||
-            style.fontWeight === '900'
-        );
-        """,
-        """
-        // If collect-style buttons appear, the FREE COINS content is probably open.
-        const texts = Array.from(document.querySelectorAll('button, [role="button"]'))
-          .map(el => (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim().toUpperCase());
-        return texts.some(t =>
-            t.includes('COLLECT') ||
-            t.includes('CLAIM') ||
-            t.includes('FREE COINS') ||
-            t.includes('DAILY')
-        );
-        """,
-    ]
+            const input = document.querySelector(selector);
+            if (!input) return false;
 
-    for script in checks:
-        try:
-            if bool(sb.execute_script(script)):
-                return True
-        except Exception:
-            continue
-    return False
+            input.scrollIntoView({ block: "center", inline: "center" });
+            input.focus();
 
+            const nativeSetter = Object.getOwnPropertyDescriptor(
+                window.HTMLInputElement.prototype,
+                "value"
+            ).set;
 
-def _click_free_coins_tab(sb: SB) -> bool:
-    """
-    Robust handler for the 'FREE COINS' tab in the coin store modal.
-    Based on your screenshot, the real element is:
-      button.coin-store-tab
-    with inner text:
-      FREE COINS
-    """
-    # Let modal fully settle first
-    _wait_small(1.5)
+            nativeSetter.call(input, value);
 
-    # Strategy 1: direct CSS selector for the actual tab class
-    css_candidates = [
-        "button.coin-store-tab",
-        ".coin-store-tabs button.coin-store-tab",
-        ".coin-store-popup-container .coin-store-tabs .coin-store-tab",
-    ]
-    for selector in css_candidates:
-        try:
-            buttons = sb.find_elements(selector)
-            for btn in buttons:
-                text = ""
-                with contextlib.suppress(Exception):
-                    text = (btn.text or "").strip().upper()
-                if "FREE COINS" in text:
-                    if _real_click_element(sb, btn):
-                        _wait_small(1.0)
-                        if _free_coins_tab_active(sb):
-                            return True
-        except Exception:
-            continue
+            input.dispatchEvent(new InputEvent("input", {
+                bubbles: true,
+                inputType: "insertText",
+                data: value
+            }));
 
-    # Strategy 2: JS search by visible text
-    for _ in range(3):
-        if _js_find_button_by_text_and_click(sb, ["FREE COINS"]):
-            _wait_small(1.0)
-            if _free_coins_tab_active(sb):
-                return True
+            input.dispatchEvent(new Event("change", { bubbles: true }));
 
-    # Strategy 3: XPath text match
-    xpath_candidates = [
-        "//button[contains(@class,'coin-store-tab')][contains(normalize-space(.), 'FREE COINS')]",
-        "//div[contains(@class,'coin-store-tabs')]//button[contains(., 'FREE COINS')]",
-        "//button[.//text()[contains(., 'FREE COINS')]]",
-    ]
-    for xp in xpath_candidates:
-        if _force_click_xpath(sb, xp, timeout=4):
-            _wait_small(1.0)
-            if _free_coins_tab_active(sb):
-                return True
+            return input.value === value;
+            """,
+            selector,
+            value,
+        )
 
-    # Strategy 4: keyboard fallback requested by user
-    if _keyboard_tab_enter_fallback(sb, tabs=4):
-        _wait_small(1.2)
-        if _free_coins_tab_active(sb):
+        sleep(0.4)
+
+        if ok:
             return True
 
-    return False
+        # Fallback: clear and type normally.
+        with contextlib.suppress(Exception):
+            sb.clear(selector)
+            sb.type(selector, value)
+            sleep(0.4)
 
-
-def _find_collect_buttons(sb):
-    """
-    Return possible collect/claim buttons in the current modal using text.
-    """
-    script = """
-    const els = Array.from(document.querySelectorAll('button, [role="button"]'));
-
-    function isVisible(el) {
-        const style = window.getComputedStyle(el);
-        const rect = el.getBoundingClientRect();
-        return (
-            style.display !== 'none' &&
-            style.visibility !== 'hidden' &&
-            style.opacity !== '0' &&
-            rect.width > 0 &&
-            rect.height > 0
-        );
-    }
-
-    const matches = els.filter(el => {
-        if (!isVisible(el)) return false;
-        const text = (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim().toUpperCase();
-        if (!text) return false;
-        return (
-            text.includes('COLLECT') ||
-            text.includes('CLAIM') ||
-            text === 'GET' ||
-            text.includes('FREE')
-        );
-    });
-
-    return matches;
-    """
-    try:
-        return sb.execute_script(script)
-    except Exception:
-        return []
-
-
-def _click_collect_button(sb: SB) -> bool:
-    """
-    Click the actual claim/collect button after FREE COINS tab is open.
-    """
-    # Strategy 1: JS text-based click
-    text_sets = [
-        ["COLLECT NOW", "COLLECT"],
-        ["CLAIM NOW", "CLAIM"],
-        ["DAILY BONUS", "FREE COINS"],
-    ]
-    for texts in text_sets:
-        for _ in range(2):
-            if _js_find_button_by_text_and_click(sb, texts):
-                _wait_small(1.2)
-                return True
-
-    # Strategy 2: common xpath fallbacks from old structure
-    xpath_candidates = [
-        "/html/body/div[5]/div/div/div/div/div[3]/div/div[1]/div[2]/div[1]/div/div[3]/button[2]",
-        "/html/body/div[4]/div/div/div/div/div[3]/div/div[1]/div[2]/div[1]/div/div[3]/button[2]",
-        "/html/body/div[6]/div/div/div/div/div[3]/div/div[1]/div[2]/div[1]/div/div[3]/button[2]",
-        "/html/body/div[4]/div/div[1]/div/div/div[2]/div/div[2]/div[2]/div[1]/div/div[3]/button[1]",
-        "/html/body/div[4]/div/div[1]/div/div/div[2]/div/div[1]/div[2]/div[1]/div/div[3]/button[1]",
-    ]
-    if _try_click_any_xpath(sb, xpath_candidates, timeout_each=4):
-        _wait_small(1.2)
         return True
 
-    # Strategy 3: generic visible button with collect-ish text
+    except Exception:
+        return False
+
+
+# ─────────────────────────────────────────────────────────────
+# LOGIN FLOW
+# ─────────────────────────────────────────────────────────────
+
+def login_fortunewins(sb) -> bool:
+    sb.uc_open_with_reconnect(LOGIN_URL, 4)
+    wait_ready(sb)
+    sleep(2)
+
+    email_ok = set_react_input(sb, "#emailAddress", FW_EMAIL)
+    pass_ok = set_react_input(sb, "#password", FW_PASSWORD)
+
+    if not email_ok or not pass_ok:
+        return False
+
+    # Cloudflare / Turnstile checkbox.
+    with contextlib.suppress(Exception):
+        sb.uc_gui_click_captcha()
+        sleep(2)
+
+    # Try clean selectors first.
+    if click_css(sb, "form button[type='submit']", timeout=5):
+        sleep(6)
+        wait_ready(sb)
+        return True
+
+    # Text fallback.
+    if click_by_text(sb, ["LOG IN", "LOGIN", "SIGN IN"], selectors="button, [role='button']"):
+        sleep(6)
+        wait_ready(sb)
+        return True
+
+    # Last XPath fallback.
+    clicked = click_any_xpath(
+        sb,
+        [
+            "//form//button[contains(translate(., 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 'LOG IN')]",
+            "//form//button[contains(translate(., 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 'LOGIN')]",
+            "//form//button[contains(translate(., 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 'SIGN IN')]",
+        ],
+        timeout=5,
+    )
+
+    sleep(6)
+    wait_ready(sb)
+    return clicked
+
+
+# ─────────────────────────────────────────────────────────────
+# POST-LOGIN FLOW
+# ─────────────────────────────────────────────────────────────
+
+def close_popups(sb):
+    """
+    Kills normal popups after login.
+    """
+    sleep(1)
+
+    click_any_xpath(
+        sb,
+        [
+            "//button[contains(@class, 'close')]",
+            "//button[contains(@aria-label, 'close')]",
+            "//button[contains(@aria-label, 'Close')]",
+            "/html/body/div[5]/div/div[1]/div/div/button",
+            "/html/body/div[4]/div/div[1]/div/div/button",
+            "/html/body/div[4]/div/div[1]/div/div/div[3]/div/button[2]",
+        ],
+        timeout=3,
+    )
+
+    with contextlib.suppress(Exception):
+        sb.press_keys("body", "\ue00c")  # ESC
+        sleep(1)
+
+
+def open_coin_store(sb) -> bool:
+    """
+    Opens the coin store/rewards modal.
+    Prefer text/semantic clicks over brittle giant XPaths.
+    """
+    sleep(1)
+
+    # Text-based attempts.
+    for text_group in (
+        ["GET COINS"],
+        ["COIN STORE"],
+        ["STORE"],
+        ["REWARDS"],
+        ["BUY COINS"],
+    ):
+        if click_by_text(sb, text_group, selectors="button, [role='button'], a, div"):
+            sleep(2)
+            return True
+
+    # Known nav fallback.
+    return click_any_xpath(
+        sb,
+        [
+            "/html/body/div[1]/div[2]/div[1]/div/nav/div[2]/div[3]/button",
+            "/html/body/div[1]/div[2]/div/nav/div[2]/div[3]/button",
+            "/html/body/div[1]/div[2]/div[1]/div/nav/div[2]/div[3]/button",
+        ],
+        timeout=5,
+    )
+
+
+def free_coins_tab_active(sb) -> bool:
+    script = """
+    const buttons = Array.from(document.querySelectorAll("button, [role='button']"));
+
+    const tab = buttons.find(el => {
+        const text = (el.innerText || el.textContent || "")
+            .replace(/\\s+/g, " ")
+            .trim()
+            .toUpperCase();
+
+        return text.includes("FREE COINS");
+    });
+
+    if (!tab) return false;
+
+    const cls = (tab.className || "").toString().toLowerCase();
+    const ariaSelected = tab.getAttribute("aria-selected");
+    const ariaPressed = tab.getAttribute("aria-pressed");
+
+    if (cls.includes("active")) return true;
+    if (ariaSelected === "true") return true;
+    if (ariaPressed === "true") return true;
+
+    const pageText = document.body.innerText.toUpperCase();
+    return pageText.includes("COLLECT") || pageText.includes("CLAIM");
+    """
+
     try:
-        buttons = sb.find_elements("button, [role='button']")
-        for btn in buttons:
-            with contextlib.suppress(Exception):
-                text = (btn.text or "").strip().upper()
-                if any(word in text for word in ("COLLECT", "CLAIM", "GET")):
-                    if _real_click_element(sb, btn):
-                        _wait_small(1.0)
-                        return True
+        return bool(sb.execute_script(script))
+    except Exception:
+        return False
+
+
+def keyboard_tab_enter(sb, tabs: int = 4) -> bool:
+    """
+    Requested fallback: TAB 4 times, ENTER.
+    """
+    try:
+        with contextlib.suppress(Exception):
+            sb.execute_script("document.body.focus();")
+
+        sleep(0.5)
+
+        for _ in range(tabs):
+            sb.press_keys("body", "\ue004")  # TAB
+            sleep(0.25)
+
+        sb.press_keys("body", "\ue007")  # ENTER
+        sleep(1.2)
+        return True
+
+    except Exception:
+        return False
+
+
+def click_free_coins_tab(sb) -> bool:
+    """
+    Clicks FREE COINS tab in the coin store modal.
+    """
+    sleep(2)
+
+    # Most likely current structure.
+    try:
+        tabs = sb.find_elements("button.coin-store-tab")
+        for tab in tabs:
+            text = (tab.text or "").strip().upper()
+            if "FREE COINS" in text:
+                if js_click_element(sb, tab):
+                    sleep(1)
+                    return True
     except Exception:
         pass
 
-    return False
-
-
-def _close_popups_if_any(sb: SB):
-    _try_click_any_xpath(
-        sb,
-        [
-            "/html/body/div[5]/div/div[1]/div/div/button",
-            "/html/body/div[4]/div/div[1]/div/div/div[3]/div/button[2]",
-            "/html/body/div[4]/div/div[1]/div/div/button",
-        ],
-        timeout_each=4,
-    )
-    with contextlib.suppress(Exception):
-        sb.press_keys("body", "ESCAPE")
-        _wait_small(1.5)
-
-
-def _open_rewards_or_coin_store(sb: SB) -> bool:
-    """
-    Open the top nav button that leads to the rewards / coin store modal.
-    """
-    xpath_candidates = [
-        "/html/body/div[1]/div[2]/div[1]/div/nav/div[2]/div[3]/button",
-        "/html/body/div[1]/div[2]/div/nav/div[2]/div[3]/button",
-        "/html/body/div[1]/div[2]/div[1]/div/nav/div[2]/div[3]/button",
-    ]
-    if _try_click_any_xpath(sb, xpath_candidates, timeout_each=6):
-        _wait_small(2.0)
-        return True
-
-    # Generic text fallback
-    for texts in (["GET COINS"], ["COIN STORE"], ["STORE"], ["REWARDS"]):
-        if _js_find_button_by_text_and_click(sb, texts):
-            _wait_small(2.0)
+    # More generic button text click.
+    for _ in range(2):
+        if click_by_text(sb, ["FREE COINS"], selectors="button, [role='button'], div, span"):
+            sleep(1)
             return True
 
-    return False
+    # XPath fallback.
+    if click_any_xpath(
+        sb,
+        [
+            "//button[contains(translate(., 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 'FREE COINS')]",
+            "//*[contains(@class, 'coin-store-tab')][contains(translate(., 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 'FREE COINS')]",
+        ],
+        timeout=4,
+    ):
+        sleep(1)
+        return True
+
+    # Last resort.
+    keyboard_tab_enter(sb, tabs=4)
+    return free_coins_tab_active(sb)
 
 
-# ───────────────────────────────────────────────────────────
-# Primary sync runner (to be called from a worker thread)
-# ───────────────────────────────────────────────────────────
+def click_collect_or_claim(sb) -> bool:
+    """
+    Clicks the collect/claim button once the FREE COINS tab is open.
+    """
+    sleep(2)
+
+    for text_group in (
+        ["COLLECT NOW", "COLLECT"],
+        ["CLAIM NOW", "CLAIM"],
+        ["GET NOW", "GET"],
+        ["DAILY BONUS"],
+    ):
+        if click_by_text(sb, text_group, selectors="button, [role='button']"):
+            sleep(2)
+            return True
+
+    # Old structure fallback.
+    return click_any_xpath(
+        sb,
+        [
+            "/html/body/div[5]/div/div/div/div/div[3]/div/div[1]/div[2]/div[1]/div/div[3]/button[2]",
+            "/html/body/div[4]/div/div/div/div/div[3]/div/div[1]/div[2]/div[1]/div/div[3]/button[2]",
+            "/html/body/div[6]/div/div/div/div/div[3]/div/div[1]/div[2]/div[1]/div/div[3]/button[2]",
+            "/html/body/div[4]/div/div[1]/div/div/div[2]/div/div[2]/div[2]/div[1]/div/div[3]/button[1]",
+            "/html/body/div[4]/div/div[1]/div/div/div[2]/div/div[1]/div[2]/div[1]/div/div[3]/button[1]",
+        ],
+        timeout=4,
+    )
+
+
+def run_claim_flow(sb) -> str:
+    """
+    Returns:
+      claimed
+      unavailable
+      login_failed
+      store_failed
+      free_tab_failed
+    """
+    if not login_fortunewins(sb):
+        return "login_failed"
+
+    # Refresh after login helps if it lands on auth callback weirdness.
+    with contextlib.suppress(Exception):
+        sb.refresh_page()
+        wait_ready(sb)
+        sleep(3)
+
+    close_popups(sb)
+
+    if not open_coin_store(sb):
+        return "store_failed"
+
+    sleep(2)
+
+    if not click_free_coins_tab(sb):
+        return "free_tab_failed"
+
+    sleep(3)
+
+    if click_collect_or_claim(sb):
+        return "claimed"
+
+    return "unavailable"
+
+
+# ─────────────────────────────────────────────────────────────
+# PUBLIC RUNNERS
+# ─────────────────────────────────────────────────────────────
+
 def fortunewins_uc_blocking(
     bot,
     channel_id: int,
     main_loop: asyncio.AbstractEventLoop,
 ):
-    """
-    Runs the entire Fortune Wins flow synchronously in a worker thread.
-    Posts messages back to the main Discord loop thread-safely.
-    Keeps SeleniumBase's sb.uc_gui_click_captcha() intact.
-    """
-    ch = bot.get_channel(channel_id)
+    channel = bot.get_channel(channel_id) if bot else None
 
-    if not FC_EMAIL or not FC_PASSWORD:
-        if ch:
-            _send_text_threadsafe(
-                main_loop,
-                ch,
-                "❌ Missing Fortune Coins/Fortune Wins credentials in your `.env`. "
-                "Supported keys: `FORTUNECOINSEMAIL` / `FORTUNECOINSPASSWORD`, "
-                "`FORTUNECOINS_EMAIL` / `FORTUNECOINS_PASSWORD`, "
-                "`FORTUNEWINSEMAIL` / `FORTUNEWINSPASSWORD`, or "
-                "`FORTUNEWINS_EMAIL` / `FORTUNEWINS_PASSWORD`."
-            )
+    if not FW_EMAIL or not FW_PASSWORD:
+        notify(
+            main_loop,
+            channel,
+            "❌ Missing Fortune Wins credentials in `.env`.\n\n"
+            "Supported keys:\n"
+            "`FORTUNEWINSEMAIL` / `FORTUNEWINSPASSWORD`\n"
+            "`FORTUNEWINS_EMAIL` / `FORTUNEWINS_PASSWORD`\n"
+            "`FORTUNECOINSEMAIL` / `FORTUNECOINSPASSWORD`\n"
+            "`FORTUNECOINS_EMAIL` / `FORTUNECOINS_PASSWORD`",
+        )
         return
 
-    if ch:
-        _send_text_threadsafe(main_loop, ch, "Launching **Fortune Wins** (UC)…")
+    notify(main_loop, channel, "Launching **Fortune Wins** UC...")
 
     try:
         with SB(uc=True, headed=True) as sb:
-            # ── Login
-            sb.uc_open_with_reconnect("https://fortunewins.com/login", 4)
-            sb.wait_for_ready_state_complete()
-            _wait_small(1.0)
+            result = run_claim_flow(sb)
 
-            sb.type("input[id='emailAddress']", FC_EMAIL)
-            _wait_small(1.0)
-            sb.type("input[id='password']", FC_PASSWORD)
-            _wait_small(0.8)
+            if result == "claimed":
+                screenshot_and_send(
+                    sb,
+                    main_loop,
+                    channel,
+                    "fortunewins_claimed.png",
+                    "Fortune Wins Daily Bonus Claimed!",
+                )
 
-            with contextlib.suppress(Exception):
-                sb.uc_gui_click_captcha()
-                _wait_small(1.0)
+            elif result == "unavailable":
+                screenshot_and_send(
+                    sb,
+                    main_loop,
+                    channel,
+                    "fortunewins_unavailable.png",
+                    "[Fortune Wins] Bonus unavailable, likely already collected.",
+                )
 
-            _try_click_any_xpath(
-                sb,
-                [
-                    "/html/body/div[1]/div[2]/div[5]/div/section/div[2]/div/div/div[2]/form/div[4]/button",
-                    "//form//button[contains(., 'Login')]",
-                    "//form//button[contains(., 'Sign In')]",
-                ],
-                timeout_each=10,
-            )
+            elif result == "login_failed":
+                screenshot_and_send(
+                    sb,
+                    main_loop,
+                    channel,
+                    "fortunewins_login_failed.png",
+                    "⚠️ Fortune Wins: login failed. Inputs/captcha/login button did not complete.",
+                )
 
-            _wait_small(6.0)
-            with contextlib.suppress(Exception):
-                sb.refresh_page()
-                sb.wait_for_ready_state_complete()
-                _wait_small(3.0)
+            elif result == "store_failed":
+                screenshot_and_send(
+                    sb,
+                    main_loop,
+                    channel,
+                    "fortunewins_store_failed.png",
+                    "⚠️ Fortune Wins: could not open the coin store/rewards modal.",
+                )
 
-            # ── Dismiss any initial popups
-            _close_popups_if_any(sb)
+            elif result == "free_tab_failed":
+                screenshot_and_send(
+                    sb,
+                    main_loop,
+                    channel,
+                    "fortunewins_free_tab_failed.png",
+                    "⚠️ Fortune Wins: could not switch to the FREE COINS tab.",
+                )
 
-            # ── Open Rewards / Coin Store modal
-            opened_store = _open_rewards_or_coin_store(sb)
-            if not opened_store:
-                snap = "fw_uc_store_not_opened.png"
-                with contextlib.suppress(Exception):
-                    sb.save_screenshot(snap)
-                if ch and os.path.exists(snap):
-                    _send_file_threadsafe(
-                        main_loop,
-                        ch,
-                        snap,
-                        "⚠️ Fortune Wins: could not open the coin store / rewards modal."
-                    )
-                elif ch:
-                    _send_text_threadsafe(
-                        main_loop,
-                        ch,
-                        "⚠️ Fortune Wins: could not open the coin store / rewards modal."
-                    )
-                return
-
-            # ── Click FREE COINS tab (main fix)
-            free_tab_ok = _click_free_coins_tab(sb)
-            _wait_small(2.0)
-
-            if not free_tab_ok:
-                snap = "fw_uc_free_coins_tab_failed.png"
-                with contextlib.suppress(Exception):
-                    sb.save_screenshot(snap)
-                if ch and os.path.exists(snap):
-                    _send_file_threadsafe(
-                        main_loop,
-                        ch,
-                        snap,
-                        "⚠️ Fortune Wins: could not switch to the FREE COINS tab."
-                    )
-                elif ch:
-                    _send_text_threadsafe(
-                        main_loop,
-                        ch,
-                        "⚠️ Fortune Wins: could not switch to the FREE COINS tab."
-                    )
-                return
-
-            # ── Let free coins content render
-            sb.wait_for_ready_state_complete()
-            _wait_small(3.0)
-
-            # ── Click collect/claim
-            collected = _click_collect_button(sb)
-
-            # Give it another shot after a tiny pause if first attempt failed
-            if not collected:
-                _wait_small(2.0)
-                collected = _click_collect_button(sb)
-
-            # ── Final result / screenshots
-            if ch:
-                if collected:
-                    snap = "fw_uc_claimed.png"
-                    with contextlib.suppress(Exception):
-                        sb.save_screenshot(snap)
-                    if os.path.exists(snap):
-                        _send_file_threadsafe(
-                            main_loop,
-                            ch,
-                            snap,
-                            "Fortune Wins Daily Bonus Claimed!"
-                        )
-                    else:
-                        _send_text_threadsafe(
-                            main_loop,
-                            ch,
-                            "Fortune Wins Daily Bonus Claimed!"
-                        )
-                else:
-                    snap = "fw_uc_unavailable.png"
-                    with contextlib.suppress(Exception):
-                        sb.save_screenshot(snap)
-                    if os.path.exists(snap):
-                        _send_file_threadsafe(
-                            main_loop,
-                            ch,
-                            snap,
-                            "[Fortune Wins] Bonus Unavailable (likely already collected)."
-                        )
-                    else:
-                        _send_text_threadsafe(
-                            main_loop,
-                            ch,
-                            "[Fortune Wins] Bonus Unavailable (likely already collected)."
-                        )
+            else:
+                screenshot_and_send(
+                    sb,
+                    main_loop,
+                    channel,
+                    "fortunewins_unknown.png",
+                    f"⚠️ Fortune Wins: unknown result: {result}",
+                )
 
     except Exception as e:
-        if ch:
-            _send_text_threadsafe(
-                main_loop,
-                ch,
-                f"⚠️ Fortune Wins (UC) error: {type(e).__name__}: {e}"
-            )
+        notify(
+            main_loop,
+            channel,
+            f"⚠️ Fortune Wins UC error: `{type(e).__name__}: {e}`",
+        )
 
 
-# Backwards-compatible alias in case main.py still imports the old name
+async def fortunewins_uc(ctx, channel: discord.abc.Messageable):
+    bot = channel.guild._state._get_client() if hasattr(channel, "guild") else None
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, fortunewins_uc_blocking, bot, channel.id, loop)
+
+
+# Backwards-compatible aliases in case main.py still imports old names.
 def fortunecoins_uc_blocking(
     bot,
     channel_id: int,
@@ -734,15 +688,5 @@ def fortunecoins_uc_blocking(
     return fortunewins_uc_blocking(bot, channel_id, main_loop)
 
 
-# ───────────────────────────────────────────────────────────
-# Optional thin async wrapper
-# ───────────────────────────────────────────────────────────
-async def fortunewins_uc(ctx, channel: discord.abc.Messageable):
-    bot = channel.guild._state._get_client() if hasattr(channel, "guild") else None
-    loop = asyncio.get_running_loop()
-    await loop.run_in_executor(None, fortunewins_uc_blocking, bot, channel.id, loop)
-
-
-# Optional backwards-compatible async alias
 async def fortunecoins_uc(ctx, channel: discord.abc.Messageable):
     await fortunewins_uc(ctx, channel)
