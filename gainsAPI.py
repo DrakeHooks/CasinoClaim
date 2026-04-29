@@ -147,7 +147,7 @@ async def claim_gains_bonus(ctx, driver, channel):
         screenshot = "gains_claim.png"
         driver.save_screenshot(screenshot)
 
-        await channel.send("💰 Gains Daily Bonus Claimed!",file=discord.File(screenshot))
+        await channel.send("Gains Daily Bonus Claimed!",file=discord.File(screenshot))
 
         os.remove(screenshot)
 
@@ -158,6 +158,6 @@ async def claim_gains_bonus(ctx, driver, channel):
         screenshot = "gains_claim_error.png"
         driver.save_screenshot(screenshot)
 
-        await channel.send("⏳ Gains daily bonus unavailable.",file=discord.File(screenshot))
+        await channel.send("Gains daily bonus unavailable.",file=discord.File(screenshot))
 
         os.remove(screenshot)        
