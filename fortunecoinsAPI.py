@@ -605,7 +605,7 @@ def fortunewins_uc_blocking(
         )
         return
 
-    notify(main_loop, channel, "Launching **Fortune Wins** UC...")
+    notify(main_loop, channel, "Launching **Fortune Wins** (UC)...")
 
     try:
         with SB(uc=True, headed=True) as sb:
@@ -635,7 +635,7 @@ def fortunewins_uc_blocking(
                     main_loop,
                     channel,
                     "fortunewins_login_failed.png",
-                    "⚠️ Fortune Wins: login failed. Inputs/captcha/login button did not complete.",
+                    "[Fortune Wins] login failed. Inputs/captcha/login button did not complete.",
                 )
 
             elif result == "store_failed":
@@ -644,7 +644,7 @@ def fortunewins_uc_blocking(
                     main_loop,
                     channel,
                     "fortunewins_store_failed.png",
-                    "⚠️ Fortune Wins: could not open the coin store/rewards modal.",
+                    "[Fortune Wins] could not open the coin store/rewards modal.",
                 )
 
             elif result == "free_tab_failed":
@@ -653,7 +653,7 @@ def fortunewins_uc_blocking(
                     main_loop,
                     channel,
                     "fortunewins_free_tab_failed.png",
-                    "⚠️ Fortune Wins: could not switch to the FREE COINS tab.",
+                    "[Fortune Wins] could not switch to the FREE COINS tab.",
                 )
 
             else:
@@ -662,14 +662,14 @@ def fortunewins_uc_blocking(
                     main_loop,
                     channel,
                     "fortunewins_unknown.png",
-                    f"⚠️ Fortune Wins: unknown result: {result}",
+                    f"[Fortune Wins] unknown result: {result}",
                 )
 
     except Exception as e:
         notify(
             main_loop,
             channel,
-            f"⚠️ Fortune Wins UC error: `{type(e).__name__}: {e}`",
+            f"[Fortune Wins] UC error: `{type(e).__name__}: {e}`",
         )
 
 
