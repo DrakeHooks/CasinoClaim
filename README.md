@@ -49,7 +49,11 @@ cd CasinoClaim
 # Usage 🎰🤖
 The bot is designed to check most casinos automatically in 2-hour intervals, with commands to check status of bonus. Some casinos only check once every 24 hours, but this can be changed with `!config` command.`!start` and `!stop` will start and stop the main loop. Running `!help` at any time provides the available commands. `!cleardatadir` command is useful for sites giving location issues, as well as sites you need to re-authenticate with.
  
+# Config File
+To keep your config file persistent across container updates, bind mount the config file in docker-compose.yml 
 
+volumes:
+  - ./config.toml:/app/config.toml
 
 # Supported Casinos ✅
 | Casino            | Auto Claim | Countdown Timer | Backend API | Bonus (SC)            | Trusted? (payment proof) |
