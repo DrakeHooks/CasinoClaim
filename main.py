@@ -16,6 +16,7 @@ import asyncio
 import importlib
 import importlib.util
 import threading
+import tomllib
 from pathlib import Path
 from dataclasses import dataclass, field
 import datetime as dt
@@ -99,6 +100,19 @@ from helperAPI import normalize_casino_key, run_with_periodic_screenshots
 # Run !imports in Discord to see exact problems.
 # ───────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent
+
+CONFIG_PATH = Path(
+    os.getenv("CASINO_CONFIG_PATH")
+    or os.getenv("BOT_CONFIG_PATH")
+    or os.getenv("CONFIG_PATH")
+    or "config.toml"
+)
+
+if not CONFIG_PATH.is_absolute():
+    CONFIG_PATH = BASE_DIR / CONFIG_PATH
+
+CONFIG_LAST_MTIME: Optional[float] = None
+CONFIG_LOCK = threading.Lock()
 
 api_modules = [
     "fortunewheelzAPI",
@@ -692,9 +706,21 @@ class CasinoLoopEntry:
         self.next_run = dt.datetime.now(dt.timezone.utc) + dt.timedelta(minutes=self.interval_minutes)
 
 
-LOOP_STAGGER_SECONDS = 30
+LOOP_STAGGER_SECONDS = int(os.getenv("LOOP_STAGGER_SECONDS", "30"))
 PER_CASINO_TIMEOUT_SEC = int(os.getenv("CASINO_TIMEOUT_SECONDS", "500"))
-MAIN_TICK_SLEEP = 10
+MAIN_TICK_SLEEP = int(os.getenv("MAIN_TICK_SLEEP_SECONDS", "10"))
+
+AUTOAUTH_ENABLED = False
+AUTOAUTH_INTERVAL_MINUTES = 720.0
+AUTOAUTH_RUN_ON_START = False
+AUTOAUTH_NEXT_RUN: Optional[dt.datetime] = None
+AUTOAUTH_SIGNATURE = None
+
+AUTODATACLEAR_ENABLED = False
+AUTODATACLEAR_INTERVAL_MINUTES = 1440.0
+AUTODATACLEAR_RUN_ON_START = False
+AUTODATACLEAR_NEXT_RUN: Optional[dt.datetime] = None
+AUTODATACLEAR_SIGNATURE = None
 
 
 async def _run_zula(channel):
@@ -820,10 +846,6 @@ casino_loop_entries: List[CasinoLoopEntry] = [
     CasinoLoopEntry("nolimitcoins", "NoLimitCoins", _run_nlc, 120),
     CasinoLoopEntry("spinquest", "SpinQuest", _run_spinquest, 120),
 
-    # Enable when wanted:
-    # CasinoLoopEntry("modo", "Modo", _run_modo, 120),
-    # CasinoLoopEntry("stake", "Stake", _run_stake, 120),
-
     CasinoLoopEntry("gains", "Gains", _run_gains, 1440),
     CasinoLoopEntry("realprize", "Real Prize", _run_realprize, 1440),
     CasinoLoopEntry("lonestar", "LoneStar Casino", _run_lonestar, 1440),
@@ -839,106 +861,11 @@ casino_loop_entries: List[CasinoLoopEntry] = [
     CasinoLoopEntry("luckparty", "Luck Party", _run_luckparty, 1440),
     CasinoLoopEntry("winbonanza", "WinBonanza", _run_winbonanza, 1440),
 
+    # CasinoLoopEntry("modo", "Modo", _run_modo, 120),
+    # CasinoLoopEntry("stake", "Stake", _run_stake, 120),
     # CasinoLoopEntry("smilescasino", "Smiles Casino", _run_smilescasino, 1440),
     # CasinoLoopEntry("luckyland", "LuckyLand", _run_luckyland, 1440),
 ]
-
-
-def reset_loop_schedule():
-    base = dt.datetime.now(dt.timezone.utc)
-    for i, entry in enumerate(casino_loop_entries):
-        entry.next_run = base + dt.timedelta(seconds=i * LOOP_STAGGER_SECONDS)
-
-
-def find_loop_entry(casino: str) -> Optional[CasinoLoopEntry]:
-    casino = (casino or "").strip().lower()
-    casino = CASINO_ALIAS_MAP.get(casino, casino)
-    return next((e for e in casino_loop_entries if e.key.lower() == casino), None)
-
-
-main_loop_task: Optional[asyncio.Task] = None
-main_loop_running = False
-
-
-def is_main_loop_running() -> bool:
-    return main_loop_running and main_loop_task and not main_loop_task.done()
-
-
-async def run_main_loop(channel: discord.abc.Messageable):
-    global main_loop_running
-
-    try:
-        while main_loop_running:
-            now = dt.datetime.now(dt.timezone.utc)
-
-            for entry in casino_loop_entries:
-                if not entry.enabled:
-                    continue
-
-                if now >= entry.next_run:
-                    try:
-                        await asyncio.wait_for(entry.runner(channel), timeout=PER_CASINO_TIMEOUT_SEC)
-                    except asyncio.TimeoutError:
-                        try:
-                            await channel.send(
-                                f"⏳ {entry.display_name} timed out after {PER_CASINO_TIMEOUT_SEC}s. Skipping."
-                            )
-                        except Exception:
-                            pass
-                        print(f"[Loop] {entry.display_name} timed out.")
-                    except Exception as e:
-                        print(f"[Loop] Error in {entry.display_name}: {type(e).__name__}: {e}")
-                        try:
-                            await channel.send(f"⚠️ {entry.display_name} error: `{type(e).__name__}: {e}`")
-                        except Exception:
-                            pass
-                    finally:
-                        entry.schedule_next()
-
-            await asyncio.sleep(MAIN_TICK_SLEEP)
-
-    except asyncio.CancelledError:
-        pass
-    finally:
-        main_loop_running = False
-
-
-async def start_main_loop(channel: Optional[discord.abc.Messageable] = None) -> bool:
-    global main_loop_task, main_loop_running
-
-    if is_main_loop_running():
-        return False
-
-    if channel is None:
-        channel = bot.get_channel(DISCORD_CHANNEL)
-
-    if channel is None:
-        print("[Loop] Cannot start, channel not found.")
-        return False
-
-    reset_loop_schedule()
-    main_loop_running = True
-    main_loop_task = asyncio.create_task(run_main_loop(channel))
-    return True
-
-
-async def stop_main_loop() -> bool:
-    global main_loop_task, main_loop_running
-
-    if not is_main_loop_running():
-        return False
-
-    main_loop_running = False
-
-    if main_loop_task:
-        main_loop_task.cancel()
-        try:
-            await main_loop_task
-        except asyncio.CancelledError:
-            pass
-
-    main_loop_task = None
-    return True
 
 
 # ───────────────────────────────────────────────────────────
@@ -985,6 +912,575 @@ CASINO_ALIAS_MAP = {
 
 
 # ───────────────────────────────────────────────────────────
+# Persistent TOML config
+# ───────────────────────────────────────────────────────────
+def normalize_config_key(value: str) -> str:
+    key = (value or "").strip().lower()
+    key = re.sub(r"\s+", " ", key)
+    key = CASINO_ALIAS_MAP.get(key, key)
+    key = key.replace(" ", "")
+    return CASINO_ALIAS_MAP.get(key, key)
+
+
+def _toml_escape(value: str) -> str:
+    return (
+        '"'
+        + str(value)
+        .replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+        + '"'
+    )
+
+
+def _toml_value(value):
+    if isinstance(value, bool):
+        return "true" if value else "false"
+
+    if isinstance(value, int):
+        return str(value)
+
+    if isinstance(value, float):
+        if value.is_integer():
+            return str(int(value))
+        return str(value)
+
+    if isinstance(value, list):
+        return "[" + ", ".join(_toml_value(v) for v in value) + "]"
+
+    return _toml_escape(str(value))
+
+
+def _config_dict_from_runtime() -> dict:
+    return {
+        "bot": {
+            "loop_stagger_seconds": int(LOOP_STAGGER_SECONDS),
+            "per_casino_timeout_seconds": int(PER_CASINO_TIMEOUT_SEC),
+            "main_tick_sleep_seconds": int(MAIN_TICK_SLEEP),
+        },
+        "autoauth": {
+            "enabled": bool(AUTOAUTH_ENABLED),
+            "interval_minutes": float(AUTOAUTH_INTERVAL_MINUTES),
+            "run_on_start": bool(AUTOAUTH_RUN_ON_START),
+        },
+        "autodataclear": {
+            "enabled": bool(AUTODATACLEAR_ENABLED),
+            "interval_minutes": float(AUTODATACLEAR_INTERVAL_MINUTES),
+            "run_on_start": bool(AUTODATACLEAR_RUN_ON_START),
+        },
+        "casinos": [
+            {
+                "key": entry.key,
+                "display_name": entry.display_name,
+                "enabled": bool(entry.enabled),
+                "interval_minutes": float(entry.interval_minutes),
+            }
+            for entry in casino_loop_entries
+        ],
+    }
+
+
+def _write_toml_config(config: dict) -> None:
+    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    lines = [
+        "# CasinoClaim persistent configuration",
+        "# This file is safe to bind-mount so settings survive Watchtower/container updates.",
+        "# You can edit this file directly or use Discord !config commands.",
+        "",
+        "[bot]",
+    ]
+
+    bot_config = config.get("bot", {})
+    for key in ("loop_stagger_seconds", "per_casino_timeout_seconds", "main_tick_sleep_seconds"):
+        lines.append(f"{key} = {_toml_value(bot_config.get(key))}")
+
+    lines += [
+        "",
+        "[autoauth]",
+    ]
+
+    autoauth_config = config.get("autoauth", {})
+    for key in ("enabled", "interval_minutes", "run_on_start"):
+        lines.append(f"{key} = {_toml_value(autoauth_config.get(key))}")
+
+    lines += [
+        "",
+        "[autodataclear]",
+    ]
+
+    autodataclear_config = config.get("autodataclear", {})
+    for key in ("enabled", "interval_minutes", "run_on_start"):
+        lines.append(f"{key} = {_toml_value(autodataclear_config.get(key))}")
+
+    for casino in config.get("casinos", []):
+        lines += [
+            "",
+            "[[casinos]]",
+            f"key = {_toml_value(casino.get('key'))}",
+            f"display_name = {_toml_value(casino.get('display_name'))}",
+            f"enabled = {_toml_value(bool(casino.get('enabled', True)))}",
+            f"interval_minutes = {_toml_value(float(casino.get('interval_minutes', 1440)))}",
+        ]
+
+    CONFIG_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def save_config_from_runtime() -> None:
+    global CONFIG_LAST_MTIME
+
+    with CONFIG_LOCK:
+        config = _config_dict_from_runtime()
+        _write_toml_config(config)
+
+        try:
+            CONFIG_LAST_MTIME = CONFIG_PATH.stat().st_mtime
+        except Exception:
+            CONFIG_LAST_MTIME = None
+
+
+def _bool_from_config(value, default=False) -> bool:
+    if isinstance(value, bool):
+        return value
+
+    if isinstance(value, (int, float)):
+        return bool(value)
+
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y", "on", "enabled", "enable"}
+
+    return default
+
+
+def _float_from_config(value, default: float) -> float:
+    try:
+        parsed = float(value)
+        if parsed <= 0:
+            return default
+        return parsed
+    except Exception:
+        return default
+
+
+def _int_from_config(value, default: int) -> int:
+    try:
+        parsed = int(float(value))
+        if parsed <= 0:
+            return default
+        return parsed
+    except Exception:
+        return default
+
+
+def _sync_auto_schedules(force: bool = False) -> None:
+    global AUTOAUTH_NEXT_RUN, AUTOAUTH_SIGNATURE
+    global AUTODATACLEAR_NEXT_RUN, AUTODATACLEAR_SIGNATURE
+
+    now = dt.datetime.now(dt.timezone.utc)
+
+    autoauth_sig = (AUTOAUTH_ENABLED, AUTOAUTH_INTERVAL_MINUTES, AUTOAUTH_RUN_ON_START)
+    if force or autoauth_sig != AUTOAUTH_SIGNATURE:
+        AUTOAUTH_SIGNATURE = autoauth_sig
+
+        if AUTOAUTH_ENABLED:
+            if AUTOAUTH_RUN_ON_START:
+                AUTOAUTH_NEXT_RUN = now
+            else:
+                AUTOAUTH_NEXT_RUN = now + dt.timedelta(minutes=AUTOAUTH_INTERVAL_MINUTES)
+        else:
+            AUTOAUTH_NEXT_RUN = None
+
+    dataclear_sig = (AUTODATACLEAR_ENABLED, AUTODATACLEAR_INTERVAL_MINUTES, AUTODATACLEAR_RUN_ON_START)
+    if force or dataclear_sig != AUTODATACLEAR_SIGNATURE:
+        AUTODATACLEAR_SIGNATURE = dataclear_sig
+
+        if AUTODATACLEAR_ENABLED:
+            if AUTODATACLEAR_RUN_ON_START:
+                AUTODATACLEAR_NEXT_RUN = now
+            else:
+                AUTODATACLEAR_NEXT_RUN = now + dt.timedelta(minutes=AUTODATACLEAR_INTERVAL_MINUTES)
+        else:
+            AUTODATACLEAR_NEXT_RUN = None
+
+
+def apply_config_to_runtime(config: dict, preserve_next_runs: bool = True) -> None:
+    global LOOP_STAGGER_SECONDS, PER_CASINO_TIMEOUT_SEC, MAIN_TICK_SLEEP
+    global AUTOAUTH_ENABLED, AUTOAUTH_INTERVAL_MINUTES, AUTOAUTH_RUN_ON_START
+    global AUTODATACLEAR_ENABLED, AUTODATACLEAR_INTERVAL_MINUTES, AUTODATACLEAR_RUN_ON_START
+
+    bot_config = config.get("bot", {})
+    autoauth_config = config.get("autoauth", {})
+    autodataclear_config = config.get("autodataclear", {})
+
+    LOOP_STAGGER_SECONDS = _int_from_config(
+        bot_config.get("loop_stagger_seconds", LOOP_STAGGER_SECONDS),
+        LOOP_STAGGER_SECONDS,
+    )
+
+    PER_CASINO_TIMEOUT_SEC = _int_from_config(
+        bot_config.get("per_casino_timeout_seconds", PER_CASINO_TIMEOUT_SEC),
+        PER_CASINO_TIMEOUT_SEC,
+    )
+
+    MAIN_TICK_SLEEP = _int_from_config(
+        bot_config.get("main_tick_sleep_seconds", MAIN_TICK_SLEEP),
+        MAIN_TICK_SLEEP,
+    )
+
+    AUTOAUTH_ENABLED = _bool_from_config(
+        autoauth_config.get("enabled", AUTOAUTH_ENABLED),
+        AUTOAUTH_ENABLED,
+    )
+
+    AUTOAUTH_INTERVAL_MINUTES = _float_from_config(
+        autoauth_config.get("interval_minutes", AUTOAUTH_INTERVAL_MINUTES),
+        AUTOAUTH_INTERVAL_MINUTES,
+    )
+
+    AUTOAUTH_RUN_ON_START = _bool_from_config(
+        autoauth_config.get("run_on_start", AUTOAUTH_RUN_ON_START),
+        AUTOAUTH_RUN_ON_START,
+    )
+
+    AUTODATACLEAR_ENABLED = _bool_from_config(
+        autodataclear_config.get("enabled", AUTODATACLEAR_ENABLED),
+        AUTODATACLEAR_ENABLED,
+    )
+
+    AUTODATACLEAR_INTERVAL_MINUTES = _float_from_config(
+        autodataclear_config.get("interval_minutes", AUTODATACLEAR_INTERVAL_MINUTES),
+        AUTODATACLEAR_INTERVAL_MINUTES,
+    )
+
+    AUTODATACLEAR_RUN_ON_START = _bool_from_config(
+        autodataclear_config.get("run_on_start", AUTODATACLEAR_RUN_ON_START),
+        AUTODATACLEAR_RUN_ON_START,
+    )
+
+    lookup = {entry.key: entry for entry in casino_loop_entries}
+    configured_entries = []
+
+    for item in config.get("casinos", []):
+        if not isinstance(item, dict):
+            continue
+
+        key = normalize_config_key(str(item.get("key", "")))
+        if not key or key not in lookup:
+            continue
+
+        entry = lookup[key]
+
+        entry.enabled = _bool_from_config(item.get("enabled", entry.enabled), entry.enabled)
+        entry.interval_minutes = _float_from_config(
+            item.get("interval_minutes", entry.interval_minutes),
+            entry.interval_minutes,
+        )
+
+        display_name = str(item.get("display_name", "")).strip()
+        if display_name:
+            entry.display_name = display_name
+
+        configured_entries.append(entry)
+
+    seen = {entry.key for entry in configured_entries}
+
+    for entry in casino_loop_entries:
+        if entry.key not in seen:
+            configured_entries.append(entry)
+
+    if configured_entries:
+        casino_loop_entries[:] = configured_entries
+
+    _sync_auto_schedules(force=not preserve_next_runs)
+
+
+def load_config_from_disk(force: bool = False, create_missing: bool = True) -> bool:
+    """
+    Returns True if config was loaded or created.
+    """
+    global CONFIG_LAST_MTIME
+
+    if not CONFIG_PATH.exists():
+        if create_missing:
+            save_config_from_runtime()
+            print(f"[Config] Created default config at {CONFIG_PATH}")
+            return True
+
+        return False
+
+    try:
+        current_mtime = CONFIG_PATH.stat().st_mtime
+    except Exception:
+        current_mtime = None
+
+    if not force and CONFIG_LAST_MTIME is not None and current_mtime == CONFIG_LAST_MTIME:
+        return False
+
+    try:
+        with CONFIG_PATH.open("rb") as f:
+            config = tomllib.load(f)
+
+        apply_config_to_runtime(config, preserve_next_runs=True)
+        CONFIG_LAST_MTIME = current_mtime
+        print(f"[Config] Loaded config from {CONFIG_PATH}")
+        return True
+
+    except Exception as e:
+        print(f"[Config] Failed to load {CONFIG_PATH}: {type(e).__name__}: {e}")
+        return False
+
+
+def reload_config_if_changed() -> bool:
+    return load_config_from_disk(force=False, create_missing=True)
+
+
+def reset_loop_schedule():
+    base = dt.datetime.now(dt.timezone.utc)
+    for i, entry in enumerate(casino_loop_entries):
+        entry.next_run = base + dt.timedelta(seconds=i * LOOP_STAGGER_SECONDS)
+
+
+def find_loop_entry(casino: str) -> Optional[CasinoLoopEntry]:
+    casino = normalize_config_key(casino)
+    return next((e for e in casino_loop_entries if e.key.lower() == casino), None)
+
+
+main_loop_task: Optional[asyncio.Task] = None
+main_loop_running = False
+
+
+def is_main_loop_running() -> bool:
+    return main_loop_running and main_loop_task and not main_loop_task.done()
+
+
+def _detect_user_data_dir() -> Optional[str]:
+    if "instance_dir" in globals():
+        v = str(globals()["instance_dir"]) or ""
+        if v.strip():
+            return v.strip()
+
+    for k in ("CHROME_INSTANCE_DIR", "CHROME_USER_DATA_DIR", "SB_USER_DATA_DIR"):
+        v = os.getenv(k, "").strip()
+        if v:
+            return v
+
+    return None
+
+
+async def clear_chrome_user_data(channel=None, reason: str = "manual") -> bool:
+    global driver
+
+    root = _detect_user_data_dir()
+
+    if not root:
+        if channel:
+            await channel.send("⚠️ No CHROME_INSTANCE_DIR or CHROME_USER_DATA_DIR configured — nothing to clear.")
+        return False
+
+    if channel:
+        await channel.send(f"🧽 Clearing Chrome user-data for `{reason}`:\n```{root}```")
+
+    for _ in range(40):
+        with _active_exec_lock:
+            busy = _active_exec_jobs
+
+        if busy == 0:
+            break
+
+        await asyncio.sleep(0.5)
+
+    try:
+        driver.quit()
+    except Exception:
+        pass
+
+    try:
+        killed = 0
+
+        if psutil:
+            for p in psutil.process_iter(attrs=["name", "cmdline"]):
+                nm = (p.info.get("name") or "").lower()
+                cmd = " ".join(p.info.get("cmdline") or [])
+
+                if "chrome" in nm or "chromium" in nm:
+                    if (not root) or (f"--user-data-dir={root}" in cmd):
+                        try:
+                            p.send_signal(signal.SIGKILL)
+                            killed += 1
+                        except Exception:
+                            pass
+
+        if killed and channel:
+            await channel.send(f"🔪 Killed {killed} stray Chrome processes.")
+
+    except Exception:
+        pass
+
+    try:
+        shutil.rmtree(root, ignore_errors=True)
+    except Exception as e:
+        if channel:
+            await channel.send(f"⚠️ Failed to clear profile dir: `{e}`")
+        return False
+
+    try:
+        driver = _build_driver_with_retry(options)
+    except Exception as e:
+        if channel:
+            await channel.send(f"❌ Failed to restart Chrome after data clear: `{type(e).__name__}: {e}`")
+        return False
+
+    if channel:
+        await channel.send("✅ Chrome user-data cleared and Chrome restarted.")
+
+    return True
+
+
+async def run_auto_google_auth(channel) -> bool:
+    google_credentials = os.getenv("GOOGLE_LOGIN")
+
+    if not google_credentials or ":" not in google_credentials:
+        try:
+            await channel.send("⚠️ Autoauth skipped: missing `.env` `GOOGLE_LOGIN=email:password`.")
+        except Exception:
+            pass
+        return False
+
+    u, p = google_credentials.split(":", 1)
+    creds = (u, p)
+
+    try:
+        await channel.send("🔐 Autoauth: authenticating Google account…")
+    except Exception:
+        pass
+
+    try:
+        result = google_auth(None, driver, channel, creds)
+        await _maybe_await(result)
+
+        try:
+            await channel.send("✅ Autoauth Google finished.")
+        except Exception:
+            pass
+
+        return True
+
+    except Exception as e:
+        try:
+            await channel.send(f"⚠️ Autoauth Google failed: `{type(e).__name__}: {e}`")
+        except Exception:
+            pass
+
+        return False
+
+
+async def maybe_run_auto_tasks(channel):
+    global AUTOAUTH_NEXT_RUN, AUTODATACLEAR_NEXT_RUN
+
+    now = dt.datetime.now(dt.timezone.utc)
+
+    if AUTOAUTH_ENABLED and AUTOAUTH_NEXT_RUN is not None and now >= AUTOAUTH_NEXT_RUN:
+        try:
+            await run_auto_google_auth(channel)
+        finally:
+            AUTOAUTH_NEXT_RUN = dt.datetime.now(dt.timezone.utc) + dt.timedelta(minutes=AUTOAUTH_INTERVAL_MINUTES)
+
+    if AUTODATACLEAR_ENABLED and AUTODATACLEAR_NEXT_RUN is not None and now >= AUTODATACLEAR_NEXT_RUN:
+        try:
+            await clear_chrome_user_data(channel=channel, reason="autodataclear")
+        finally:
+            AUTODATACLEAR_NEXT_RUN = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
+                minutes=AUTODATACLEAR_INTERVAL_MINUTES
+            )
+
+
+async def run_main_loop(channel: discord.abc.Messageable):
+    global main_loop_running
+
+    try:
+        while main_loop_running:
+            reload_config_if_changed()
+            await maybe_run_auto_tasks(channel)
+
+            now = dt.datetime.now(dt.timezone.utc)
+
+            for entry in list(casino_loop_entries):
+                if not entry.enabled:
+                    continue
+
+                if now >= entry.next_run:
+                    try:
+                        await asyncio.wait_for(entry.runner(channel), timeout=PER_CASINO_TIMEOUT_SEC)
+                    except asyncio.TimeoutError:
+                        try:
+                            await channel.send(
+                                f"⏳ {entry.display_name} timed out after {PER_CASINO_TIMEOUT_SEC}s. Skipping."
+                            )
+                        except Exception:
+                            pass
+                        print(f"[Loop] {entry.display_name} timed out.")
+                    except Exception as e:
+                        print(f"[Loop] Error in {entry.display_name}: {type(e).__name__}: {e}")
+                        try:
+                            await channel.send(f"⚠️ {entry.display_name} error: `{type(e).__name__}: {e}`")
+                        except Exception:
+                            pass
+                    finally:
+                        entry.schedule_next()
+
+            await asyncio.sleep(MAIN_TICK_SLEEP)
+
+    except asyncio.CancelledError:
+        pass
+    finally:
+        main_loop_running = False
+
+
+async def start_main_loop(channel: Optional[discord.abc.Messageable] = None) -> bool:
+    global main_loop_task, main_loop_running
+
+    if is_main_loop_running():
+        return False
+
+    if channel is None:
+        channel = bot.get_channel(DISCORD_CHANNEL)
+
+    if channel is None:
+        print("[Loop] Cannot start, channel not found.")
+        return False
+
+    load_config_from_disk(force=True, create_missing=True)
+    reset_loop_schedule()
+    main_loop_running = True
+    main_loop_task = asyncio.create_task(run_main_loop(channel))
+    return True
+
+
+async def stop_main_loop() -> bool:
+    global main_loop_task, main_loop_running
+
+    if not is_main_loop_running():
+        return False
+
+    main_loop_running = False
+
+    if main_loop_task:
+        main_loop_task.cancel()
+        try:
+            await main_loop_task
+        except asyncio.CancelledError:
+            pass
+
+    main_loop_task = None
+    return True
+
+
+# Load/create config before the bot starts.
+load_config_from_disk(force=True, create_missing=True)
+
+
+# ───────────────────────────────────────────────────────────
 # Modo auth helper
 # ───────────────────────────────────────────────────────────
 async def run_modo_auth(channel):
@@ -1017,7 +1513,7 @@ async def on_ready():
         await asyncio.sleep(10)
 
         if await start_main_loop(channel):
-            await channel.send("🎰 Casino loop started with current configuration.")
+            await channel.send("🎰 Casino loop started with current TOML configuration.")
     else:
         print("Invalid DISCORD_CHANNEL")
 
@@ -1146,9 +1642,7 @@ async def stop_loop_command(ctx: commands.Context):
 
 @bot.command(name="cleardatadir")
 async def clear_data_dir(ctx: commands.Context):
-    global driver
-
-    root = instance_dir or os.getenv("CHROME_USER_DATA_DIR", "").strip()
+    root = _detect_user_data_dir()
 
     if not root:
         await ctx.send("⚠️ No CHROME_INSTANCE_DIR or CHROME_USER_DATA_DIR configured — nothing to clear.")
@@ -1174,71 +1668,13 @@ async def clear_data_dir(ctx: commands.Context):
         await ctx.send("❎ Cancelled.")
         return
 
-    await ctx.send("🛑 Stopping the loop…")
     try:
         if is_main_loop_running():
             await stop_main_loop()
     except Exception:
         pass
 
-    await ctx.send("⏳ Waiting for background tasks to finish, up to 20s…")
-    for _ in range(40):
-        with _active_exec_lock:
-            busy = _active_exec_jobs
-
-        if busy == 0:
-            break
-
-        await asyncio.sleep(0.5)
-    else:
-        await ctx.send("⚠️ Background task still running; proceeding anyway.")
-
-    await ctx.send("🔌 Quitting Chrome…")
-    try:
-        driver.quit()
-    except Exception:
-        pass
-
-    try:
-        killed = 0
-
-        if psutil:
-            for p in psutil.process_iter(attrs=["name", "cmdline"]):
-                nm = (p.info.get("name") or "").lower()
-                cmd = " ".join(p.info.get("cmdline") or [])
-
-                if "chrome" in nm or "chromium" in nm:
-                    if (not root) or (f"--user-data-dir={root}" in cmd):
-                        try:
-                            p.send_signal(signal.SIGKILL)
-                            killed += 1
-                        except Exception:
-                            pass
-
-        if killed:
-            await ctx.send(f"🔪 Killed {killed} stray Chrome processes.")
-
-    except Exception:
-        pass
-
-    await ctx.send(f"🧽 Clearing Chrome user-data at:\n```{root}```")
-
-    try:
-        shutil.rmtree(root, ignore_errors=True)
-        await ctx.send("✅ Chrome user-data cleared.")
-    except Exception as e:
-        await ctx.send(f"⚠️ Failed to clear profile dir: `{e}`")
-        return
-
-    await ctx.send("🚀 Restarting Chrome with a fresh profile…")
-
-    try:
-        _apply_common_chrome_flags(options)
-        driver = _build_driver_with_retry(options)
-        await ctx.send("✅ Chrome restarted.")
-    except Exception as e:
-        await ctx.send(f"❌ Failed to restart Chrome: `{e}`")
-        return
+    await clear_chrome_user_data(channel=ctx.channel, reason="manual cleardatadir")
 
     try:
         channel = bot.get_channel(DISCORD_CHANNEL)
@@ -1283,20 +1719,6 @@ def _maybe_quit_driver() -> None:
                     getattr(obj, "quit", lambda: None)()
             except Exception:
                 pass
-
-
-def _detect_user_data_dir() -> Optional[str]:
-    if "instance_dir" in globals():
-        v = str(globals()["instance_dir"]) or ""
-        if v.strip():
-            return v.strip()
-
-    for k in ("CHROME_INSTANCE_DIR", "CHROME_USER_DATA_DIR", "SB_USER_DATA_DIR"):
-        v = os.getenv(k, "").strip()
-        if v:
-            return v
-
-    return None
 
 
 def _q(s: str) -> str:
@@ -1348,6 +1770,7 @@ async def reset_cmd(ctx, mode: str = ""):
         f"• Compose file: `{compose_file}`\n"
         f"• Target service: `{target_svc}` watchtower stays running\n"
         f"• Chrome profile: `{user_data or '(none configured)'}`\n"
+        f"• Config file: `{CONFIG_PATH}`\n"
         f"• Build mode: `{'--no-cache' if nocache else '(cached)'}`\n"
         f"• Helper image: `{helper_image}`\n\n"
         "Type **YES** within 20 seconds to proceed. Anything else cancels."
@@ -1502,13 +1925,37 @@ async def reset_cmd(ctx, mode: str = ""):
 # ───────────────────────────────────────────────────────────
 # Config command
 # ───────────────────────────────────────────────────────────
+def _next_run_text(value: Optional[dt.datetime]) -> str:
+    if value is None:
+        return "disabled"
+
+    now = dt.datetime.now(dt.timezone.utc)
+    seconds = max(0, int((value - now).total_seconds()))
+    minutes = seconds // 60
+
+    return f"in ~{minutes} min"
+
+
 def format_loop_config() -> str:
+    reload_config_if_changed()
+
     status = "running" if is_main_loop_running() else "stopped"
 
     lines = [
-        "🎛️ **Casino loop configuration**",
+        "🎛️ **CasinoClaim TOML configuration**",
+        f"Config file: `{CONFIG_PATH}`",
         f"Status: **{status}**",
-        "Order, state, and intervals:",
+        "",
+        "**Bot:**",
+        f"loop_stagger_seconds: `{LOOP_STAGGER_SECONDS}`",
+        f"per_casino_timeout_seconds: `{PER_CASINO_TIMEOUT_SEC}`",
+        f"main_tick_sleep_seconds: `{MAIN_TICK_SLEEP}`",
+        "",
+        "**Automation:**",
+        f"autoauth: `{'enabled' if AUTOAUTH_ENABLED else 'disabled'}` every `{AUTOAUTH_INTERVAL_MINUTES:g}` min, next `{_next_run_text(AUTOAUTH_NEXT_RUN)}`",
+        f"autodataclear: `{'enabled' if AUTODATACLEAR_ENABLED else 'disabled'}` every `{AUTODATACLEAR_INTERVAL_MINUTES:g}` min, next `{_next_run_text(AUTODATACLEAR_NEXT_RUN)}`",
+        "",
+        "**Casino order, state, and intervals:**",
     ]
 
     for i, e in enumerate(casino_loop_entries, 1):
@@ -1519,10 +1966,16 @@ def format_loop_config() -> str:
 
     lines += [
         "",
-        "Use `!config interval <casino> <minutes>` to change an interval.",
-        "Use `!config enable <casino>` to enable a casino in the loop.",
-        "Use `!config disable <casino>` to disable a casino in the loop.",
-        "Use `!config order <casino1> <casino2> ...>` to set a new run order.",
+        "**Commands:**",
+        "`!config reload` - reload config from TOML",
+        "`!config save` - overwrite TOML with current runtime config",
+        "`!config enable <casino>`",
+        "`!config disable <casino>`",
+        "`!config interval <casino> <minutes>`",
+        "`!config order <casino1> <casino2> ...>`",
+        "`!config autoauth enable|disable|interval|runonstart [value]`",
+        "`!config autodataclear enable|disable|interval|runonstart [value]`",
+        "`!config bot loop_stagger_seconds|per_casino_timeout_seconds|main_tick_sleep_seconds <value>`",
     ]
 
     return "\n".join(lines)
@@ -1530,10 +1983,37 @@ def format_loop_config() -> str:
 
 @dcommands.group(name="config", invoke_without_command=True)
 async def _config(ctx: dcommands.Context):
-    await ctx.send(format_loop_config())
+    await _send_long_message(ctx, format_loop_config())
 
 
 bot.add_command(_config)
+
+
+@_config.command(name="path")
+async def config_path(ctx: dcommands.Context):
+    await ctx.send(f"Config path:\n```{CONFIG_PATH}```")
+
+
+@_config.command(name="reload")
+async def config_reload(ctx: dcommands.Context):
+    loaded = load_config_from_disk(force=True, create_missing=True)
+
+    if loaded:
+        reset_loop_schedule()
+        await ctx.send("✅ Reloaded TOML config and reset loop schedule.")
+    else:
+        await ctx.send("⚠️ Could not reload TOML config. Check container logs.")
+
+
+@_config.command(name="save")
+async def config_save(ctx: dcommands.Context):
+    save_config_from_runtime()
+    await ctx.send(f"✅ Wrote current runtime config to:\n```{CONFIG_PATH}```")
+
+
+@_config.command(name="show")
+async def config_show(ctx: dcommands.Context):
+    await _send_long_message(ctx, format_loop_config())
 
 
 @_config.command(name="interval")
@@ -1550,8 +2030,9 @@ async def config_interval(ctx: dcommands.Context, casino: str, minutes: float):
 
     target.interval_minutes = minutes
     target.next_run = dt.datetime.now(dt.timezone.utc)
+    save_config_from_runtime()
 
-    await ctx.send(f"Updated {target.display_name} to run every {minutes:.1f} minutes.")
+    await ctx.send(f"✅ Updated {target.display_name} to run every {minutes:.1f} minutes and wrote TOML config.")
 
 
 @_config.command(name="enable")
@@ -1568,8 +2049,9 @@ async def config_enable(ctx: dcommands.Context, casino: str):
 
     target.enabled = True
     target.next_run = dt.datetime.now(dt.timezone.utc)
+    save_config_from_runtime()
 
-    await ctx.send(f"✅ Enabled {target.display_name} in the automated loop.")
+    await ctx.send(f"✅ Enabled {target.display_name} in the automated loop and wrote TOML config.")
 
 
 @_config.command(name="disable")
@@ -1585,8 +2067,9 @@ async def config_disable(ctx: dcommands.Context, casino: str):
         return
 
     target.enabled = False
+    save_config_from_runtime()
 
-    await ctx.send(f"⏸️ Disabled {target.display_name} in the automated loop.")
+    await ctx.send(f"⏸️ Disabled {target.display_name} in the automated loop and wrote TOML config.")
 
 
 @_config.command(name="order")
@@ -1595,19 +2078,216 @@ async def config_order(ctx: dcommands.Context, *casinos: str):
         await ctx.send("Provide the complete list of casino keys in the desired order.")
         return
 
-    desired = [CASINO_ALIAS_MAP.get(c.lower(), c.lower()) for c in casinos]
+    desired = [normalize_config_key(c) for c in casinos]
     current = [e.key for e in casino_loop_entries]
 
     if len(desired) != len(current) or set(desired) != set(current):
-        await ctx.send(f"You must include each of: {', '.join(current)} exactly once.")
+        await ctx.send(
+            "You must include each casino exactly once.\n"
+            f"Current keys:\n```{', '.join(current)}```"
+        )
         return
 
     lookup = {e.key: e for e in casino_loop_entries}
     casino_loop_entries[:] = [lookup[k] for k in desired]
 
     reset_loop_schedule()
+    save_config_from_runtime()
 
-    await ctx.send("Casino loop order updated.\n" + format_loop_config())
+    await ctx.send("✅ Casino loop order updated and TOML config overwritten.\n" + format_loop_config())
+
+
+@_config.command(name="bot")
+async def config_bot(ctx: dcommands.Context, setting: str = "", value: str = ""):
+    global LOOP_STAGGER_SECONDS, PER_CASINO_TIMEOUT_SEC, MAIN_TICK_SLEEP
+
+    setting = (setting or "").strip().lower()
+    value = (value or "").strip()
+
+    allowed = {
+        "loop_stagger_seconds",
+        "per_casino_timeout_seconds",
+        "main_tick_sleep_seconds",
+    }
+
+    if setting not in allowed or not value:
+        await ctx.send(
+            "Usage:\n"
+            "`!config bot loop_stagger_seconds 30`\n"
+            "`!config bot per_casino_timeout_seconds 500`\n"
+            "`!config bot main_tick_sleep_seconds 10`"
+        )
+        return
+
+    try:
+        parsed = int(float(value))
+    except Exception:
+        await ctx.send("Value must be a number.")
+        return
+
+    if parsed <= 0:
+        await ctx.send("Value must be greater than zero.")
+        return
+
+    if setting == "loop_stagger_seconds":
+        LOOP_STAGGER_SECONDS = parsed
+    elif setting == "per_casino_timeout_seconds":
+        PER_CASINO_TIMEOUT_SEC = parsed
+    elif setting == "main_tick_sleep_seconds":
+        MAIN_TICK_SLEEP = parsed
+
+    save_config_from_runtime()
+    await ctx.send(f"✅ Updated `{setting}` to `{parsed}` and wrote TOML config.")
+
+
+def _parse_bool_arg(value: str) -> Optional[bool]:
+    value = (value or "").strip().lower()
+
+    if value in {"1", "true", "yes", "y", "on", "enable", "enabled"}:
+        return True
+
+    if value in {"0", "false", "no", "n", "off", "disable", "disabled"}:
+        return False
+
+    return None
+
+
+@_config.command(name="autoauth")
+async def config_autoauth(ctx: dcommands.Context, action: str = "", value: str = ""):
+    global AUTOAUTH_ENABLED, AUTOAUTH_INTERVAL_MINUTES, AUTOAUTH_RUN_ON_START
+
+    action = (action or "").strip().lower()
+    value = (value or "").strip()
+
+    if action in {"enable", "enabled", "on", "true"}:
+        AUTOAUTH_ENABLED = True
+
+        if value:
+            try:
+                AUTOAUTH_INTERVAL_MINUTES = float(value)
+            except Exception:
+                await ctx.send("Interval must be a number of minutes.")
+                return
+
+        _sync_auto_schedules(force=True)
+        save_config_from_runtime()
+        await ctx.send(f"✅ Autoauth enabled every `{AUTOAUTH_INTERVAL_MINUTES:g}` minutes and TOML config written.")
+        return
+
+    if action in {"disable", "disabled", "off", "false"}:
+        AUTOAUTH_ENABLED = False
+        _sync_auto_schedules(force=True)
+        save_config_from_runtime()
+        await ctx.send("⏸️ Autoauth disabled and TOML config written.")
+        return
+
+    if action == "interval":
+        try:
+            minutes = float(value)
+        except Exception:
+            await ctx.send("Usage: `!config autoauth interval <minutes>`")
+            return
+
+        if minutes <= 0:
+            await ctx.send("Interval must be greater than zero.")
+            return
+
+        AUTOAUTH_INTERVAL_MINUTES = minutes
+        _sync_auto_schedules(force=True)
+        save_config_from_runtime()
+        await ctx.send(f"✅ Autoauth interval set to `{minutes:g}` minutes and TOML config written.")
+        return
+
+    if action in {"runonstart", "run_on_start"}:
+        parsed = _parse_bool_arg(value)
+
+        if parsed is None:
+            await ctx.send("Usage: `!config autoauth runonstart true|false`")
+            return
+
+        AUTOAUTH_RUN_ON_START = parsed
+        _sync_auto_schedules(force=True)
+        save_config_from_runtime()
+        await ctx.send(f"✅ Autoauth run_on_start set to `{parsed}` and TOML config written.")
+        return
+
+    await ctx.send(
+        "Usage:\n"
+        "`!config autoauth enable [minutes]`\n"
+        "`!config autoauth disable`\n"
+        "`!config autoauth interval <minutes>`\n"
+        "`!config autoauth runonstart true|false`"
+    )
+
+
+@_config.command(name="autodataclear")
+async def config_autodataclear(ctx: dcommands.Context, action: str = "", value: str = ""):
+    global AUTODATACLEAR_ENABLED, AUTODATACLEAR_INTERVAL_MINUTES, AUTODATACLEAR_RUN_ON_START
+
+    action = (action or "").strip().lower()
+    value = (value or "").strip()
+
+    if action in {"enable", "enabled", "on", "true"}:
+        AUTODATACLEAR_ENABLED = True
+
+        if value:
+            try:
+                AUTODATACLEAR_INTERVAL_MINUTES = float(value)
+            except Exception:
+                await ctx.send("Interval must be a number of minutes.")
+                return
+
+        _sync_auto_schedules(force=True)
+        save_config_from_runtime()
+        await ctx.send(
+            f"✅ Autodataclear enabled every `{AUTODATACLEAR_INTERVAL_MINUTES:g}` minutes and TOML config written."
+        )
+        return
+
+    if action in {"disable", "disabled", "off", "false"}:
+        AUTODATACLEAR_ENABLED = False
+        _sync_auto_schedules(force=True)
+        save_config_from_runtime()
+        await ctx.send("⏸️ Autodataclear disabled and TOML config written.")
+        return
+
+    if action == "interval":
+        try:
+            minutes = float(value)
+        except Exception:
+            await ctx.send("Usage: `!config autodataclear interval <minutes>`")
+            return
+
+        if minutes <= 0:
+            await ctx.send("Interval must be greater than zero.")
+            return
+
+        AUTODATACLEAR_INTERVAL_MINUTES = minutes
+        _sync_auto_schedules(force=True)
+        save_config_from_runtime()
+        await ctx.send(f"✅ Autodataclear interval set to `{minutes:g}` minutes and TOML config written.")
+        return
+
+    if action in {"runonstart", "run_on_start"}:
+        parsed = _parse_bool_arg(value)
+
+        if parsed is None:
+            await ctx.send("Usage: `!config autodataclear runonstart true|false`")
+            return
+
+        AUTODATACLEAR_RUN_ON_START = parsed
+        _sync_auto_schedules(force=True)
+        save_config_from_runtime()
+        await ctx.send(f"✅ Autodataclear run_on_start set to `{parsed}` and TOML config written.")
+        return
+
+    await ctx.send(
+        "Usage:\n"
+        "`!config autodataclear enable [minutes]`\n"
+        "`!config autodataclear disable`\n"
+        "`!config autodataclear interval <minutes>`\n"
+        "`!config autodataclear runonstart true|false`"
+    )
 
 
 # ───────────────────────────────────────────────────────────
@@ -2201,12 +2881,28 @@ Aliases:
 !imports winbonanza
 
 ---------------------------------------  
+⚙️ **Config/TOML:**
+!config
+!config path
+!config reload
+!config save
+!config enable <casino>
+!config disable <casino>
+!config interval <casino> <minutes>
+!config order <all casinos in order>
+!config autoauth enable|disable|interval|runonstart [value]
+!config autodataclear enable|disable|interval|runonstart [value]
+!config bot loop_stagger_seconds|per_casino_timeout_seconds|main_tick_sleep_seconds <value>
+
+---------------------------------------  
 ⚙️ **General:**  
-!ping, !restart, !help, !start, !stop, !about, !config, !reset
+!ping, !restart, !help, !start, !stop, !about, !reset
 
 Examples:
 `!config disable spinquest`
 `!config enable winbonanza`
+`!config autoauth enable 720`
+`!config autodataclear enable 1440`
 `!winbonanza`
 """
     )
