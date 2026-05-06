@@ -16,7 +16,10 @@ import asyncio
 import importlib
 import importlib.util
 import threading
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 from pathlib import Path
 from dataclasses import dataclass, field
 import datetime as dt

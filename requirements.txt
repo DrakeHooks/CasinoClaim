@@ -16,4 +16,4 @@ pytesseract
 opencv-python-headless
 brotli
 seleniumbase
-tomllib
+tomli
