@@ -12,3 +12,8 @@ chrome-profile/
 **/Login Data*
 **/Web Data*
 **/History*
+
+
+# Live bot config, generated/edited by the bot
+config/*
+!config/.gitkeep

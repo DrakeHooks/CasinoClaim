@@ -1,11 +1,8 @@
 services:
   casino-bot:
     container_name: casino-bot
-
-    # Remote image (current) Use drakehooks/casinoclaim:testing for testing 
     image: drakehooks/casinoclaim:testing
-    # ── Local build option (comment out the line above and use this instead)
-    # image: casinoclaim-local:dev
+    pull_policy: always
 
     ports:
       - "5900:5900"
@@ -15,11 +12,13 @@ services:
       - CHROME_PROFILE_DIR=Default
       - PYTHONPATH=/app:/app/apis:/app/app
       - FC_USER_DATA_DIR=/data/fortunecoins
+      - CASINO_CONFIG_PATH=/config/config.toml
 
     volumes:
       - chrome-profile:/data/chrome
       - chrome-profile:/data/fortunecoins
-      - ./CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx:/temp/CAPTCHA-Solver.crx
+      - ./config:/config:rw
+      - ./CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx:/temp/CAPTCHA-Solver-auto-hCAPTCHA-reCAPTCHA-freely-Chrome-Web-Store.crx:ro
 
     env_file:
       - .env
@@ -27,14 +26,13 @@ services:
     shm_size: "2g"
     restart: unless-stopped
 
-    entrypoint: ["/bin/bash","-lc","bash /app/entrypoint.sh"]
+    entrypoint: ["/bin/bash", "-lc", "bash /app/entrypoint.sh"]
 
     labels:
       - com.centurylinklabs.watchtower.enable=true
 
   watchtower:
     container_name: watchtower
-    # Active fork (instead of containrrr/watchtower)
     image: nickfedor/watchtower:latest-dev
 
     volumes:

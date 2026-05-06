@@ -96,6 +96,7 @@ def get_luckparty_credentials() -> Tuple[str, str]:
     return email, password
 
 
+
 # ───────────────────────────────────────────────────────────
 # DISCORD HELPERS
 # ───────────────────────────────────────────────────────────
@@ -455,6 +456,7 @@ def wait_for_coin_store(sb: SB, timeout: int = 25) -> bool:
 
 def open_login_page(sb: SB) -> bool:
     try:
+
         sb.uc_open_with_reconnect(LOGIN_URL, 4)
     except Exception:
         try:
