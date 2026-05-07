@@ -28,6 +28,7 @@ from selenium.common.exceptions import (
 # ───────────────────────────────────────────────────────────
 # Config & Constants
 # ───────────────────────────────────────────────────────────
+
 load_dotenv()
 CHIPNWIN_CRED = os.getenv("CHIPNWIN")  # format "username:password"
 SITE_URL = "https://chipnwin.com"
@@ -38,10 +39,13 @@ COOKIE_BUTTON_XPATHS = [
     "/html/body/div[1]/div[7]/div/div[2]/button",
 ]
 
-LOGIN_BUTTON_XPATH = "/html/body/div[1]/div[3]/div[1]/div[2]/div[1]/button"
+LOGIN_BUTTON_XPATH = "//span[@class='s14__w500__h22 color_ADADC2']"
+EMAIL_INPUT_XPATH = "//input[@id='input_customemail']"
+PASSWORD_INPUT_XPATH = "//input[@id='input_custompassword']"
 
-EMAIL_INPUT_ID = "input_customemail"
-PASSWORD_INPUT_ID = "input_custompassword"
+
+#EMAIL_INPUT_ID = "input_customemail"
+#PASSWORD_INPUT_ID = "input_custompassword"
 
 LOGIN_SUBMIT_XPATHS = [
     "/html/body/div[1]/div[6]/div/div[2]/div[2]/div[5]/div/button",
@@ -75,6 +79,7 @@ COUNTDOWN_XPATH = "//p[starts-with(@class, 's14__w500__h22') and contains(normal
 # ───────────────────────────────────────────────────────────
 # Helpers
 # ───────────────────────────────────────────────────────────
+
 def _is_logged_in(driver) -> bool:
     """Detect if already logged in."""
     try:
@@ -244,8 +249,9 @@ def _confirm_claim_succeeded(driver, clicked_element, timeout=8) -> bool:
 
 
 # ───────────────────────────────────────────────────────────
-# 1) Login & then hand off to claim
+# 1) Login Flow
 # ───────────────────────────────────────────────────────────
+
 async def chipnwin_casino(ctx, driver, channel):
     if not CHIPNWIN_CRED:
         await channel.send("❌ Missing `CHIPNWIN` as 'email:password' in your .env.")
@@ -253,9 +259,9 @@ async def chipnwin_casino(ctx, driver, channel):
 
     username, password = CHIPNWIN_CRED.split(":", 1)
 
-    print("[Chipnwin] Navigating to site…")
+    print("[Chipnwin] Navigating to site...")
     driver.get(SITE_URL)
-    await asyncio.sleep(6)
+    await asyncio.sleep(10)
 
     # Accept cookies (best-effort)
     print("[Chipnwin] Attempting to accept cookie...")
@@ -263,7 +269,7 @@ async def chipnwin_casino(ctx, driver, channel):
         try:
             cookie = WebDriverWait(driver, 4).until(EC.element_to_be_clickable((By.XPATH, cb)))
             if _safe_click(driver, cookie):
-                await asyncio.sleep(2)
+                await asyncio.sleep(5)
                 break
         except TimeoutException:
             pass
@@ -271,7 +277,7 @@ async def chipnwin_casino(ctx, driver, channel):
             pass
 
     if _is_logged_in(driver):
-        print("[Chipnwin] Already logged in, skipping login.")
+        print("[Chipnwin] Already logged in.")
         await claim_chipnwin_bonus(ctx, driver, channel)
         return
 
@@ -281,26 +287,26 @@ async def chipnwin_casino(ctx, driver, channel):
         try:
             login_btn = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, LOGIN_BUTTON_XPATH)))
             _safe_click(driver, login_btn)
-            await asyncio.sleep(3)
+            await asyncio.sleep(10)
         except Exception:
-            print("[Chipnwin] Unable to click login button.")
+            print("[Chipnwin] Login button failed.")
 
         # Fill credentials
         try:
-            email = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, EMAIL_INPUT_ID)))
+            email = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, EMAIL_INPUT_XPATH)))
             email.clear()
             email.send_keys(username)
-            await asyncio.sleep(1)
+            await asyncio.sleep(5)
         except Exception:
-            print("[Chipnwin] Unable to enter email.")
+            print("[Chipnwin] Email input failed.")
 
         try:
-            pw = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, PASSWORD_INPUT_ID)))
+            pw = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, PASSWORD_INPUT_XPATH)))
             pw.clear()
             pw.send_keys(password)
-            await asyncio.sleep(1)
+            await asyncio.sleep(5)
         except Exception:
-            print("[Chipnwin] Unable to enter password.")
+            print("[Chipnwin] Password input failed.")
 
         # Submit
         submitted = False
@@ -310,18 +316,18 @@ async def chipnwin_casino(ctx, driver, channel):
                 if _safe_click(driver, btn):
                     submitted = True
                     print("[Chipnwin] Submitted credentials.")
-                    await asyncio.sleep(6)
+                    await asyncio.sleep(10)
                     break
             except Exception:
                 continue
 
         if not submitted:
-            print("[Chipnwin] Unable to submit login (no submit button clicked).")
+            print("[Chipnwin] Submit failed.")
 
         # Refresh to deal with popups / ensure session state
-        print("[Chipnwin] Reloading page.")
+        print("[Chipnwin] Reloading site once...")
         driver.refresh()
-        await asyncio.sleep(4)
+        await asyncio.sleep(5)
 
         await claim_chipnwin_bonus(ctx, driver, channel)
 
@@ -329,7 +335,7 @@ async def chipnwin_casino(ctx, driver, channel):
         screenshot = "chipnwin_login_error.png"
         driver.save_screenshot(screenshot)
         await channel.send(
-            "Chipnwin login timed out, will retry later.",
+            "Chipnwin login timed out.",
             file=discord.File(screenshot),
         )
         os.remove(screenshot)
@@ -337,10 +343,11 @@ async def chipnwin_casino(ctx, driver, channel):
 
 
 # ───────────────────────────────────────────────────────────
-# 2) After login: click the daily card + claim buttons
+# 2) Claim Bonus
 # ───────────────────────────────────────────────────────────
+
 async def claim_chipnwin_bonus(ctx, driver, channel):
-    print("[Chipnwin] Navigating to store…")
+    print("[Chipnwin] Navigating to store...")
     driver.get(STORE_URL)
     await asyncio.sleep(5)
 
@@ -355,7 +362,7 @@ async def claim_chipnwin_bonus(ctx, driver, channel):
 
     # IMPORTANT FIX:
     # Only announce "claimed" if click happens AND we can confirm a post-click success state.
-    print("[Chipnwin] Attempting to click Claim button...")
+    print("[Chipnwin] Attempting to claim bonus...")
     claimed = False
 
     claim_xpath, claim_btn = _first_clickable(driver, CLAIM_BUTTON_XPATHS, timeout=6)
@@ -389,8 +396,9 @@ async def claim_chipnwin_bonus(ctx, driver, channel):
 # ───────────────────────────────────────────────────────────
 # 3) Standalone countdown reader
 # ───────────────────────────────────────────────────────────
+
 async def check_chipnwin_countdown(ctx, driver, channel):
-    print("[Chipnwin] Navigating to store…")
+    print("[Chipnwin] Navigating to store...")
     driver.get(STORE_URL)
     await asyncio.sleep(6)
 
@@ -405,8 +413,9 @@ async def check_chipnwin_countdown(ctx, driver, channel):
 # ───────────────────────────────────────────────────────────
 # 4) Daily Spin Wheel
 # ───────────────────────────────────────────────────────────
+
 async def spin_chipnwin_wheel(ctx, driver, channel):
-    print("[Chipnwin] Navigating to store…")
+    print("[Chipnwin] Navigating to store...")
     driver.get(STORE_URL)
     await asyncio.sleep(6)
 
@@ -424,7 +433,3 @@ async def spin_chipnwin_wheel(ctx, driver, channel):
         await channel.send("Chipnwin Wheel Spun!")
     else:
         await channel.send("[Chipnwin] spin not available (or could not click).")
-
-
-
-
