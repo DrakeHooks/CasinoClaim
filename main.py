@@ -147,6 +147,7 @@ api_modules = [
     "gainsAPI",
     "stormrushAPI",
     "scarletsandsAPI",
+    "playtanaAPI",
     "yaycasinoAPI",
     "luckylandAPI",
 
@@ -788,6 +789,10 @@ async def _run_scarletsands(channel):
     await scarletsands_casino(None, driver, channel)
 
 
+async def _run_playtana(channel):
+    await playtana_casino(None, driver, channel)
+
+
 async def _run_lonestar(channel):
     await lonestar_casino(None, driver, channel)
 
@@ -862,6 +867,7 @@ casino_loop_entries: List[CasinoLoopEntry] = [
     CasinoLoopEntry("gains", "Gains", _run_gains, 1440),
     CasinoLoopEntry("stormrush", "Stormrush", _run_stormrush, 1440),
     CasinoLoopEntry("scarletsands", "Scarlet Sands", _run_scarletsands, 1440),
+    CasinoLoopEntry("playtana", "Playtana", _run_playtana, 1440),
     CasinoLoopEntry("realprize", "Real Prize", _run_realprize, 1440),
     CasinoLoopEntry("lonestar", "LoneStar Casino", _run_lonestar, 1440),
     CasinoLoopEntry("wildworld", "WildWorld", _run_wildworld, 1440),
@@ -1563,6 +1569,7 @@ MANUAL_CASINO_COMMANDS = {
     "gains",
     "stormrush",
     "scarletsands",
+    "playtana",
     "luckparty",
     "luckyparty",
     "winbonanza",
@@ -2448,6 +2455,12 @@ async def scarletsands_cmd(ctx):
     await scarletsands_casino(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
 
 
+@bot.command(name="playtana")
+async def playtana_cmd(ctx):
+    await ctx.send("Checking Playtana for bonus...")
+    await playtana_casino(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
+
+
 @bot.command(name="chipnwin")
 async def chipnwin_cmd(ctx):
     await ctx.send("Checking Chipnwin for bonus...")
@@ -2650,6 +2663,7 @@ async def debug_cmd(ctx, *, casino: str):
         "gains": lambda: gains_casino(ctx, driver, channel),
         "stormrush": lambda: stormrush_casino(ctx, driver, channel),
         "scarletsands": lambda: scarletsands_casino(ctx, driver, channel),
+        "playtana": lambda: playtana_casino(ctx, driver, channel),
         "crowncoins": lambda: crowncoins_casino(driver, bot, ctx, channel),
         "americanluck": lambda: americanluck_uc(ctx, channel),
         "rollingriches": lambda: rolling_riches_casino(ctx, driver, channel),
@@ -2886,7 +2900,7 @@ async def help_cmd(ctx):
 !fortunecoins, !nolimitcoins, !fortunewheelz, !stake, !dingdingding,
 !smilescasino, !yaycasino, !realprize, !luckyland, !jumbo, !spree,
 !chipnwin, !wildworld, !lonestar, !gains, !luckparty, !winbonanza,
-!stormrush, !scarletsands,
+!stormrush, !scarletsands, !playtana,
 
 Aliases:
 !luckyparty, !lp
