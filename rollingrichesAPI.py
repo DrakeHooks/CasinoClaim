@@ -351,7 +351,7 @@ async def _login_six_tries(driver, username: str, password: str) -> bool:
             return True
 
         try:
-            email = WebDriverWait(driver, 8).until(EC.presence_of_element_located((By.ID, "email")))
+            email = WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.ID, "email")))
             pwd   = driver.find_element(By.ID, "password")
             email.clear(); email.send_keys(username)
             pwd.clear();   pwd.send_keys(password); pwd.send_keys(Keys.ENTER)
@@ -360,7 +360,7 @@ async def _login_six_tries(driver, username: str, password: str) -> bool:
             await _log(f"⚠️ Couldn’t submit login on attempt {attempt}: {e}")
             continue
 
-        await asyncio.sleep(10)
+        await asyncio.sleep(15)
         await _driver_shot(driver, f"📸 10s after submit (attempt {attempt}/6)")
         await _close_popup(driver)
 
