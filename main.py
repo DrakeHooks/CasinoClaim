@@ -833,7 +833,7 @@ async def _run_stake(channel):
 
 
 async def _run_fortunewheelz(channel):
-    await fortunewheelz_flow(None, driver, channel)
+    await fortunewheelz_casino(None, driver, channel)
 
 
 async def _run_spinquest(channel):
@@ -860,11 +860,11 @@ casino_loop_entries: List[CasinoLoopEntry] = [
     CasinoLoopEntry("globalpoker", "GlobalPoker", _run_globalpoker, 120),
     CasinoLoopEntry("jumbo", "Jumbo", _run_jumbo, 120),
     CasinoLoopEntry("spree", "Spree", _run_spree, 120),
-    CasinoLoopEntry("fortunewheelz", "Fortune Wheelz", _run_fortunewheelz, 120),
     CasinoLoopEntry("nolimitcoins", "NoLimitCoins", _run_nlc, 120),
     CasinoLoopEntry("spinquest", "SpinQuest", _run_spinquest, 120),
 
     CasinoLoopEntry("gains", "Gains", _run_gains, 1440),
+    CasinoLoopEntry("fortunewheelz", "Fortune Wheelz", _run_fortunewheelz, 1440),
     CasinoLoopEntry("stormrush", "Stormrush", _run_stormrush, 1440),
     CasinoLoopEntry("scarletsands", "Scarlet Sands", _run_scarletsands, 1440),
     CasinoLoopEntry("playtana", "Playtana", _run_playtana, 1440),
@@ -2544,7 +2544,7 @@ async def stake_cmd(ctx):
 @bot.command(name="fortunewheelz")
 async def fortunewheelz_cmd(ctx):
     await ctx.send("Checking Fortune Wheelz for bonus…")
-    await fortunewheelz_flow(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
+    await fortunewheelz_casino(ctx, driver, bot.get_channel(DISCORD_CHANNEL))
 
 
 @bot.command(name="fortunewins", aliases=["fortune wins", "fw", "fortune coins", "fc", "fortunecoins"])
@@ -2669,7 +2669,7 @@ async def debug_cmd(ctx, *, casino: str):
         "rollingriches": lambda: rolling_riches_casino(ctx, driver, channel),
         "luckyland": lambda: luckyland_uc(ctx, channel),
         "stake": lambda: stake_claim(driver, bot, ctx, channel),
-        "fortunewheelz": lambda: fortunewheelz_flow(ctx, driver, channel),
+        "fortunewheelz": lambda: fortunewheelz_casino(ctx, driver, channel),
         "spinquest": lambda: spinquest_flow(ctx, driver, channel),
         "spinpals": lambda: spinpals_flow(ctx, driver, channel),
         "chumba": lambda: chumba_cmd(ctx),
