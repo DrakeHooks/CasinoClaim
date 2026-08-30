@@ -1,7 +1,7 @@
 services:
   casino-bot:
     container_name: casino-bot
-    image: drakehooks/casinoclaim:testing
+    image: drakehooks/casinoclaim:main
     pull_policy: always
 
     ports:
