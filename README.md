@@ -84,6 +84,7 @@ volumes:
 | SweepJungle       | ✓          | ✗              | No                          | $0.07 Average Daily              | No      |
 | Zumo              | ✓          | ✗              | No                          | $0.11 Average Daily              | No      |
 | Jolly Sweeps      | ✓          | ✗              | No                          | $0.20 Daily                      | No      |
+| Gleaming          | ✓          | ✗              | No                          | $0.24 Average Daily              | No      |
 | Rolling Riches    | ✓          | ✗              | No                          | $0.20 Daily                      | Yes     |
 | American Luck     | ✓          | ✗              | No                          | $0.60 Average Daily              | Yes     |
 | Fortune Wins      | ✓          | ✗              | No                          | $0.46 Average Daily              | Yes     |
