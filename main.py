@@ -219,6 +219,7 @@ api_modules = [
     "sweepjungleAPI",
     "zumoAPI",
     "jollysweepsAPI",
+    "gleamingAPI",
     "sweepicoAPI",
     "sweepsharkAPI",
     "yaycasinoAPI",
@@ -1234,6 +1235,10 @@ async def _run_jollysweeps(channel):
     await jollysweeps_casino(None, driver, channel)
 
 
+async def _run_gleaming(channel):
+    await gleaming_casino(None, driver, channel)
+
+
 async def _run_sweepico(channel):
     await sweepico_casino(None, driver, channel)
 
@@ -1331,6 +1336,8 @@ casino_loop_entries: List[CasinoLoopEntry] = [
     CasinoLoopEntry("zumo", "Zumo", _run_zumo, 1440),
 
     CasinoLoopEntry("jollysweeps", "Jolly Sweeps", _run_jollysweeps, 1440),
+
+    CasinoLoopEntry("gleaming", "Gleaming", _run_gleaming, 1440),
 
     CasinoLoopEntry("rollingriches", "Rolling Riches", _run_rollingriches, 1440),
     CasinoLoopEntry("americanluck", "American Luck", _run_americanluck, 1440),
@@ -2080,6 +2087,7 @@ MANUAL_CASINO_COMMANDS = {
     "sweepjungle",
     "zumo",
     "jollysweeps",
+    "gleaming",
     "sweepico",
     "sweepshark",
     "luckparty",
@@ -3183,6 +3191,16 @@ async def jollysweeps_cmd(ctx):
     )
 
 
+@bot.command(name="gleaming")
+async def gleaming_cmd(ctx):
+    await ctx.send("Checking Gleaming for bonus...")
+    await _run_manual_casino_command(
+        ctx,
+        "Gleaming",
+        lambda pctx, channel: gleaming_casino(pctx, driver, channel),
+    )
+
+
 @bot.command(name="sweepico")
 async def sweepico_cmd(ctx):
     await ctx.send("Checking Sweepico for bonus...")
@@ -3408,6 +3426,7 @@ async def _debug_worker_flow(ctx, channel, key: str):
         "sweepjungle": lambda: sweepjungle_casino(ctx, driver, channel),
         "zumo": lambda: zumo_casino(ctx, driver, channel),
         "jollysweeps": lambda: jollysweeps_casino(ctx, driver, channel),
+        "gleaming": lambda: gleaming_casino(ctx, driver, channel),
         "sweepico": lambda: sweepico_casino(ctx, driver, channel),
         "sweepshark": lambda: sweepshark_casino(ctx, driver, channel),
         "crowncoins": lambda: crowncoins_casino(driver, _bot(), ctx, channel),
@@ -3674,7 +3693,7 @@ async def help_cmd(ctx):
 !smilescasino, !yaycasino, !realprize, !luckyland, !jumbo, !spree,
 !chipnwin, !wildworld, !lonestar, !gains, !luckparty, !winbonanza,
 !stormrush, !scarletsands, !playtana, !cashoomo, !taofortune,
-!sweepjungle, !zumo, !jollysweeps, !sweepico, !sweepshark,
+!sweepjungle, !zumo, !jollysweeps, !sweepico, !sweepshark, !gleaming,
 
 Aliases:
 !luckyparty, !lp
