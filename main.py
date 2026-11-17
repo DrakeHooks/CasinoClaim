@@ -37,7 +37,9 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
-from selenium.common.exceptions import SessionNotCreatedException
+from selenium.common.exceptions import (
+    SessionNotCreatedException, InvalidSessionIdException, NoSuchWindowException, WebDriverException
+)
 from webdriver_manager.chrome import ChromeDriverManager
 
 # Discord
@@ -548,11 +550,16 @@ def _run_runner_in_worker_thread(
     _casino_worker_started(label)
 
     try:
+        _ensure_chrome_session(f"before {label}")
+
         async def _inner():
             result = runner(proxy_channel)
             return await _maybe_await(result)
 
         return asyncio.run(_inner())
+    except Exception as exc:
+        _recover_chrome_after_error(label, exc)
+        raise
 
     finally:
         try:
@@ -609,11 +616,16 @@ def _run_manual_action_in_worker_thread(label: str, ctx: commands.Context, main_
     _casino_worker_started(label)
 
     try:
+        _ensure_chrome_session(f"before manual {label}")
+
         async def _inner():
             result = action(proxy_ctx, proxy_channel)
             return await _maybe_await(result)
 
         return asyncio.run(_inner())
+    except Exception as exc:
+        _recover_chrome_after_error(f"manual {label}", exc)
+        raise
 
     finally:
         try:
@@ -1050,6 +1062,89 @@ def _build_driver_with_retry(opts: Options):
 
 
 driver = _build_driver_with_retry(options)
+
+
+# ───────────────────────────────────────────────────────────
+# Chrome session recovery. A WebDriver object does not become usable again
+# once Chrome/ChromeDriver loses its session: it must be replaced.
+# We recover BEFORE the next casino run; we never replay a failed claim.
+# ───────────────────────────────────────────────────────────
+_CHROME_RECOVERY_LOCK = threading.RLock()
+_CHROME_RECOVERY_COUNT = 0
+
+
+def _chrome_session_alive() -> bool:
+    """Probe the ChromeDriver session, not the site's internet connection."""
+    try:
+        handles = driver.window_handles
+        if not handles:
+            return False
+        try:
+            current = driver.current_window_handle
+        except NoSuchWindowException:
+            current = None
+        if current not in handles:
+            driver.switch_to.window(handles[0])
+        return True
+    except (InvalidSessionIdException, NoSuchWindowException, WebDriverException, OSError) as exc:
+        logging.warning("[Chrome] Session health probe failed: %s: %s", type(exc).__name__, exc)
+        return False
+
+
+def _ensure_chrome_session(reason: str) -> bool:
+    """Create a replacement driver only after the current session is unusable.
+
+    Returns True if a new session was created. Do not use from a second thread
+    while the casino worker is operating the browser.
+    """
+    global driver, _CHROME_RECOVERY_COUNT
+
+    with _CHROME_RECOVERY_LOCK:
+        if _chrome_session_alive():
+            return False
+
+        old = driver
+        old_id = getattr(old, "session_id", None)
+        logging.warning("[Chrome] Recreating invalid session %s (%s)", old_id, reason)
+        try:
+            old.quit()
+        except Exception:
+            logging.debug("[Chrome] Old session could not quit cleanly", exc_info=True)
+
+        # Reuse the configured profile to preserve browser logins. Do not
+        # delete cookies/profile data and do not replay a failed claim.
+        driver = _build_driver_with_retry(options)
+        _CHROME_RECOVERY_COUNT += 1
+        logging.warning(
+            "[Chrome] Session recovered: %s -> %s (recovery #%d)",
+            old_id, getattr(driver, "session_id", None), _CHROME_RECOVERY_COUNT,
+        )
+        return True
+
+
+def _recover_chrome_after_error(label: str, exc: Exception) -> None:
+    """Diagnose a failure and restore a dead driver for later jobs.
+
+    Leave the original exception for the caller. A claim can have succeeded
+    just before the browser died, so it must NOT be retried automatically.
+    """
+    message = str(exc).lower()
+    session_error = isinstance(exc, (InvalidSessionIdException, NoSuchWindowException)) or (
+        isinstance(exc, (WebDriverException, OSError)) and any(
+            marker in message for marker in (
+                "invalid session id", "session deleted", "chrome not reachable",
+                "not connected to devtools", "disconnected: unable to receive message",
+                "target window already closed", "connection refused",
+            )
+        )
+    )
+    if not session_error:
+        return
+    logging.warning("[Chrome] %s lost its browser session: %s", label, type(exc).__name__)
+    try:
+        _ensure_chrome_session(f"after {label}: {type(exc).__name__}")
+    except Exception:
+        logging.exception("[Chrome] Automatic recovery failed; next job will retry")
 
 
 # ───────────────────────────────────────────────────────────
@@ -1755,6 +1850,12 @@ def _detect_user_data_dir() -> Optional[str]:
 
 async def clear_chrome_user_data(channel=None, reason: str = "manual") -> bool:
     global driver
+
+    # Never wipe a live browser's profile while a casino job is using it.
+    if _casino_worker_busy():
+        if channel:
+            await channel.send("⚠️ Chrome data clear deferred: Selenium worker is busy.")
+        return False
 
     root = _detect_user_data_dir()
 
