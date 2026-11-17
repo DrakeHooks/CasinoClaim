@@ -19,15 +19,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set tags
+      # testing publishes only :testing and an immutable commit tag.
+      # main publishes :main (used by production Compose), :latest, and a commit tag.
+      - name: Set Docker image tags
         id: vars
+        shell: bash
         run: |
-          if [ "${GITHUB_REF_NAME}" = "main" ]; then
-            echo "TAG=latest" >> $GITHUB_OUTPUT
-          else
-            echo "TAG=testing" >> $GITHUB_OUTPUT
-          fi
-          echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+          {
+            echo "TAGS<<EOF"
+            if [[ "${GITHUB_REF_NAME}" == "main" ]]; then
+              echo "drakehooks/casinoclaim:main"
+              echo "drakehooks/casinoclaim:latest"
+            elif [[ "${GITHUB_REF_NAME}" == "testing" ]]; then
+              echo "drakehooks/casinoclaim:testing"
+            else
+              echo "Unexpected branch: ${GITHUB_REF_NAME}" >&2
+              exit 1
+            fi
+            echo "drakehooks/casinoclaim:${GITHUB_SHA::7}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -48,9 +59,7 @@ jobs:
           push: true
           # If you don't need ARM yet, set to linux/amd64
           platforms: linux/amd64
-          tags: |
-            drakehooks/casinoclaim:${{ steps.vars.outputs.TAG }}
-            drakehooks/casinoclaim:${{ steps.vars.outputs.SHORT_SHA }}
+          tags: ${{ steps.vars.outputs.TAGS }}
           # Optional: cache to speed up builds
           cache-from: type=gha
           cache-to: type=gha,mode=max
