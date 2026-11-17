@@ -19,6 +19,12 @@ SPORTZINO_CRED = os.getenv("SPORTZINO", "")
 
 LOGIN_URL = "https://sportzino.com/login"
 HOME_URL = "https://sportzino.com/"
+# Observed Nov 16, 2026. Layout-based XPath: diagnostic fallback only, never
+# enough on its own to authorize a claim click.
+CURRENT_DAILY_CLAIM_XPATH = (
+    "/html/body/div[1]/div[1]/div/div/div[2]/div[3]/div[2]/"
+    "div/div[1]/div/div[3]/div/div[1]/button"
+)
 
 EMAIL_LOCATORS: Tuple[str, ...] = (
     # Exact current Sportzino login field from the supplied DevTools markup.
@@ -998,87 +1004,154 @@ def _close_popups_before_rewards(sb: SB):
         pass
 
 
-def _open_rewards(sb: SB) -> bool:
-    locators = (
-        # Existing known header locations.
-        "/html/body/div[1]/div/nav/div/div[4]/div[1]/button",
-        "/html/body/div[1]/div[1]/div/nav/div/div[4]/div[1]/button",
-        # Current text and accessible-name fallbacks.
-        "//button[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'coin store')]",
-        "//a[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'coin store')]",
-        "//button[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'free coins')]",
-        "//button[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'get coins')]",
-        "//button[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'rewards')]",
-        "//a[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'free coins')]",
-        "//a[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'get coins')]",
-        "//a[contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'rewards')]",
-        "//*[@aria-label and (contains(translate(@aria-label, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'coin') or contains(translate(@aria-label, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'reward'))]",
-        "//*[@title and (contains(translate(@title, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'coin') or contains(translate(@title, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'reward'))]",
-    )
+def _inbox_panel_open(sb: SB) -> bool:
+    """Detect the new header inbox panel (not merely its mail icon)."""
+    return bool(_safe_js(sb, r"""
+        const visible = e => {
+            if (!e) return false;
+            const s = getComputedStyle(e), r = e.getBoundingClientRect();
+            return s.display !== 'none' && s.visibility !== 'hidden' &&
+                r.width > 0 && r.height > 0;
+        };
+        const panels = document.querySelectorAll(
+            '[class*="header-inbox" i], [class*="inbox-panel" i], ' +
+            '[class*="inbox-modal" i], [data-sentry-component*="Inbox" i]'
+        );
+        return [...panels].some(el => {
+            if (!visible(el)) return false;
+            // Header icon itself does not constitute an opened inbox.
+            if (el.matches('button, a, [role="button"]')) return false;
+            if (el.closest('header') && el.getBoundingClientRect().height < 100)
+                return false;
+            const t = (el.innerText || '').toLowerCase();
+            return t.includes('inbox') || t.includes('message') ||
+                t.includes('notification') || el.getBoundingClientRect().height > 160;
+        });
+    """, default=False))
 
-    if _try_click_any(sb, locators, timeout_each=4):
+
+def _close_inbox(sb: SB) -> bool:
+    """Try closing only the inbox; never click the header inbox button."""
+    if not _inbox_panel_open(sb):
+        return True
+    print('[Sportzino] New header inbox is open; closing before Coin Store.')
+    closed = bool(_safe_js(sb, r"""
+        const visible = e => {
+            const r = e.getBoundingClientRect(), s = getComputedStyle(e);
+            return r.width > 0 && r.height > 0 && s.display !== 'none';
+        };
+        const roots = [...document.querySelectorAll(
+            '[class*="inbox-panel" i], [class*="inbox-modal" i], ' +
+            '[class*="header-auth-inbox" i], [class*="header-inbox" i]'
+        )].filter(e => visible(e) && e.getBoundingClientRect().height > 100);
+        for (const root of roots) {
+            const button = [...root.querySelectorAll('button, [role="button"]')]
+                .find(e => visible(e) && /^(close|dismiss|x|×)$/i.test(
+                    [e.getAttribute('aria-label'), e.title, e.innerText]
+                    .filter(Boolean).join(' ').trim()
+                ));
+            if (button) { button.click(); return true; }
+        }
+        return false;
+    """, default=False))
+    if closed:
+        sb.wait(0.5)
+    if _inbox_panel_open(sb):
+        try:
+            sb.press_keys('body', 'ESCAPE')
+            sb.wait(0.5)
+        except Exception:
+            pass
+    return not _inbox_panel_open(sb)
+
+
+def _coin_store_candidates(sb: SB) -> list[Dict[str, Any]]:
+    """Select the *actual* Coin Store control, never a neighboring inbox button.
+
+    The screenshot identifies a DIV with the stable class
+    header-auth-coin-store-button-hide-on-mobile. Do not use absolute header
+    XPaths; insertion of the inbox shifted their positions.
+    """
+    result = _safe_js(sb, r"""
+        const visible = el => {
+            if (!el) return false;
+            const s = getComputedStyle(el), r = el.getBoundingClientRect();
+            return s.display !== 'none' && s.visibility !== 'hidden' &&
+                r.width > 0 && r.height > 0;
+        };
+        const norm = x => (x || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        const nodes = [...document.querySelectorAll(
+            '[class*="header-auth-coin-store-button" i], ' +
+            'header button, header a, header [role="button"], ' +
+            'nav button, nav a, [data-sentry-component*="CoinStore" i]'
+        )];
+        const seen = new Set(), candidates = [];
+        for (const node of nodes) {
+            const target = node.closest('[class*="header-auth-coin-store-button" i]') || node;
+            if (seen.has(target) || !visible(target)) continue;
+            seen.add(target);
+            const cls = norm(typeof target.className === 'string' ? target.className : '');
+            const own = norm(target.innerText || target.textContent ||
+                target.getAttribute('aria-label') || target.getAttribute('title') || '');
+            const component = norm(target.getAttribute('data-sentry-component'));
+            const combined = norm([cls, own, component].join(' '));
+            if (target.closest('[class*="inbox" i]') ||
+                /inbox|message|notification|add friend|hamburger|burger|menu/.test(combined)) continue;
+            const hasHeaderClass = cls.includes('header-auth-coin-store-button');
+            const explicitlyNamed = own.includes('coin store') ||
+                own.includes('get coins') || own.includes('free coins');
+            if (!hasHeaderClass && !explicitlyNamed) continue;
+            let score = 0, reasons = [];
+            if (hasHeaderClass) { score += 900; reasons.push('specific header Coin Store class'); }
+            if (own.includes('coin store')) { score += 500; reasons.push('Coin Store own label'); }
+            if (own.includes('get coins')) { score += 180; reasons.push('Get Coins own label'); }
+            if (component.includes('coinstore')) { score += 240; reasons.push('CoinStore component'); }
+            if (target.closest('header,nav,[class*="header-auth" i]')) score += 100;
+            if (/purchase|checkout|pay now/.test(own)) score -= 2000;
+            if (target.disabled || target.getAttribute('aria-disabled') === 'true') score -= 2000;
+            const id = `sportzino-store-${candidates.length}`;
+            target.setAttribute('data-sportzino-coin-store-id', id);
+            candidates.push({id,score,own:own.slice(0,100),reasons});
+        }
+        return candidates.sort((a,b) => b.score - a.score);
+    """, default=[])
+    return result if isinstance(result, list) else []
+
+
+def _open_rewards(sb: SB) -> bool:
+    """Open Coin Store and verify it opened, with one guarded recovery."""
+    if _rewards_dialog_open(sb):
         return True
 
-    # Last fallback: score visible clickable controls by their own and nearby text.
-    candidate_id = _safe_js(
-        sb,
-        r"""
-        const visible = (el) => {
-            if (!el) return false;
-            const style = window.getComputedStyle(el);
-            const rect = el.getBoundingClientRect();
-            return style.display !== 'none'
-                && style.visibility !== 'hidden'
-                && style.opacity !== '0'
-                && rect.width > 0
-                && rect.height > 0;
-        };
+    for attempt in range(2):
+        if _inbox_panel_open(sb) and not _close_inbox(sb):
+            print('[Sportzino] Inbox could not be dismissed. Returning to lobby.')
+            sb.open(HOME_URL)
+            sb.wait(2)
+        candidates = _coin_store_candidates(sb)
+        print('[Sportzino] Coin Store candidate ranking:', candidates[:4])
+        for candidate in candidates:
+            if int(candidate.get('score', 0)) < 500:
+                continue
+            target = f"[data-sportzino-coin-store-id='{candidate['id']}']"
+            if not _force_click(sb, target, timeout=3):
+                continue
+            sb.wait(1.2)
+            if _rewards_dialog_open(sb):
+                print('[Sportzino] Confirmed Coin Store / free rewards view.')
+                return True
+            if _inbox_panel_open(sb):
+                print('[Sportzino] Unexpected inbox after store click: closing it.')
+                _close_inbox(sb)
+                break
+            print('[Sportzino] Click did not open a confirmed Coin Store.')
+        if attempt == 0:
+            print('[Sportzino] Recovering Coin Store navigation once from lobby.')
+            sb.open(HOME_URL)
+            sb.wait(2)
+            _handle_cookie_consent(sb)
 
-        const normalize = (value) => (value || '')
-            .replace(/\s+/g, ' ')
-            .trim()
-            .toLowerCase();
-
-        const candidates = Array.from(
-            document.querySelectorAll('button, a, [role="button"]')
-        ).filter(visible).map((el, index) => {
-            const parent = el.closest('header, nav, section, article') || el.parentElement;
-            const own = normalize([
-                el.innerText,
-                el.textContent,
-                el.getAttribute('aria-label'),
-                el.getAttribute('title')
-            ].join(' '));
-            const context = normalize(parent ? (parent.innerText || parent.textContent || '') : '');
-            const combined = `${own} ${context}`;
-            let score = 0;
-
-            if (own.includes('coin store')) score += 180;
-            if (own.includes('free coins')) score += 170;
-            if (own.includes('get coins')) score += 160;
-            if (own.includes('rewards')) score += 140;
-            if (combined.includes('coin store')) score += 55;
-            if (combined.includes('free coins')) score += 50;
-            if (combined.includes('rewards')) score += 40;
-            if (combined.includes('log in') || combined.includes('sign up')) score -= 300;
-
-            const id = `sportzino-reward-${index}`;
-            el.setAttribute('data-sportzino-reward-id', id);
-            return {id, score};
-        }).sort((a, b) => b.score - a.score);
-
-        return candidates.length && candidates[0].score >= 120
-            ? candidates[0].id
-            : '';
-        """,
-        default="",
-    )
-
-    if not candidate_id:
-        return False
-
-    return _force_click(sb, f"[data-sportzino-reward-id='{candidate_id}']", timeout=2)
-
+    return False
 
 def _rewards_dialog_open(sb: SB) -> bool:
     """Detect the visible Sportzino Coin Store / Claim Free Rewards dialog."""
@@ -1120,6 +1193,10 @@ def _rewards_dialog_open(sb: SB) -> bool:
                     (
                         text.includes('coin store') &&
                         text.includes('purchase store packs')
+                    ) || (
+                        text.includes('daily bonus') &&
+                        (text.includes('collect') || text.includes('claim')) &&
+                        root.querySelector('button, [role="button"]')
                     )
                 );
             });
@@ -1198,659 +1275,256 @@ def _visible_checkout_detected(sb: SB) -> bool:
 
 
 def _daily_claim_candidates(sb: SB) -> list[Dict[str, Any]]:
-    """
-    Score every visible Collect/Claim button.
+    """Rank visible *daily* claim buttons only inside an opened Coin Store.
 
-    The strongest signals come from Sportzino's stable DOM:
-    - .coin-store-free-rewards-row-item.daily-bonus
-    - .coin-store-collect-button
-    - data-sentry-component="CoinStoreCollectButton"
-    - nearby "Progressive Daily Bonus" / "Daily Bonus" text
-
-    Purchase, Facebook, Google, and generic promotion controls receive large
-    penalties. This keeps the bot from clicking an unrelated Collect button.
+    Absolute XPath is included as a candidate source but never bypasses
+    contextual scoring. Header/inbox/checkout controls are always rejected.
     """
-    result = _safe_js(
-        sb,
-        r"""
-        const visible = (el) => {
+    if not _rewards_dialog_open(sb) or _inbox_panel_open(sb):
+        print('[Sportzino] Claim scan blocked: Coin Store not confirmed or inbox open.')
+        return []
+
+    result = _safe_js(sb, r"""
+        const xpath = arguments[0];
+        const visible = el => {
             if (!el) return false;
-            const style = window.getComputedStyle(el);
-            const rect = el.getBoundingClientRect();
-
-            return (
-                style.display !== 'none' &&
-                style.visibility !== 'hidden' &&
-                style.opacity !== '0' &&
-                rect.width > 0 &&
-                rect.height > 0
-            );
+            const s = getComputedStyle(el), r = el.getBoundingClientRect();
+            return s.display !== 'none' && s.visibility !== 'hidden' &&
+                r.width > 0 && r.height > 0;
         };
-
-        const normalize = (value) => (value || '')
-            .replace(/\s+/g, ' ')
-            .trim()
-            .toLowerCase();
-
-        const controls = Array.from(document.querySelectorAll(
-            'button, [role="button"]'
-        )).filter(visible);
-
+        const norm = x => (x || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        const controls = new Set([...document.querySelectorAll('button, [role="button"]')]);
+        let inspected = null;
+        try { inspected = document.evaluate(xpath, document, null,
+            XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue; }
+        catch (_) { /* changed DOM; dynamic candidate discovery still works */ }
+        if (inspected && inspected.matches('button, [role="button"]')) controls.add(inspected);
         const candidates = [];
-
-        controls.forEach((button, index) => {
-            const ownText = normalize([
-                button.innerText,
-                button.textContent,
-                button.getAttribute('aria-label'),
-                button.getAttribute('title')
-            ].join(' '));
-
-            if (
-                ownText !== 'collect' &&
-                ownText !== 'claim' &&
-                !ownText.startsWith('collect ') &&
-                !ownText.startsWith('claim ')
-            ) {
-                return;
-            }
-
-            const disabled = Boolean(
-                button.disabled ||
+        for (const button of controls) {
+            if (!visible(button)) continue;
+            if (button.closest('header, nav, [class*="inbox" i], ' +
+                '[class*="checkout" i], [class*="payment" i]')) continue;
+            const own = norm(button.innerText || button.textContent ||
+                button.getAttribute('aria-label') || button.getAttribute('title') || '');
+            if (!/^(collect|claim)(\s|$)/.test(own)) continue;
+            const disabled = Boolean(button.disabled ||
                 button.getAttribute('aria-disabled') === 'true' ||
-                normalize(button.className).includes('disabled')
-            );
-
+                norm(button.className).includes('disabled'));
+            const coinRoot = button.closest('.coin-store, .coin-store-content, ' +
+                '[class*="coin-store-section" i], [class*="coin-store-free-rewards" i], ' +
+                '[role="dialog"], .dialog-modal');
+            if (!coinRoot) continue;
             const dailyRoot = button.closest(
-                '.coin-store-free-rewards-row-item.daily-bonus, ' +
-                '[class~="daily-bonus"], ' +
-                '[class*="serial-daily-bonus" i]'
-            );
-
+                '.coin-store-free-rewards-row-item.daily-bonus, [class~="daily-bonus"], ' +
+                '[class*="serial-daily-bonus" i], [class*="progressive-daily" i]');
             const rewardCard = button.closest(
-                '.coin-store-free-rewards-card, ' +
-                '.coin-store-free-rewards-row-item, ' +
-                '[class*="free-rewards-card" i], ' +
-                '[class*="free-rewards-row-item" i]'
-            );
-
-            const section = button.closest(
-                '.coin-store-section, .coin-store-content, ' +
-                '.coin-store, [role="dialog"]'
-            );
-
-            const localRoot =
-                dailyRoot ||
-                rewardCard ||
-                button.parentElement ||
-                button;
-
-            const localText = normalize(
-                localRoot.innerText ||
-                localRoot.textContent ||
-                ''
-            );
-
-            const sectionText = normalize(
-                section
-                    ? (
-                        section.innerText ||
-                        section.textContent ||
-                        ''
-                    )
-                    : ''
-            );
-
-            const className = normalize(button.className);
-            const component = normalize(
-                button.getAttribute('data-sentry-component')
-            );
-
-            let score = 0;
+                '.coin-store-free-rewards-card, .coin-store-free-rewards-row-item, ' +
+                '[class*="free-rewards-card" i]');
+            // React can change wrappers. Look only at compact ancestors,
+            // not the entire store, to avoid borrowing another card's label.
+            let contextual = null;
+            for (let node = button.parentElement, depth = 0;
+                 node && depth < 10 && node !== coinRoot; node = node.parentElement, depth++) {
+                const t = norm(node.innerText || node.textContent || '');
+                if (t.length <= 800 && /(?:progressive\s+)?daily\s+bonus/.test(t)) {
+                    contextual = node; break;
+                }
+            }
+            const root = dailyRoot || contextual || rewardCard || button.parentElement;
+            const local = norm(root?.innerText || root?.textContent || '');
+            const cls = norm(button.className);
+            const component = norm(button.getAttribute('data-sentry-component'));
+            const hasDaily = Boolean(dailyRoot || contextual);
+            const inspectedPath = button === inspected;
             const reasons = [];
-
-            if (ownText === 'collect') {
-                score += 120;
-                reasons.push('exact COLLECT text');
-            } else if (ownText === 'claim') {
-                score += 90;
-                reasons.push('exact CLAIM text');
-            } else {
-                score += 45;
-                reasons.push('claim-like text');
+            let score = own === 'collect' ? 120 : own === 'claim' ? 100 : 50;
+            if (cls.includes('coin-store-collect-button')) {
+                score += 220; reasons.push('Coin Store collect class');
             }
-
-            if (className.includes('coin-store-collect-button')) {
-                score += 220;
-                reasons.push('coin-store-collect-button class');
+            if (component.includes('coinstorecollectbutton')) {
+                score += 220; reasons.push('Coin Store component');
             }
-
-            if (component === 'coinstorecollectbutton') {
-                score += 220;
-                reasons.push('CoinStoreCollectButton component');
+            if (dailyRoot) { score += 650; reasons.push('daily bonus DOM ancestor'); }
+            if (contextual) { score += 400; reasons.push('compact daily context'); }
+            if (local.includes('progressive daily bonus')) {
+                score += 320; reasons.push('Progressive Daily Bonus label');
+            } else if (local.includes('daily bonus')) {
+                score += 250; reasons.push('Daily Bonus label');
             }
-
-            if (dailyRoot) {
-                score += 650;
-                reasons.push('daily-bonus ancestor');
+            if (inspectedPath) { score += 80; reasons.push('user-inspected XPath match'); }
+            if (/\bday [1-7]\b/.test(local)) { score += 60; reasons.push('daily progression'); }
+            if (/facebook|google grab|connect with google|purchase|checkout|pay using|buy now|\$\s*\d/.test(local)) {
+                score -= 1500; reasons.push('unrelated/purchase context');
             }
-
-            if (localText.includes('progressive daily bonus')) {
-                score += 320;
-                reasons.push('Progressive Daily Bonus context');
-            } else if (localText.includes('daily bonus')) {
-                score += 280;
-                reasons.push('Daily Bonus context');
-            }
-
-            if (sectionText.includes('claim free rewards')) {
-                score += 140;
-                reasons.push('Claim Free Rewards section');
-            }
-
-            if (
-                localText.includes('day 1') ||
-                localText.includes('day 2') ||
-                localText.includes('day 3') ||
-                localText.includes('day 4') ||
-                localText.includes('day 5') ||
-                localText.includes('day 6') ||
-                localText.includes('day 7')
-            ) {
-                score += 80;
-                reasons.push('daily progression day');
-            }
-
-            if (
-                localText.includes('facebook friendly') ||
-                localText.includes('facebook')
-            ) {
-                score -= 700;
-                reasons.push('Facebook penalty');
-            }
-
-            if (
-                localText.includes('connect with google') ||
-                localText.includes('google grab') ||
-                localText.includes('google')
-            ) {
-                score -= 700;
-                reasons.push('Google penalty');
-            }
-
-            if (
-                localText.includes('purchase') ||
-                localText.includes('buy now') ||
-                localText.includes('checkout') ||
-                /\$\s*\d/.test(localText)
-            ) {
-                score -= 800;
-                reasons.push('purchase/payment penalty');
-            }
-
-            if (
-                localText.includes('see more') &&
-                !localText.includes('daily bonus')
-            ) {
-                score -= 150;
-                reasons.push('generic promotion penalty');
-            }
-
-            if (disabled) {
-                score -= 2000;
-                reasons.push('disabled');
-            }
-
-            const candidateId =
-                `sportzino-daily-claim-${Date.now()}-${index}`;
-
-            button.setAttribute(
-                'data-sportzino-daily-claim-id',
-                candidateId
-            );
-
-            candidates.push({
-                id: candidateId,
-                score,
-                text: ownText,
-                localText: localText.slice(0, 260),
-                className,
-                component,
-                disabled,
-                hasDailyRoot: Boolean(dailyRoot),
-                reasons
-            });
-        });
-
-        candidates.sort((a, b) => b.score - a.score);
-        return candidates;
-        """,
-        default=[],
-    )
-
+            if (disabled) { score -= 2000; reasons.push('disabled'); }
+            const id = `sportzino-daily-claim-${candidates.length}`;
+            button.setAttribute('data-sportzino-daily-claim-id', id);
+            candidates.push({ id, score, text:own, localText:local.slice(0,260),
+                className:cls, component, disabled, hasDailyRoot:Boolean(dailyRoot),
+                hasDailyContext:hasDaily, inspectedPath, reasons });
+        }
+        return candidates.sort((a,b) => b.score - a.score);
+    """, CURRENT_DAILY_CLAIM_XPATH, default=[])
     return result if isinstance(result, list) else []
 
-
-def _select_daily_claim_candidate(
-    sb: SB,
-) -> Optional[Dict[str, Any]]:
+def _select_daily_claim_candidate(sb: SB) -> Optional[Dict[str, Any]]:
     candidates = _daily_claim_candidates(sb)
-
     if not candidates:
-        print("[Sportzino] No visible Collect/Claim candidates found.")
+        print('[Sportzino] No eligible visible Daily Bonus claim candidates.')
         return None
-
-    print("[Sportzino] Claim candidate ranking:")
-
-    for index, candidate in enumerate(candidates[:8], start=1):
-        print(
-            f"  #{index} score={candidate.get('score')} "
-            f"text={candidate.get('text')!r} "
-            f"daily_root={candidate.get('hasDailyRoot')} "
-            f"context={_short(candidate.get('localText', ''), 140)!r} "
-            f"reasons={candidate.get('reasons')}"
-        )
+    print('[Sportzino] Daily claim candidate ranking:')
+    for index, candidate in enumerate(candidates[:8], 1):
+        print(f"  #{index} score={candidate.get('score')} "
+              f"text={candidate.get('text')!r} "
+              f"context={_short(candidate.get('localText', ''), 130)!r} "
+              f"reasons={candidate.get('reasons')}")
 
     best = candidates[0]
-    best_score = int(best.get("score", 0))
-    has_daily_root = bool(best.get("hasDailyRoot"))
-    context = _up(best.get("localText", ""))
-
-    context_is_daily = (
-        "PROGRESSIVE DAILY BONUS" in context or
-        "DAILY BONUS" in context
-    )
-
-    # Require both a very strong score and a direct daily-bonus signal.
-    if best_score < 800 or not (has_daily_root or context_is_daily):
-        print(
-            "[Sportzino] Rejected the best candidate because it was not "
-            "confidently tied to the Progressive Daily Bonus card."
-        )
+    if int(best.get('score', 0)) < 800 or not best.get('hasDailyContext'):
+        print('[Sportzino] Rejected candidate without strong local daily evidence.')
         return None
-
-    # If two candidates are close, require the winner to have the explicit
-    # daily-bonus ancestor. This avoids ambiguous global Collect buttons.
     if len(candidates) > 1:
-        second_score = int(candidates[1].get("score", 0))
-
-        if (
-            best_score - second_score < 100 and
-            not has_daily_root
-        ):
-            print(
-                "[Sportzino] Rejected ambiguous claim candidates "
-                f"(best={best_score}, second={second_score})."
-            )
+        runner_up = int(candidates[1].get('score', 0))
+        if int(best.get('score', 0)) - runner_up < 100:
+            print('[Sportzino] Ambiguous top candidates; refusing to click.')
             return None
-
     return best
 
 
-def _click_daily_collect(
-    sb: SB,
-) -> Optional[Dict[str, Any]]:
+def _click_daily_collect(sb: SB) -> Optional[Dict[str, Any]]:
     candidate = _select_daily_claim_candidate(sb)
-
-    if candidate is None:
+    if not candidate:
         return None
-
-    candidate_id = candidate.get("id", "")
-    locator = (
-        "[data-sportzino-daily-claim-id="
-        f"'{candidate_id}']"
-    )
-
-    print(
-        "[Sportzino] Selected Progressive Daily Bonus candidate: "
-        f"score={candidate.get('score')} "
-        f"context={_short(candidate.get('localText', ''), 180)!r}"
-    )
-
-    if _force_click(sb, locator, timeout=4):
-        print("[Sportzino] Clicked Progressive Daily Bonus → COLLECT.")
+    locator = f"[data-sportzino-daily-claim-id='{candidate['id']}']"
+    # Revalidate before acting: stale controls / a different modal may now exist.
+    if not _rewards_dialog_open(sb) or _inbox_panel_open(sb):
+        print('[Sportzino] Claim canceled: Coin Store no longer exclusively open.')
+        return None
+    if _force_click(sb, locator, timeout=3):
+        print('[Sportzino] Clicked the verified Progressive Daily Bonus candidate.')
         return candidate
-
-    # Guarded fallback using the currently inspected XPath. It is clicked only
-    # when the element still scores as a daily-bonus candidate.
-    inspected_xpath = (
-        "/html/body/div[1]/div[1]/div/div/div[2]/div[2]/"
-        "div[2]/div[1]/div/div[3]/div/div[1]/button"
-    )
-
-    for fallback in _daily_claim_candidates(sb):
-        if (
-            int(fallback.get("score", 0)) >= 800 and
-            (
-                fallback.get("hasDailyRoot") or
-                "DAILY BONUS" in _up(fallback.get("localText", ""))
-            )
-        ):
-            try:
-                element = sb.find_element(inspected_xpath)
-                element_text = _up(
-                    _safe_js(
-                        sb,
-                        """
-                        return arguments[0]
-                            ? (
-                                arguments[0].innerText ||
-                                arguments[0].textContent ||
-                                ''
-                            )
-                            : '';
-                        """,
-                        element,
-                        default="",
-                    )
-                )
-
-                if element_text == "COLLECT":
-                    sb.execute_script(
-                        "arguments[0].scrollIntoView({block:'center'});",
-                        element,
-                    )
-                    sb.wait(0.3)
-
-                    try:
-                        element.click()
-                    except Exception:
-                        sb.execute_script(
-                            "arguments[0].click();",
-                            element,
-                        )
-
-                    print(
-                        "[Sportzino] Clicked guarded inspected XPath for "
-                        "Progressive Daily Bonus → COLLECT."
-                    )
-                    return fallback
-            except Exception:
-                pass
-
-    print("[Sportzino] The selected daily claim candidate could not be clicked.")
+    print('[Sportzino] Candidate click did not complete; not clicking a random XPath.')
     return None
 
-
 def _daily_claim_observation(sb: SB) -> Dict[str, Any]:
-    """
-    Capture the visible state of the Progressive Daily Bonus card and button.
-    """
-    data = _safe_js(
-        sb,
-        r"""
-        const visible = (el) => {
-            if (!el) return false;
-            const style = window.getComputedStyle(el);
-            const rect = el.getBoundingClientRect();
-
-            return (
-                style.display !== 'none' &&
-                style.visibility !== 'hidden' &&
-                style.opacity !== '0' &&
-                rect.width > 0 &&
-                rect.height > 0
-            );
+    """Visible daily card metrics, never inferred from unrelated body text."""
+    data = _safe_js(sb, r"""
+        const visible = el => {
+            const s = getComputedStyle(el), r = el.getBoundingClientRect();
+            return s.display !== 'none' && s.visibility !== 'hidden' &&
+                r.width > 0 && r.height > 0;
         };
-
-        const normalize = (value) => (value || '')
-            .replace(/\s+/g, ' ')
-            .trim();
-
-        const dailyRoots = Array.from(document.querySelectorAll(
-            '.coin-store-free-rewards-row-item.daily-bonus, ' +
-            '[class~="daily-bonus"]'
-        )).filter(visible);
-
-        const dailyText = dailyRoots
-            .map((root) => normalize(
-                root.innerText || root.textContent || ''
-            ))
-            .join(' | ');
-
-        const collectButtons = dailyRoots.flatMap((root) =>
-            Array.from(root.querySelectorAll(
-                'button.coin-store-collect-button, ' +
-                'button[data-sentry-component="CoinStoreCollectButton"], ' +
-                'button'
-            )).filter((button) => {
-                if (!visible(button)) return false;
-
-                const text = normalize(
-                    button.innerText ||
-                    button.textContent ||
-                    ''
-                ).toLowerCase();
-
-                return (
-                    text === 'collect' ||
-                    text === 'claim' ||
-                    text.startsWith('collect ') ||
-                    text.startsWith('claim ')
-                );
-            })
-        );
-
-        const enabledCollectButtons = collectButtons.filter(
-            (button) => (
-                !button.disabled &&
-                button.getAttribute('aria-disabled') !== 'true'
-            )
-        );
-
-        const visibleMessageText = Array.from(document.querySelectorAll(
-            '[role="alert"], [role="status"], [role="dialog"], ' +
-            '[class*="toast" i], [class*="notification" i], ' +
-            '[class*="message" i]'
-        )).filter(visible).map((node) =>
-            normalize(node.innerText || node.textContent || '')
-        ).join(' | ');
-
-        return {
-            dailyRootCount: dailyRoots.length,
-            dailyText,
-            collectCount: collectButtons.length,
-            enabledCollectCount: enabledCollectButtons.length,
-            visibleMessageText
-        };
-        """,
-        default={},
-    )
-
+        const norm = x => (x || '').replace(/\s+/g, ' ').trim();
+        const containers = [...document.querySelectorAll(
+            '.coin-store-free-rewards-row-item.daily-bonus, [class~="daily-bonus"], ' +
+            '[class*="serial-daily-bonus" i], [class*="progressive-daily" i]'
+        )].filter(visible);
+        const outerRoots = containers.filter(el => !containers.some(
+            parent => parent !== el && parent.contains(el)));
+        // React can rename the daily-bonus wrapper. Recover a compact card
+        // containing 'Daily Bonus' and an action button, without ever using
+        // the whole Coin Store or the page body as the daily card.
+        const fallbacks = [...document.querySelectorAll(
+            '.coin-store-free-rewards-row-item, .coin-store-free-rewards-card, ' +
+            '[class*="free-rewards-card" i], [class*="daily" i]'
+        )].filter(visible).filter(el => {
+            const t = norm(el.innerText || el.textContent || '');
+            return t.length <= 800 && /daily bonus/i.test(t) &&
+                el.querySelector('button, [role="button"]');
+        });
+        const roots = outerRoots.length ? outerRoots : fallbacks.filter(
+            el => !fallbacks.some(parent => parent !== el && parent.contains(el)));
+        const txt = roots.map(el => norm(el.innerText || el.textContent || '')).join(' | ');
+        const buttons = roots.flatMap(root => [...root.querySelectorAll('button, [role="button"]')])
+            .filter(visible).filter(el => /^(collect|claim)(\s|$)/i.test(norm(el.innerText || el.textContent || '')));
+        const enabled = buttons.filter(b => !b.disabled &&
+            b.getAttribute('aria-disabled') !== 'true');
+        const notices = [...document.querySelectorAll(
+            '[role="status"], [role="alert"], [class*="toast" i], ' +
+            '[class*="notification" i]'
+        )].filter(visible).map(e => norm(e.innerText || e.textContent || '')).join(' | ');
+        return { dailyRootCount:roots.length, dailyText:txt, collectCount:buttons.length,
+            enabledCollectCount:enabled.length, disabledCollectCount:buttons.length-enabled.length,
+            visibleMessageText:notices };
+    """, default={})
     if not isinstance(data, dict):
-        return {
-            "dailyRootCount": 0,
-            "dailyText": "",
-            "collectCount": 0,
-            "enabledCollectCount": 0,
-            "visibleMessageText": "",
-        }
-
+        return { 'dailyRootCount': 0, 'dailyText': '', 'collectCount': 0,
+                 'enabledCollectCount': 0, 'disabledCollectCount': 0,
+                 'visibleMessageText': '' }
     return data
-
 
 def _current_state(sb: SB) -> Dict[str, str]:
     snapshot = _page_snapshot(sb)
-    text = snapshot["text"]
-
     if _is_login_page(sb):
-        return {
-            "status": "login",
-            "reason": "Login page is still visible",
-            "evidence": snapshot["url"],
-        }
-
-    claimed_hit = _first_marker(text, CLAIMED_MARKERS)
-    if claimed_hit:
-        return {
-            "status": "claimed",
-            "reason": "Visible text reports that the daily bonus is claimed",
-            "evidence": claimed_hit,
-        }
-
-    success_hit = _first_marker(text, SUCCESS_MARKERS)
-    if success_hit:
-        return {
-            "status": "success",
-            "reason": "Visible claim-success text detected",
-            "evidence": success_hit,
-        }
-
+        return { 'status':'login', 'reason':'Login page still visible',
+                 'evidence':snapshot['url'] }
+    if _inbox_panel_open(sb):
+        return { 'status':'inbox', 'reason':'New inbox panel is open, not Coin Store',
+                 'evidence':snapshot['url'] }
     if _visible_checkout_detected(sb):
-        return {
-            "status": "checkout",
-            "reason": "A visible checkout/payment dialog was detected",
-            "evidence": "VISIBLE CHECKOUT DIALOG",
-        }
+        return { 'status':'checkout', 'reason':'Visible checkout/payment dialog',
+                 'evidence':'VISIBLE CHECKOUT DIALOG' }
 
+    observation = _daily_claim_observation(sb)
+    daily = observation.get('dailyText', '')
+    notices = observation.get('visibleMessageText', '')
+    claimed = _first_marker(daily, CLAIMED_MARKERS)
+    if claimed:
+        return {'status':'claimed', 'reason':'Daily Bonus card says claimed',
+                'evidence':claimed}
+    # Only accept a claim success notification explicitly linked to a bonus.
+    notice_upper = _up(notices)
+    if ('BONUS' in notice_upper or 'REWARD' in notice_upper) and _contains_any(
+        notices, ('CLAIMED', 'COLLECTED', 'SUCCESSFULLY CLAIMED')):
+        return {'status':'success', 'reason':'Visible bonus claim notification',
+                'evidence':_short(notices, 140)}
+    if _contains_any(daily, ('UNAVAILABLE', 'COME BACK TOMORROW', 'ALREADY CLAIMED')):
+        return {'status':'unavailable', 'reason':'Daily Bonus card says unavailable',
+                'evidence':_short(daily, 140)}
     if _rewards_dialog_open(sb):
-        return {
-            "status": "rewards",
-            "reason": "Sportzino Coin Store / rewards dialog is open",
-            "evidence": "CLAIM FREE REWARDS",
-        }
-
-    return {
-        "status": "unknown",
-        "reason": "Visible page state did not match a known condition",
-        "evidence": _short(text, 120),
-    }
-
+        return {'status':'rewards', 'reason':'Coin Store rewards view is open',
+                'evidence':_short(daily, 140)}
+    return {'status':'unknown', 'reason':'No recognizable rewards interface open',
+            'evidence':snapshot['url']}
 
 def _wait_for_claim_result(
-    sb: SB,
-    before: Dict[str, Any],
-    timeout: float = 18,
+    sb: SB, before: Dict[str, Any], timeout: float = 18
 ) -> Dict[str, str]:
-    """
-    Verify the claim using visible success text or a durable daily-card change.
-
-    A claim is considered verified when:
-    - Sportzino shows an explicit success/claimed message; or
-    - the previously enabled Daily Bonus Collect button disappears or remains
-      disabled for multiple consecutive observations.
-
-    A single transient DOM change is not enough.
-    """
+    """Conservative one-shot verification. Never resend a possible claim."""
     step = 0.5
     loops = max(1, int(timeout / step))
-    no_enabled_streak = 0
-    retry_used = False
-    before_enabled = int(before.get("enabledCollectCount", 0))
-
-    last = {
-        "status": "unknown",
-        "reason": "No claim-result state yet",
-        "evidence": "",
-    }
-
-    for index in range(loops):
+    stable_disabled = 0
+    before_enabled = int(before.get('enabledCollectCount', 0))
+    before_roots = int(before.get('dailyRootCount', 0))
+    for _ in range(loops):
         state = _current_state(sb)
-        observation = _daily_claim_observation(sb)
-
-        combined_visible = " ".join(
-            [
-                observation.get("dailyText", ""),
-                observation.get("visibleMessageText", ""),
-            ]
-        )
-
-        claimed_hit = _first_marker(
-            combined_visible,
-            CLAIMED_MARKERS,
-        )
-        success_hit = _first_marker(
-            combined_visible,
-            SUCCESS_MARKERS,
-        )
-
-        if claimed_hit:
-            return {
-                "status": "claimed",
-                "reason": "Sportzino confirmed the Daily Bonus is claimed",
-                "evidence": claimed_hit,
-            }
-
-        if success_hit:
-            return {
-                "status": "success",
-                "reason": "Sportzino displayed claim-success text",
-                "evidence": success_hit,
-            }
-
-        if state["status"] in ("login", "checkout"):
+        obs = _daily_claim_observation(sb)
+        if state['status'] in ('claimed', 'success', 'login', 'checkout', 'inbox'):
             return state
-
-        enabled_now = int(
-            observation.get("enabledCollectCount", 0)
-        )
-
-        # The card had an enabled claim before the click. Require the enabled
-        # claim control to remain gone/disabled for at least two polls.
-        if before_enabled > 0 and enabled_now == 0:
-            no_enabled_streak += 1
+        after_enabled = int(obs.get('enabledCollectCount', 0))
+        after_roots = int(obs.get('dailyRootCount', 0))
+        # Require both before/after daily card presence. An inbox/closed Coin
+        # Store also makes Collect disappear, but does NOT prove a claim.
+        if (before_enabled > 0 and before_roots > 0 and after_roots > 0 and
+                after_enabled == 0 and state['status'] == 'rewards'):
+            stable_disabled += 1
         else:
-            no_enabled_streak = 0
-
-        print(
-            "[Sportzino] Claim verification: "
-            f"state={state['status']} "
-            f"daily_roots={observation.get('dailyRootCount')} "
-            f"collect={observation.get('collectCount')} "
-            f"enabled_collect={enabled_now} "
-            f"gone_streak={no_enabled_streak} "
-            f"daily_text={_short(observation.get('dailyText', ''), 160)!r}"
-        )
-
-        if no_enabled_streak >= 2:
-            return {
-                "status": "success",
-                "reason": (
-                    "The enabled Progressive Daily Bonus Collect button "
-                    "disappeared or became disabled after the click"
-                ),
-                "evidence": (
-                    f"before_enabled={before_enabled} "
-                    f"after_enabled={enabled_now}"
-                ),
-            }
-
-        # If the first normal click was swallowed, retry the same high-
-        # confidence daily candidate once. Sportzino's claim endpoint should
-        # be idempotent, and no unrelated button can pass the score threshold.
-        if (
-            index == 8 and
-            not retry_used and
-            enabled_now > 0
-        ):
-            retry_used = True
-            print(
-                "[Sportzino] Daily Collect is still enabled; performing one "
-                "guarded retry."
-            )
-            _click_daily_collect(sb)
-
-        last = {
-            "status": state["status"],
-            "reason": state["reason"],
-            "evidence": state["evidence"],
-        }
-
+            stable_disabled = 0
+        print('[Sportzino] Claim verification:', state['status'],
+              'daily_roots=', after_roots, 'enabled=', after_enabled,
+              'stable_disabled=', stable_disabled)
+        if stable_disabled >= 3:
+            return {'status':'success',
+                    'reason':'Daily Bonus card remained visible with Collect disabled',
+                    'evidence':f'before_enabled={before_enabled} after_enabled={after_enabled}'}
+        if state['status'] == 'unavailable':
+            # Could mean a successful claim was just processed or today's
+            # reward was unavailable. Do not repeat the request.
+            return state
         sb.wait(step)
-
-    return {
-        "status": "unverified",
-        "reason": (
-            "The claim button was clicked, but Sportzino did not provide "
-            "a durable success signal"
-        ),
-        "evidence": last.get("evidence", ""),
-    }
-
-
-# ───────────────────────────────────────────────────────────
-# Main UC-based flow
-# ───────────────────────────────────────────────────────────
+    return {'status':'unverified',
+            'reason':'Claim clicked, but no reliable confirmation was observed',
+            'evidence':'No automatic second click was performed'}
 
 async def Sportzino(ctx, driver, channel: discord.abc.Messageable):
     """
@@ -1867,7 +1541,8 @@ async def Sportzino(ctx, driver, channel: discord.abc.Messageable):
     - Scores every visible Collect/Claim control.
     - Requires a strong Progressive Daily Bonus / daily-bonus DOM signal.
     - Rejects Facebook, Google, purchase, checkout, and ambiguous candidates.
-    - Verifies success using visible confirmation or a durable button change.
+    - Verifies success using a scoped confirmation or a persistent daily card change.
+    - Never retries a claim merely because a result timed out.
     """
     del ctx, driver
 
@@ -1963,12 +1638,12 @@ async def Sportzino(ctx, driver, channel: discord.abc.Messageable):
             _handle_cookie_consent(sb)
 
             if not _rewards_dialog_open(sb):
-                print(
-                    "[Sportzino] Coin Store click occurred, but the visible "
-                    "Claim Free Rewards dialog was not confirmed."
-                )
+                await _send_screenshot(sb, channel,
+                    '[Sportzino] Coin Store is not visible; aborting safely.',
+                    'sportzino_store_unconfirmed')
+                return
 
-            print("[Sportzino] Coin Store / rewards interface opened.")
+            print("[Sportzino] Coin Store / rewards interface confirmed.")
 
             # ── Step 3: inspect the Progressive Daily Bonus ──
 
@@ -2003,7 +1678,13 @@ async def Sportzino(ctx, driver, channel: discord.abc.Messageable):
                 )
                 return
 
-            if pre_state["status"] == "claimed":
+            if pre_state["status"] == "inbox":
+                await _send_screenshot(sb, channel,
+                    '[Sportzino] Inbox interrupted rewards navigation. No claim attempted.',
+                    'sportzino_inbox_interrupted')
+                return
+
+            if pre_state["status"] in ("claimed", "unavailable"):
                 await _send_screenshot(
                     sb,
                     channel,
@@ -2029,13 +1710,20 @@ async def Sportzino(ctx, driver, channel: discord.abc.Messageable):
                     f"{after_scan}"
                 )
 
-                await _send_screenshot(
-                    sb,
-                    channel,
-                    "Sportzino Daily Bonus Unavailable.",
-                    "sportzino_no_safe_claim",
-                    discord_message="Sportzino Daily Bonus Unavailable.",
-                )
+                status = _current_state(sb)
+                if status['status'] in ('claimed', 'unavailable') or (
+                    after_scan.get('dailyRootCount', 0) > 0 and
+                    after_scan.get('collectCount', 0) > 0 and
+                    after_scan.get('enabledCollectCount', 0) == 0
+                ):
+                    await _send_screenshot(sb, channel,
+                        'Sportzino Daily Bonus Unavailable.',
+                        'sportzino_no_safe_claim',
+                        discord_message='Sportzino Daily Bonus Unavailable.')
+                else:
+                    await _send_screenshot(sb, channel,
+                        '[Sportzino] No verified daily bonus button found; check screenshot.',
+                        'sportzino_no_verified_claim')
                 return
 
             # ── Step 5: verify the result ──
@@ -2056,6 +1744,12 @@ async def Sportzino(ctx, driver, channel: discord.abc.Messageable):
                     "sportzino_claimed",
                     discord_message="Sportzino Daily Bonus Claimed!",
                 )
+                return
+
+            if result["status"] in ('inbox', 'unavailable'):
+                await _send_screenshot(sb, channel,
+                    '[Sportzino] Claim result not confirmed; state: ' + result['status'],
+                    'sportzino_post_claim_uncertain')
                 return
 
             if result["status"] == "checkout":
