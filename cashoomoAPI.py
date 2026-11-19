@@ -1,7 +1,7 @@
 # Drake Hooks + WaterTrooper
 # Casino Claim 3 - Cashoomo API
-# Version 5.0 | 2026-11-18
-# Conservative, observable state machine for the current Cashoomo login and
+# Version 6.0 | 2026-11-18
+# Observable state machine, native login event diagnostics, and controlled
 # seven-day Daily Reward experience. Never retries an ambiguous claim.
 # Public callable compatibility: cashoomo_casino(ctx, driver, channel)
 #                                claim_cashoomo_bonus(ctx, driver, channel)
@@ -26,6 +26,7 @@ from selenium.common.exceptions import (
     WebDriverException,
 )
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 
 load_dotenv()
 LOG = logging.getLogger("CasinoClaim.Cashoomo")
@@ -46,6 +47,12 @@ REWARD_TIMEOUT = max(8, int(os.getenv("CASHOOMO_REWARD_TIMEOUT", "18")))
 VERIFY_TIMEOUT = max(8, int(os.getenv("CASHOOMO_VERIFY_TIMEOUT", "18")))
 SCREENSHOTS = os.getenv("CASHOOMO_SCREENSHOTS", "1").lower() not in {"0", "false", "no"}
 POLL_INTERVAL = 0.6
+# Optional: wait for a human to finish a CAPTCHA/2FA in the remote Chrome window.
+# Off by default so a scheduled worker never gets stuck for minutes.
+MANUAL_LOGIN_WAIT = min(300, max(0, int(os.getenv("CASHOOMO_MANUAL_LOGIN_WAIT_SECONDS", "0"))))
+# Optional guarded Enter fallback ONLY if the first native click was not seen
+# by the document and the login form remains unchanged. Off by default.
+ENTER_FALLBACK = os.getenv("CASHOOMO_LOGIN_ENTER_FALLBACK", "0").lower() in {"1", "true", "yes"}
 
 FATAL_BROWSER_PHRASES = (
     "invalid session id", "session deleted", "not attached to an active page",
@@ -185,6 +192,22 @@ const disabled=e => !!e.disabled || e.getAttribute('aria-disabled')==='true' ||
   norm(e.className).includes('disabled');
 const toasts=visible('[role="alert"],[role="status"],[class*="toast" i],'+
   '[class*="snackbar" i]').map(text).filter(t=>t.length>0&&t.length<260);
+// Expose only categories and booleans. Never return credential values.
+const submit=login ? Array.from(login.querySelectorAll(
+  'button,[role="button"],input[type="submit"],[data-event_name],div[class*="btn-"],div[class*="button"]'))
+  .filter(shown).filter(e=>{
+    const label=norm(e.getAttribute('aria-label')||text(e));
+    const ev=norm(e.getAttribute('data-event_name'));
+    return /^(log in|login|sign in)$/.test(label) || ev==='submit login';
+  }) : [];
+const activeSubmit=submit.find(e => e.getAttribute('data-event_name')==='Submit Login')||submit[0];
+const typedEmail=emailFields.find(e=>login&&login.contains(e));
+const typedPassword=passwords.find(e=>login&&login.contains(e));
+const validationErrors=login ? Array.from(login.querySelectorAll(
+  '[role="alert"],[aria-live="assertive"],[class*="error" i],'+
+  '[class*="invalid" i],[class*="validation" i]'))
+  .filter(shown).map(text).filter(t=>t&&t.length<=180).slice(0,6) : [];
+const trace=window.__cashoomoLoginTrace||{};
 return {
   url: location.href, pageReady: document.readyState, loginVisible: !!login,
   emailVisible: emailFields.length>0, passwordVisible: passwords.length>0,
@@ -193,7 +216,18 @@ return {
   claimCount:claimControls.length,
   enabledClaimCount:claimControls.filter(e=>!disabled(e)).length,
   alerts:alerts.join(' | ').slice(0,550), toasts:toasts.join(' | ').slice(0,400),
-  overlays, pageSummary:pageText.slice(0,300)
+  overlays, pageSummary:pageText.slice(0,300),
+  formErrors:validationErrors.join(' | ').slice(0,450),
+  emailPopulated:Boolean(typedEmail&&typedEmail.value.length),
+  passwordPopulated:Boolean(typedPassword&&typedPassword.value.length),
+  emailValid:typedEmail ? typedEmail.validity.valid : null,
+  passwordValid:typedPassword ? typedPassword.validity.valid : null,
+  submitVisible:Boolean(activeSubmit),
+  submitDisabled:activeSubmit ? Boolean(activeSubmit.disabled ||
+     activeSubmit.getAttribute('aria-disabled')==='true' ||
+     getComputedStyle(activeSubmit).pointerEvents==='none') : null,
+  traceClicks:trace.clicks||0, traceSubmits:trace.submits||0,
+  traceInvalid:trace.invalid||0
 };
 """
 
@@ -328,6 +362,97 @@ for(const c of results){
 return distinct.slice(0,8);
 """
 
+
+# Select the *actual submit control* within the visible email/password dialog.
+# Avoid div wrappers whose combined text accidentally reads "LOG IN".
+# Only a native user-style click is allowed (no form.submit() or JS click).
+LOGIN_TARGET_JS = r"""
+const norm=s=>String(s||'').replace(/\s+/g,' ').trim().toLowerCase();
+const shown=e=>{if(!e)return false;const r=e.getBoundingClientRect();
+ const s=getComputedStyle(e);return r.width>0&&r.height>0&&s.display!=='none'&&
+ s.visibility!=='hidden'&&Number(s.opacity)>0;};
+const password=Array.from(document.querySelectorAll('input[type="password"]')).find(shown);
+const mail='input[type="email"],input[autocomplete="username"],'+
+ 'input[name*="email" i],input[placeholder*="email" i],input[id*="email" i]';
+if(!password)return {element:null,reason:'no visible password field'};
+let root=password.closest('form');
+if(!root||!root.querySelector(mail)){
+ root=null;
+ for(let n=password.parentElement,i=0;n&&i<12;n=n.parentElement,i++){
+   if(n.querySelector(mail)&&n.querySelector('button,[role="button"],'+
+        '[data-event_name],div[class*="btn-"],div[class*="button"]')){root=n;break;}
+ }
+}
+if(!root)return {element:null,reason:'login dialog scope missing'};
+const nodes=Array.from(root.querySelectorAll('button,input[type="submit"],'+
+ '[role="button"],[data-event_name],div[class*="btn-"],div[class*="button"]'))
+ .filter(shown);
+let best=null;
+for(const el of nodes){
+ let label=norm(el.getAttribute('aria-label')||el.innerText||el.textContent||el.value);
+ const event=norm(el.getAttribute('data-event_name'));
+ const cls=norm(el.className);
+ const disabled=Boolean(el.disabled||el.getAttribute('aria-disabled')==='true'||
+  getComputedStyle(el).pointerEvents==='none');
+ let score=0;
+ if(label==='log in'||label==='login')score+=950;
+ if(label==='sign in')score+=850;
+ if(event==='submit login')score+=1100;
+ if(el.matches('button,input[type="submit"]'))score+=150;
+ if(el.matches('[role="button"]'))score+=65;
+ if(el.getAttribute('type')==='submit')score+=65;
+ if(cls.includes('login')&&cls.includes('button'))score+=80;
+ if(/google|facebook|apple|signup|sign up|create account|forgot|password reset|close|register/.test(label))score-=3000;
+ if(/google|facebook|apple|signup|register|social/.test(event))score-=3000;
+ if(disabled)score-=3000;
+ if(!best||score>best.score)best={element:el,score,label,disabled,event,
+    tag:el.tagName.toLowerCase()};
+}
+if(!best||best.score<900)return {element:null,reason:'no confident enabled login submit',
+  candidates:nodes.length};
+return best;
+"""
+
+# Event listeners observe whether Selenium's native click / browser validation
+# reached the page. These are READ-ONLY diagnostics and never intercept requests.
+LOGIN_TRACE_JS = r"""
+window.__cashoomoLoginTrace={clicks:0,submits:0,invalid:0};
+if(!window.__cashoomoLoginTraceInstalled){
+ window.__cashoomoLoginTraceInstalled=true;
+ document.addEventListener('click',e=>{
+  const el=e.target&&e.target.closest && e.target.closest(
+    'button,input[type="submit"],[role="button"],[data-event_name],div[class*="btn-"],div[class*="button"]');
+  if(!el)return;
+  const label=String(el.getAttribute('aria-label')||el.innerText||el.textContent||'')
+    .replace(/\s+/g,' ').trim().toLowerCase();
+  if(/^(log in|login|sign in)$/.test(label)||
+     String(el.getAttribute('data-event_name')||'').toLowerCase()==='submit login'){
+   window.__cashoomoLoginTrace.clicks++;
+  }
+ },true);
+ document.addEventListener('submit',()=>{
+   window.__cashoomoLoginTrace.submits++;
+ },true);
+ document.addEventListener('invalid',()=>{
+   window.__cashoomoLoginTrace.invalid++;
+ },true);
+}
+return true;
+"""
+
+# React and similar controlled fields can rerender after typing. The native
+# setter is a fallback ONLY when ordinary Selenium typing fails its readback.
+REACT_INPUT_FALLBACK_JS = r"""
+const el=arguments[0], value=arguments[1];
+if(!el||!(el instanceof HTMLInputElement))return false;
+const d=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');
+if(!d||!d.set)return false;
+d.set.call(el,value);
+el.dispatchEvent(new Event('input',{bubbles:true}));
+el.dispatchEvent(new Event('change',{bubbles:true}));
+el.dispatchEvent(new Event('blur',{bubbles:true}));
+return el.value===value;
+"""
 
 # CSS hiding, not value clearing: user inputs remain intact. The change is
 # temporary and restored in a finally block following screenshot capture.
@@ -466,36 +591,128 @@ def _fields(driver) -> Optional[Tuple[Any, Any]]:
     return None
 
 
+def _type_field(driver, element, value: str, label: str) -> bool:
+    """Type with browser keyboard events, then blur and check field retention."""
+    try:
+        element.click()
+        element.clear()
+        element.send_keys(value)
+        # Validation libraries often update form state on change/blur.
+        element.send_keys(Keys.TAB)
+        actual = element.get_attribute('value')
+        if actual == value:
+            LOG.info("Cashoomo %s input retained typed value (%d chars)", label, len(value))
+            return True
+        LOG.info("Cashoomo %s field changed after typing; native setter fallback", label)
+        if _script(driver, REACT_INPUT_FALLBACK_JS, element, value, default=False):
+            return element.get_attribute('value') == value
+        return False
+    except (StaleElementReferenceException, WebDriverException) as exc:
+        _propagate_browser_failure(exc)
+        LOG.info("Cashoomo %s input was rerendered or became unavailable", label)
+        return False
+
+
 def _fill_credentials(driver, username: str, password: str) -> bool:
+    """Never log secrets or place them into DOM debug payloads."""
     for attempt in range(2):
         pair = _fields(driver)
         if not pair:
+            LOG.warning("Cashoomo: no matching visible email/password inputs")
             return False
         email, pwd = pair
-        try:
-            email.clear()
-            email.send_keys(username)
-            pwd.clear()
-            pwd.send_keys(password)
-            # Compare without logging or sending any entered values.
-            return (email.get_attribute("value") == username and
-                    pwd.get_attribute("value") == password)
-        except (StaleElementReferenceException, WebDriverException) as exc:
-            _propagate_browser_failure(exc)
-            LOG.warning("Login form changed while typing, attempt %d", attempt + 1)
+        email_ok = _type_field(driver, email, username, 'email')
+        # The email may trigger an entire form rerender; find fresh elements.
+        fresh = _fields(driver)
+        if fresh:
+            email, pwd = fresh
+        password_ok = _type_field(driver, pwd, password, 'password')
+        refreshed = _fields(driver)
+        if refreshed:
+            email, pwd = refreshed
+            try:
+                values_ok = (email.get_attribute('value') == username and
+                             pwd.get_attribute('value') == password)
+            except (StaleElementReferenceException, WebDriverException) as exc:
+                _propagate_browser_failure(exc)
+                values_ok = False
+            if values_ok and email_ok and password_ok:
+                return True
+        LOG.warning("Cashoomo inputs didn't retain values; retrying typing attempt %s",attempt+1)
     return False
 
 
+def _submit_login(driver) -> Tuple[bool, str]:
+    """Click the highest-confidence real Log In control once.
+
+    Does not bypass CAPTCHA or call JS .click()/form.submit(). If a native
+    click is blocked by an overlay, stops and reports the blocker instead.
+    """
+    _script(driver, LOGIN_TRACE_JS)
+    item = _script(driver, LOGIN_TARGET_JS, default={})
+    if not isinstance(item, dict) or item.get('element') is None:
+        reason = (item or {}).get('reason', 'login submit not found') if isinstance(item,dict) else 'submit not found'
+        LOG.warning('Cashoomo login submit discovery: %s', reason)
+        return False, 'The Log In button could not be selected reliably'
+    element = item['element']
+    LOG.info('Cashoomo login submit selected: tag=%s score=%s event=%s',
+             item.get('tag'), item.get('score'), item.get('event'))
+    try:
+        if not element.is_displayed() or not element.is_enabled():
+            return False, 'The Log In button is disabled'
+        driver.execute_script("arguments[0].scrollIntoView({block:'center',inline:'nearest'});", element)
+        element.click()
+        LOG.info('Cashoomo native login click dispatched')
+        return True, 'Native login click performed'
+    except ElementClickInterceptedException:
+        LOG.warning('Cashoomo native login click blocked by a visible overlay')
+        return False, 'The Log In button is obstructed by another element'
+    except StaleElementReferenceException:
+        LOG.warning('Cashoomo login button rerendered during click; no blind retry')
+        return False, 'The Log In button changed while it was being clicked'
+    except WebDriverException as exc:
+        _propagate_browser_failure(exc)
+        # A failed click may still have triggered the request. Do not send another.
+        LOG.warning('Cashoomo login click failed: %s',type(exc).__name__)
+        return False, 'The browser could not complete the login click'
+
+
 def _login_problem(state: Dict[str, Any]) -> str:
-    errors = _norm(state.get("alerts", ""))
-    if errors and re.search(r"invalid|incorrect|wrong|failed|locked|suspended|try again|error", errors, re.I):
-        # Avoid echoing arbitrary site text or any embedded sensitive fields.
-        return "The login form reported an error"
-    if state.get("challengeVisible"):
-        return "A verification step is visible"
-    if state.get("passwordVisible") or state.get("loginVisible"):
-        return "The login form is still open"
-    return "An authenticated session could not be confirmed"
+    errors = _norm(state.get('formErrors', '')+' | '+state.get('alerts', '')).lower()
+    if state.get('challengeVisible') or any(t in errors for t in
+          ('captcha','verify you are human','verification required','two-factor','2fa')):
+        return 'A verification step needs to be completed manually'
+    if any(t in errors for t in ('invalid password','incorrect password','wrong password','invalid credentials')):
+        return 'Cashoomo rejected the supplied credentials'
+    if any(t in errors for t in ('too many attempts','rate limit','try again later','temporarily locked')):
+        return 'Cashoomo is temporarily rate-limiting login'
+    if any(t in errors for t in ('invalid email','enter a valid email','required field','please fill')):
+        return 'The login form rejected an input value'
+    if state.get('emailValid') is False or state.get('passwordValid') is False:
+        return 'Browser form validation did not pass'
+    if state.get('submitDisabled') is True:
+        return 'The Log In button is disabled; review on-page requirements'
+    if not state.get('emailPopulated') or not state.get('passwordPopulated'):
+        return 'The site cleared one or both login fields after submission'
+    if state.get('traceInvalid',0):
+        return 'Browser input validation prevented login'
+    if state.get('loginVisible'):
+        if state.get('traceClicks',0):
+            return 'Cashoomo kept the login form open after clicking Log In; check the screenshot for an on-page message'
+        return 'No login click was observed by the page'
+    return 'An authenticated session could not be confirmed'
+
+
+def _log_login_diagnostics(state: Dict[str,Any]) -> None:
+    """Log only non-secret structured facts. Never log form values."""
+    LOG.warning('Cashoomo login diagnostics: phase=%s clicked=%s submits=%s invalid=%s '
+        'fields_filled=%s/%s field_valid=%s/%s submit_visible=%s disabled=%s '
+        'challenge=%s url=%s',
+        _classify(state),state.get('traceClicks'),state.get('traceSubmits'),
+        state.get('traceInvalid'),state.get('emailPopulated'),state.get('passwordPopulated'),
+        state.get('emailValid'),state.get('passwordValid'),state.get('submitVisible'),
+        state.get('submitDisabled'),state.get('challengeVisible'),
+        str(state.get('url','')).split('?')[0])
 
 
 def _claim_state(state: Dict[str, Any], *, clicked: bool = False) -> Optional[str]:
@@ -580,44 +797,95 @@ async def _prepare_page(driver, runner: RunState) -> Dict[str, Any]:
 
 
 async def _login(driver, runner: RunState) -> Tuple[bool, str]:
-    credentials = os.getenv("CASHOOMO", "").strip()
-    if ":" not in credentials:
-        return False, "Missing CASHOOMO=email:password in the environment"
-    username, password = credentials.split(":", 1)
+    credentials = os.getenv('CASHOOMO', '').strip()
+    if ':' not in credentials:
+        return False, 'Missing CASHOOMO=email:password in the environment'
+    username, password = credentials.split(':', 1)
     if not username or not password:
-        return False, "Login credentials are incomplete"
+        return False, 'Login credentials are incomplete'
 
     state = _observe(driver)
-    if state.get("authenticated") and not state.get("loginVisible"):
-        return True, "Authenticated"
-    runner.transition("login", state)
-    if not state.get("loginVisible"):
-        if not _click(driver, "login_open", 750):
-            return False, "Log In control not found"
-        state, ready = await _poll(driver, lambda s: s.get("loginVisible"), 12)
-        runner.transition("login_form", state)
+    if state.get('authenticated') and not state.get('loginVisible'):
+        return True, 'Authenticated'
+    runner.transition('login', state)
+    if not state.get('loginVisible'):
+        if not _click(driver, 'login_open', 750):
+            return False, 'Log In control not found'
+        state, ready = await _poll(driver, lambda s: s.get('loginVisible'), 12)
+        runner.transition('login_form', state)
         if not ready:
-            return False, "Login form did not open"
+            return False, 'Login form did not open'
 
+    # Be sure the actual visible form is populated and focus has left the input.
     if not _fill_credentials(driver, username, password):
-        return False, "Login fields could not be completed"
-    # At most one submit; a pending challenge or ambiguous response stops here.
-    if not _click(driver, "login_submit", 800):
-        return False, "Login submit button could not be identified"
-    runner.transition("login_submitted", _observe(driver))
+        return False, 'The email/password fields did not retain their values'
+    preflight = _observe(driver)
+    runner.transition('login_ready', preflight)
+    if preflight.get('challengeVisible'):
+        return False, 'The site requires manual verification before login'
+    if preflight.get('emailValid') is False or preflight.get('passwordValid') is False:
+        return False, 'The login form reports an invalid field'
+    if preflight.get('submitDisabled') is True:
+        return False, 'The Log In button is disabled'
 
+    submitted, reason = _submit_login(driver)
+    if not submitted:
+        _log_login_diagnostics(_observe(driver))
+        return False, reason
+    runner.transition('login_submitted', _observe(driver))
+
+    # Never blindly submit again: a request can be pending even when the form
+    # remains visible. Let the site finish, then expose the exact observed state.
     state, done = await _poll(
         driver,
-        lambda s: "authenticated" if s.get("authenticated") and not s.get("loginVisible")
-        else "error" if re.search(r"invalid|incorrect|wrong|failed|locked|suspended|try again",
-                                  _norm(s.get("alerts", "")), re.I)
+        lambda s: 'authenticated' if s.get('authenticated') and not s.get('loginVisible')
+        else 'challenge' if s.get('challengeVisible')
+        else 'rejected' if re.search(
+            r'invalid|incorrect|wrong password|credentials|locked|too many attempts|'
+            r'try again later|verification required',
+            _norm(s.get('formErrors','')+' | '+s.get('alerts','')),re.I)
         else None,
         LOGIN_TIMEOUT,
     )
-    runner.transition("login_result", state)
-    if done == "authenticated":
-        return True, "Authenticated"
-    return False, _login_problem(state)
+    runner.transition('login_result',state)
+    if done=='authenticated':
+        LOG.info('Cashoomo confirmed authenticated session')
+        return True,'Authenticated'
+
+    # If the site demands a human verification step, an operator can finish it
+    # in the remote Chrome browser. The script never bypasses the challenge.
+    if done=='challenge' and MANUAL_LOGIN_WAIT:
+        LOG.info('Cashoomo waiting up to %ds for manual verification', MANUAL_LOGIN_WAIT)
+        state, manual_ok = await _poll(driver,
+           lambda s: s.get('authenticated') and not s.get('loginVisible'),
+           MANUAL_LOGIN_WAIT)
+        if manual_ok:
+            LOG.info('Cashoomo manual verification completed successfully')
+            return True, 'Authenticated after manual verification'
+
+    # Controlled fallback for unusual custom form handlers. It requires an
+    # explicit opt-in and zero observed clicks, so it is not a blind retry.
+    if (ENTER_FALLBACK and state.get('loginVisible') and
+        not state.get('challengeVisible') and
+        not state.get('traceClicks') and not state.get('traceSubmits') and
+        state.get('emailPopulated') and state.get('passwordPopulated') and
+        not state.get('formErrors')):
+        try:
+            pair = _fields(driver)
+            if pair:
+                pair[1].send_keys(Keys.RETURN)
+                LOG.warning('Cashoomo attempted one keyboard Enter login fallback')
+                state, keyboard_ok = await _poll(driver,
+                    lambda s: s.get('authenticated') and not s.get('loginVisible'),
+                    min(15, LOGIN_TIMEOUT))
+                if keyboard_ok:
+                    return True,'Authenticated using keyboard submit'
+        except WebDriverException as exc:
+            _propagate_browser_failure(exc)
+            LOG.warning('Cashoomo keyboard submit fallback was unavailable')
+
+    _log_login_diagnostics(state)
+    return False,_login_problem(state)
 
 
 async def _open_reward(driver, runner: RunState) -> bool:
