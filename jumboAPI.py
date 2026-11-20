@@ -1,8 +1,8 @@
 # Drake Hooks + WaterTrooper
-# Casino Claim 2
+# Casino Claim 3
 # Jumbo API
-# Version 3
-# Notes:
+# Version 3.4
+# Updated 2026.11.16
 
 import re
 import os
@@ -15,177 +15,261 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementClickInterceptedException
 
+
 # ───────────────────────────────────────────────────────────
 # Config & Constants
 # ───────────────────────────────────────────────────────────
+
 load_dotenv()
 JUMBO_CRED = os.getenv("JUMBO")  # format "username:password"
 
 SITE_URL = "https://www.jumbo88.com"
 LOGIN_URL = "https://www.jumbo88.com/login"
-LOBBY_URL = "https://www.jumbo88.com/lobby"
-REWARDS_URL = "https://www.jumbo88.com/daily-rewards"
+LOBBY_URL = "https://jumbo88.com/games"
+REWARDS_URL = "https://jumbo88.com/rewards"
+ACTIVE_URL = "https://jumbo88.com/rewards/active"
 
-EMAIL_INPUT_XPATH = ("/html/body/div[2]/div/main/form/div[1]/label/input")
-PASSWORD_INPUT_XPATH = ("html/body/div[2]/div/main/form/div[2]/div/label/input")
-LOGIN_SUBMIT_XPATH =("/html/body/div[2]/div/main/form/button")
+LOGIN_BUTTON_XPATH = "//button[contains(@class, 'inline-flex items-center justify-center') and text()='Login']"
+EMAIL_INPUT_XPATH = "//input[@type='email']"
+PASSWORD_INPUT_XPATH = "//input[@type='password']"
+LOGIN_SUBMIT_XPATH = "//button[@type='submit' and text()='Login']"
 
-CLAIM_BUTTON_XPATH = ("/html/body/div[2]/div[2]/main/div/div/div/div/div/div[1]/div[2]/button")
-SPIN_BUTTON_XPATH = ("/html/body/div[2]/div[2]/main/div/div/div/div[2]/div/button[2]")
-SPINWIN_BUTTON_XPATH = ("/html/body/div[3]/div/div/div[2]/div/button")
-CLAIM_FREE_BUTTON_XPATH = ("/html/body/div[3]/div/div/div[2]/div/div/div/div[3]/div/div/div/div[10]/div/div[3]/form/div/button")
+REWARD_BUTTON_XPATH = "//span[@class='text-micro font-bold uppercase tracking-wider text-text-secondary' and text()='Mystery Spin']"
+SPIN_BUTTON_XPATH = "//button[contains(@class, 'inline-flex items-center justify-center') and text()='Spin']"
+DONE_BUTTON_XPATH = "//button[contains(@class, 'inline-flex items-center justify-center') and text()='Done']"
+SEEALL_BUTTON_XPATH = "//a[@href='/rewards/active']"
+COINS_BUTTON_XPATH = "//button[@aria-label='View details: Mystery Spin Coins']"
+CLAIM_BUTTON_XPATH = "//button[contains(@class, 'inline-flex items-center justify-center') and text()='Claim Bonus']"
 
-COUNTDOWN_XPATH = "//button[@disabled and contains(normalize-space(.), ':')]"
 
 # ───────────────────────────────────────────────────────────
-# 1) Jumbo Helpers
+# 0) Helpers
 # ───────────────────────────────────────────────────────────
+
 def _is_logged_in(driver) -> bool:
     """Detect if already logged in."""
     try:
-        driver.find_element(By.XPATH, "//button[@data-test='currency-switcher']")
+        driver.find_element(By.XPATH, "//button[@aria-label='Add funds']")
         return True
     except NoSuchElementException:
         pass
     try:
-        driver.find_element(By.XPATH, "//span[@data-test='balance']")
+        driver.find_element(By.XPATH, "//a[@aria-label='Open profile']")
         return True
     except NoSuchElementException:
         return False
 
+
+def _wait_clickable(driver, by, value, timeout=10):
+    return WebDriverWait(driver, timeout).until(EC.element_to_be_clickable((by, value)))
+
+
+def _wait_present(driver, by, value, timeout=10):
+    return WebDriverWait(driver, timeout).until(EC.presence_of_element_located((by, value)))
+
+
+def _safe_click(driver, element, label="element") -> bool:
+    try:
+        driver.execute_script(
+            "arguments[0].scrollIntoView({block: 'center', inline: 'center'});",
+            element
+        )
+    except Exception:
+        pass
+
+    try:
+        element.click()
+        print(f"[Jumbo] Clicked {label}.")
+        return True
+    except Exception as e:
+        print(f"[Jumbo] Normal click failed for {label}: {e}")
+
+    try:
+        driver.execute_script("arguments[0].click();", element)
+        print(f"[Jumbo] JS clicked {label}.")
+        return True
+    except Exception as e:
+        print(f"[Jumbo] JS click failed for {label}: {e}")
+
+    return False
+
+
+async def _send_screenshot(channel, driver, message, filename):
+    try:
+        driver.save_screenshot(filename)
+
+        await channel.send(
+            message,
+            file=discord.File(filename)
+        )
+
+    except Exception as e:
+        print(f"[Jumbo] Screenshot send failed: {e}")
+        await channel.send(message)
+
+    finally:
+        try:
+            os.remove(filename)
+        except Exception:
+            pass
+
+
 # ───────────────────────────────────────────────────────────
-# 2) Login & then hand off to claim
+# 1) Login Flow
 # ───────────────────────────────────────────────────────────
+
 async def jumbo_casino(ctx, driver, channel):
     if not JUMBO_CRED:
-        await channel.send("Jumbo credentials not found in environment variables.")
+        await channel.send("❌ Missing `JUMBO` as 'email:password' in your .env.")
         return
 
     username, password = JUMBO_CRED.split(":", 1)
 
-    # 2a) Navigate to site
-    print("[Jumbo] Navigating to site…")
-    driver.get(LOBBY_URL)
+    print("[Jumbo] Navigating to site...")
+    driver.get(SITE_URL)
     await asyncio.sleep(10)
 
     if _is_logged_in(driver):
-        print("[Jumbo] Already logged in, skipping login.")
+        print("[Jumbo] Already logged in.")
         await claim_jumbo_bonus(ctx, driver, channel)
         return
 
-    # 2b) Login to site
     print("[Jumbo] Attempting to login...")
     try:
         try:
-            driver.get(LOGIN_URL)
+            login = _wait_clickable(driver, By.XPATH, LOGIN_BUTTON_XPATH, timeout=10)
+            _safe_click(driver, login, "login button")
             await asyncio.sleep(10)
-        except Exception:
-            print("[Jumbo] Unable to load login url.")    
+        except Exception as e:
+            print(f"[Jumbo] Login button failed: {e}")
+
+            try:
+                print("[Jumbo] Trying direct signin URL...")
+                driver.get(LOGIN_URL)
+                await asyncio.sleep(10)
+            except Exception:
+                pass
 
         try:
-            email_input = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, EMAIL_INPUT_XPATH)))
-            email_input.send_keys(username)
+            email = _wait_present(driver, By.XPATH, EMAIL_INPUT_XPATH, timeout=10)
+            email.clear()
+            email.send_keys(username)
             await asyncio.sleep(5)
-        except Exception:
-            print("[Jumbo] Unable to enter email.")
+        except Exception as e:
+            print(f"[Jumbo] Email input failed: {e}")
 
         try:
-            password_input = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, PASSWORD_INPUT_XPATH)))
-            password_input.send_keys(password)
+            pw = _wait_present(driver, By.XPATH, PASSWORD_INPUT_XPATH, timeout=10)
+            pw.clear()
+            pw.send_keys(password)
             await asyncio.sleep(5)
-        except Exception:
-            print("[Jumbo] Unable to enter password.")    
+        except Exception as e:
+            print(f"[Jumbo] Password input failed: {e}")
 
         try:
-            login_submit = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, LOGIN_SUBMIT_XPATH)))
-            login_submit.click()
+            submit = _wait_clickable(driver, By.XPATH, LOGIN_SUBMIT_XPATH, timeout=10)
+            _safe_click(driver, submit, "login submit button")
             print("[Jumbo] Submitted credentials.")
             await asyncio.sleep(10)
-        except Exception:
-            print("[Jumbo] Unable to click login button.")
+        except Exception as e:
+            print(f"[Jumbo] Submit failed: {e}")
 
-        # Now that we're logged in, try claiming
-        await claim_jumbo_bonus(ctx, driver, channel)    
+        await claim_jumbo_bonus(ctx, driver, channel)
 
     except TimeoutException as e:
-        screenshot = "jumbo_login_error.png"
-        driver.save_screenshot(screenshot)
-        await channel.send("Jumbo login timed out, will retry later.",file=discord.File(screenshot))
-        os.remove(screenshot)
-        print("Login timeout:", e)
+        print(f"[Jumbo] Login timeout: {e}")
+
+        await _send_screenshot(
+            channel,
+            driver,
+            "Jumbo login timed out.",
+            "jumbo_login_error.png"
+        )
+
 
 # ───────────────────────────────────────────────────────────
-# 3) Click Daily Reward Button -> Click Claim Now Button(s)
+# 2) Claim Bonus
 # ───────────────────────────────────────────────────────────
+
 async def claim_jumbo_bonus(ctx, driver, channel):
-    # 3a) Navigate to daily rewards
-    print("[Jumbo] Navigating to daily rewards...")   
+
+    print("[Jumbo] Navigating to rewards...")
     try:
         driver.get(REWARDS_URL)
         await asyncio.sleep(10)
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"[Jumbo] Rewards navigation error: {e}")
 
-    # 3b) Click the “Claim Day X Spin” button
-    print("[Jumbo] Attempting to click daily spin button...")
+
+    print ("[Jumbo] Attempting to click reward button")
     try:
-        claim_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, CLAIM_BUTTON_XPATH)))
-        claim_button.click()
+        reward = _wait_clickable(driver, By.XPATH, REWARD_BUTTON_XPATH, timeout=10)
+        _safe_click(driver, reward, "reward button")
         await asyncio.sleep(10)
-    except Exception:
-        print("[Jumbo] Unable to click daily spin button.") 
+    except Exception as e:
+        print(f"[Jumbo] Reward failed: {e}")
 
-    # 3c) Click the "Spin" button
-    print("[Jumbo] Attempting to click spin button...")
+    print ("[Jumbo] Attempting to click spin button")
     try:
-        spin_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, SPIN_BUTTON_XPATH)))
-        spin_button.click()
+        spin = _wait_clickable(driver, By.XPATH, SPIN_BUTTON_XPATH, timeout=10)
+        _safe_click(driver, spin, "spin button")
         await asyncio.sleep(10)
-    except Exception:
-        print("[Jumbo] Unable to click spin button.")
+    except Exception as e:
+        print(f"[Jumbo] Spin failed: {e}")
 
-    # 3d) Click the "Spin to Win" button
-    print("[Jumbo] Attempting to click spin to win button...")
+    print ("[Jumbo] Attempting to click done button")
     try:
-        spinwin_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, SPINWIN_BUTTON_XPATH)))
-        spinwin_button.click()
+        done = _wait_clickable(driver, By.XPATH, DONE_BUTTON_XPATH, timeout=10)
+        _safe_click(driver, done, "done button")
         await asyncio.sleep(10)
-    except Exception:
-        print("[Jumbo] Unable to click spin to win button.")
+    except Exception as e:
+        print(f"[Jumbo] Done failed: {e}")
 
-    # 3e) Click the "Claim Free" button
-    print("[Jumbo] Attempting to click claim free button...")
+    print ("[Jumbo] Attempting to click see all button")
     try:
-        claimfree_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, CLAIM_FREE_BUTTON_XPATH)))
-        claimfree_button.click()
-        await channel.send("Jumbo Daily Bonus Claimed!")
-    except Exception:
-        print("[Jumbo] Unable to claim daily bonus.")
+        seeall = _wait_clickable(driver, By.XPATH, SEEALL_BUTTON_XPATH, timeout=10)
+        _safe_click(driver, seeall, "see all button")
+        await asyncio.sleep(10)
+    except Exception as e:
+        print(f"[Jumbo] See all failed: {e}")
 
-    # 3f) If no claim, try to read the countdown
-    print("[Jumbo] Checking for countdown...")
+        try:
+            print("[Jumbo] Trying direct active URL...")
+            driver.get(ACTIVE_URL)
+            await asyncio.sleep(10)
+        except Exception:
+            pass
+
+    print ("[Jumbo] Attempting to click coins button")
     try:
-        countdown_btn = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, COUNTDOWN_XPATH)))
-        raw       = countdown_btn.text.strip()               # e.g. "22 : 27 : 06"
-        countdown = re.sub(r"Available\s+", "", raw)           # => "22:27:06"
-        await channel.send(f"Next Jumbo Bonus Available in: {countdown}")
-        return
-    except:
-        print("[Jumbo] Unable to read countdown.")
-        screenshot = "jumbo_countdown_error.png"
+        coins = _wait_clickable(driver, By.XPATH, COINS_BUTTON_XPATH, timeout=10)
+        _safe_click(driver, coins, "coins button")
+        await asyncio.sleep(10)
+    except Exception as e:
+        print(f"[Jumbo] Coins failed: {e}")
+
+    print("[Jumbo] Attempting to claim daily bonus...")
+    try:
+        claim = _wait_clickable(driver, By.XPATH, CLAIM_BUTTON_XPATH, timeout=10)
+        _safe_click(driver, claim, "claim button")
+
+        await asyncio.sleep(5)
+
+        # 📸 success screenshot
+        screenshot = "jumbo_claim.png"
         driver.save_screenshot(screenshot)
-        await channel.send("Jumbo: unable to read countdown.",file=discord.File(screenshot))
-        os.remove(screenshot)
-# ───────────────────────────────────────────────────────────
-# 4) (Optional) Standalone Countdown Reader
-# ───────────────────────────────────────────────────────────
-async def check_jumbo_countdown(ctx, driver, channel):
-    # you can call this directly if you ever just want the timer
-    print("[Jumbo] Checking for countdown...")
-    driver.get(REWARDS_URL)
-    await asyncio.sleep(10)
 
-    countdown_btn = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, COUNTDOWN_XPATH)))
-    raw       = countdown_btn.text.strip()
-    countdown = re.sub(r"\s+", "", raw)
-    await channel.send(f"Next Jumbo Bonus Available in: {countdown}")        
+        await channel.send("Jumbo Daily Bonus Claimed!",file=discord.File(screenshot))
+
+        os.remove(screenshot)
+
+    except Exception as e:
+        print(f"[Jumbo] Claim failed: {e}")
+
+        # 📸 error screenshot
+        screenshot = "jumbo_claim_error.png"
+        driver.save_screenshot(screenshot)
+
+        await channel.send("Jumbo Daily Bonus Unavailable.",file=discord.File(screenshot))
+
+        os.remove(screenshot)
