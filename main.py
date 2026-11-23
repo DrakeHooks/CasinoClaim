@@ -562,6 +562,9 @@ def _run_runner_in_worker_thread(
         raise
 
     finally:
+        # Some API modules suppress WebDriverException internally. Inspect the
+        # shared driver after every job and restore it before queueing another.
+        _recover_if_unhealthy_after_job(label)
         try:
             delattr(_worker_local, "bot_proxy")
         except Exception:
@@ -576,8 +579,19 @@ async def _run_entry_without_blocking_discord(entry: Any, channel: discord.abc.M
     FortuneCoins already uses its own blocking executor path that needs the real
     Discord loop, so leave it on the main loop wrapper.
     """
-    if not RUN_CASINOS_IN_WORKER_THREAD or entry.key == "fortunecoins":
+    if entry.key == "fortunecoins":
+        # FortuneCoins has its own SeleniumBase browser; do not interfere.
         return await entry.runner(channel)
+
+    if not RUN_CASINOS_IN_WORKER_THREAD:
+        _ensure_chrome_session(f"before {entry.display_name}")
+        try:
+            return await entry.runner(channel)
+        except Exception as exc:
+            _recover_chrome_after_error(entry.display_name, exc)
+            raise
+        finally:
+            _recover_if_unhealthy_after_job(entry.display_name)
 
     main_loop = asyncio.get_running_loop()
     return await main_loop.run_in_executor(
@@ -592,8 +606,15 @@ async def _run_entry_without_blocking_discord(entry: Any, channel: discord.abc.M
 
 async def _run_callable_without_blocking_discord(label: str, func, channel: discord.abc.Messageable):
     if not RUN_CASINOS_IN_WORKER_THREAD:
-        result = func(channel)
-        return await _maybe_await(result)
+        _ensure_chrome_session(f"before {label}")
+        try:
+            result = func(channel)
+            return await _maybe_await(result)
+        except Exception as exc:
+            _recover_chrome_after_error(label, exc)
+            raise
+        finally:
+            _recover_if_unhealthy_after_job(label)
 
     main_loop = asyncio.get_running_loop()
     return await main_loop.run_in_executor(
@@ -628,6 +649,9 @@ def _run_manual_action_in_worker_thread(label: str, ctx: commands.Context, main_
         raise
 
     finally:
+        # Some API modules suppress WebDriverException internally. Inspect the
+        # shared driver after every job and restore it before queueing another.
+        _recover_if_unhealthy_after_job(label)
         try:
             delattr(_worker_local, "bot_proxy")
         except Exception:
@@ -661,13 +685,17 @@ async def _run_manual_casino_command(ctx: commands.Context, label: str, action, 
 
     if not RUN_CASINOS_IN_WORKER_THREAD:
         try:
+            _ensure_chrome_session(f"before manual {label}")
             result = action(ctx, bot.get_channel(DISCORD_CHANNEL) or ctx.channel)
             return await _maybe_await(result)
         except Exception as e:
+            _recover_chrome_after_error(f"manual {label}", e)
             print(f"[Manual] Error in {label}: {type(e).__name__}: {e}")
             traceback.print_exc()
             await ctx.send(f"⚠️ `{label}` error: `{type(e).__name__}: {e}`")
             return None
+        finally:
+            _recover_if_unhealthy_after_job(f"manual {label}")
 
     main_loop = asyncio.get_running_loop()
 
@@ -1007,7 +1035,8 @@ def _apply_common_chrome_flags(opts: Options) -> None:
     opts.add_argument("--enable-unsafe-swiftshader")
     opts.add_argument("--disable-gpu-driver-bug-workarounds")
 
-    opts.add_argument(f"--remote-debugging-port={9222 + (os.getpid() % 1000)}")
+    # Let ChromeDriver choose a free DevTools port for every new session.
+    # A fixed port can remain occupied by a stale Chrome process after recovery.
 
     ua = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -1042,9 +1071,75 @@ if os.path.exists(crx_path):
 _apply_common_chrome_flags(options)
 
 
+# ───────────────────────────────────────────────────────────
+# Shared ChromeDriver health monitoring and recovery
+# ───────────────────────────────────────────────────────────
+# Chromium can raise "aborted by navigation: Not attached to an active page"
+# while WebDriver still has a valid session ID and valid window handles.
+# Some casino modules catch and report Selenium errors without re-raising.
+# Track errors at the WebDriver command boundary so they cannot be swallowed.
+_CHROME_RECOVERY_LOCK = threading.RLock()
+_CHROME_RECOVERY_COUNT = 0
+
+_CHROME_FATAL_MARKERS = (
+    "invalid session id",
+    "session deleted",
+    "not attached to an active page",
+    "aborted by navigation",
+    "chrome not reachable",
+    "not connected to devtools",
+    "disconnected: unable to receive message",
+    "disconnected: not connected to devtools",
+    "target window already closed",
+    "connection refused",
+)
+
+
+def _is_chrome_lifecycle_error(exc: BaseException) -> bool:
+    """Only recognize Chrome/session failures, not normal element timeouts."""
+    if isinstance(exc, (InvalidSessionIdException, NoSuchWindowException)):
+        return True
+    if not isinstance(exc, (WebDriverException, OSError)):
+        return False
+    message = str(exc).lower()
+    return any(marker in message for marker in _CHROME_FATAL_MARKERS)
+
+
+def _monitor_chrome_commands(chrome_driver):
+    """Remember fatal Chrome errors even when a scraper catches the exception.
+
+    The marker belongs to the driver instance, not a global boolean. Recovery
+    occurs only between casino jobs, never in the middle of a claim.
+    """
+    original_execute = chrome_driver.execute
+
+    def monitored_execute(command, params=None):
+        try:
+            return original_execute(command, params)
+        except (WebDriverException, OSError) as exc:
+            if _is_chrome_lifecycle_error(exc):
+                if not getattr(chrome_driver, "_casinoclaim_needs_restart", False):
+                    logging.warning(
+                        "[Chrome] Browser marked unhealthy during %s: %s: %s",
+                        command, type(exc).__name__, str(exc).splitlines()[0][:240],
+                    )
+                chrome_driver._casinoclaim_needs_restart = True
+            raise
+
+    chrome_driver.execute = monitored_execute
+    chrome_driver._casinoclaim_needs_restart = False
+    return chrome_driver
+
+
 def _build_driver_with_retry(opts: Options):
+    def create():
+        raw = webdriver.Chrome(
+            service=Service(ChromeDriverManager().install()), options=opts
+        )
+        return _monitor_chrome_commands(raw)
+
     try:
-        return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=opts)
+        return create()
     except SessionNotCreatedException as e:
         msg = str(e)
 
@@ -1056,7 +1151,7 @@ def _build_driver_with_retry(opts: Options):
                 print("[Chrome] Retrying after force-unlock of profile…")
                 _clean_chrome_locks(root, prof)
                 time.sleep(1.0)
-                return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=opts)
+                return create()
 
         raise
 
@@ -1064,38 +1159,48 @@ def _build_driver_with_retry(opts: Options):
 driver = _build_driver_with_retry(options)
 
 
-# ───────────────────────────────────────────────────────────
-# Chrome session recovery. A WebDriver object does not become usable again
-# once Chrome/ChromeDriver loses its session: it must be replaced.
-# We recover BEFORE the next casino run; we never replay a failed claim.
-# ───────────────────────────────────────────────────────────
-_CHROME_RECOVERY_LOCK = threading.RLock()
-_CHROME_RECOVERY_COUNT = 0
-
-
 def _chrome_session_alive() -> bool:
-    """Probe the ChromeDriver session, not the site's internet connection."""
-    try:
-        handles = driver.window_handles
-        if not handles:
-            return False
-        try:
-            current = driver.current_window_handle
-        except NoSuchWindowException:
-            current = None
-        if current not in handles:
-            driver.switch_to.window(handles[0])
-        return True
-    except (InvalidSessionIdException, NoSuchWindowException, WebDriverException, OSError) as exc:
-        logging.warning("[Chrome] Session health probe failed: %s: %s", type(exc).__name__, exc)
+    """Check that Chrome can execute a page command, not just list windows."""
+    if driver is None or getattr(driver, "_casinoclaim_needs_restart", False):
         return False
+
+    # A freshly navigated page can briefly detach. Two probes reduce needless
+    # restarts for a transient event while still detecting a stuck DevTools tab.
+    for attempt in range(2):
+        try:
+            handles = driver.window_handles
+            if not handles:
+                return False
+
+            try:
+                current = driver.current_window_handle
+            except NoSuchWindowException:
+                current = None
+            if current not in handles:
+                driver.switch_to.window(handles[0])
+
+            # Crucial addition: window_handles may work even when the page's
+            # DevTools session is broken. This command must also succeed.
+            driver.execute_script("return 1")
+            return not getattr(driver, "_casinoclaim_needs_restart", False)
+        except (InvalidSessionIdException, NoSuchWindowException, WebDriverException, OSError) as exc:
+            logging.warning(
+                "[Chrome] Page execution health probe %d failed: %s: %s",
+                attempt + 1, type(exc).__name__, str(exc).splitlines()[0][:240],
+            )
+            if getattr(driver, "_casinoclaim_needs_restart", False):
+                return False
+            if attempt == 0:
+                time.sleep(0.5)
+
+    return False
 
 
 def _ensure_chrome_session(reason: str) -> bool:
-    """Create a replacement driver only after the current session is unusable.
+    """Replace a detached/crashed ChromeDriver between casino jobs.
 
-    Returns True if a new session was created. Do not use from a second thread
-    while the casino worker is operating the browser.
+    Keep the persistent user profile. Never replay a casino claim just because
+    Chrome died after clicking; the claim may have already succeeded.
     """
     global driver, _CHROME_RECOVERY_COUNT
 
@@ -1105,15 +1210,21 @@ def _ensure_chrome_session(reason: str) -> bool:
 
         old = driver
         old_id = getattr(old, "session_id", None)
-        logging.warning("[Chrome] Recreating invalid session %s (%s)", old_id, reason)
-        try:
-            old.quit()
-        except Exception:
-            logging.debug("[Chrome] Old session could not quit cleanly", exc_info=True)
+        logging.warning(
+            "[Chrome] Restarting detached/unhealthy browser session %s (%s)",
+            old_id, reason,
+        )
+        if old is not None:
+            old._casinoclaim_needs_restart = True
+            try:
+                old.quit()
+            except Exception:
+                logging.debug("[Chrome] Old session could not quit cleanly", exc_info=True)
 
-        # Reuse the configured profile to preserve browser logins. Do not
-        # delete cookies/profile data and do not replay a failed claim.
-        driver = _build_driver_with_retry(options)
+        # Reuse the configured profile; never delete cookies or claim state.
+        # Assign only after successful startup so future calls can retry.
+        replacement = _build_driver_with_retry(options)
+        driver = replacement
         _CHROME_RECOVERY_COUNT += 1
         logging.warning(
             "[Chrome] Session recovered: %s -> %s (recovery #%d)",
@@ -1123,28 +1234,26 @@ def _ensure_chrome_session(reason: str) -> bool:
 
 
 def _recover_chrome_after_error(label: str, exc: Exception) -> None:
-    """Diagnose a failure and restore a dead driver for later jobs.
-
-    Leave the original exception for the caller. A claim can have succeeded
-    just before the browser died, so it must NOT be retried automatically.
-    """
-    message = str(exc).lower()
-    session_error = isinstance(exc, (InvalidSessionIdException, NoSuchWindowException)) or (
-        isinstance(exc, (WebDriverException, OSError)) and any(
-            marker in message for marker in (
-                "invalid session id", "session deleted", "chrome not reachable",
-                "not connected to devtools", "disconnected: unable to receive message",
-                "target window already closed", "connection refused",
-            )
-        )
-    )
-    if not session_error:
+    """Recover only known browser failures; do not re-run the failed claim."""
+    if not _is_chrome_lifecycle_error(exc):
         return
-    logging.warning("[Chrome] %s lost its browser session: %s", label, type(exc).__name__)
+    if driver is not None:
+        driver._casinoclaim_needs_restart = True
+    logging.warning(
+        "[Chrome] %s failed due to Chrome/DevTools: %s", label, type(exc).__name__
+    )
     try:
         _ensure_chrome_session(f"after {label}: {type(exc).__name__}")
     except Exception:
-        logging.exception("[Chrome] Automatic recovery failed; next job will retry")
+        logging.exception("[Chrome] Recovery failed; next job will retry")
+
+
+def _recover_if_unhealthy_after_job(label: str) -> None:
+    """Catch page-detachment errors swallowed inside casino API modules."""
+    try:
+        _ensure_chrome_session(f"post-job health check: {label}")
+    except Exception:
+        logging.exception("[Chrome] Post-job recovery failed; next job will retry")
 
 
 # ───────────────────────────────────────────────────────────
@@ -2964,6 +3073,8 @@ async def status_cmd(ctx):
         f"Selenium worker: {worker_text}\n"
         f"Misc executor jobs: `{active_misc_jobs}`\n"
         f"Worker-thread mode: `{'enabled' if RUN_CASINOS_IN_WORKER_THREAD else 'disabled'}`\n"
+        f"Chrome recoveries: `{_CHROME_RECOVERY_COUNT}`\n"
+        f"Chrome restart pending: `{'yes' if getattr(driver, '_casinoclaim_needs_restart', False) else 'no'}`\n"
         f"Heartbeat timeout: `{DISCORD_HEARTBEAT_TIMEOUT:g}s`\n"
         f"Config: `{CONFIG_PATH}`"
     )
