@@ -2,7 +2,7 @@
 # Casino Claim 3
 # SweepJungle API
 # Version 3.4
-# Updated 2026.07.14
+# Updated 2026.11.21
 
 import re
 import os
@@ -31,9 +31,12 @@ EMAIL_INPUT_XPATH = "//input[@name='email']"
 PASSWORD_INPUT_XPATH = "//input[@name='password']"
 LOGIN_SUBMIT_XPATH = "//button[contains(@class, 'bg-yellow-300 text-neutral-0 border border-neutral-1000')]//span[text()='Log in']"
 
-TOTEM_CLOSE_XPATH = "/html/body/div[6]/dialog/button[2]"
-PRIZE_CLOSE_XPATH = "/html/body/div[5]/dialog/button[1]"
-REWARD_BUTTON_XPATH = "//img[@alt='daily-refill-widget']"
+BEST_DEAL_XPATH = "//button[@class='flex size-9 cursor-pointer items-center justify-center rounded-full bg-transparent ease-spring transition-transform duration-100 hover:scale-110 hover:bg-transparent absolute top-6 right-3 z-30']"
+WILD_SHOP_XPATH = "//button[@class='flex cursor-pointer items-center justify-center bg-transparent ease-spring duration-100 hover:scale-110 hover:bg-transparent absolute right-0 size-6 rounded-full transition-transform']"
+BONUS_MODAL_XPATH = "//button[@class='flex size-9 cursor-pointer items-center justify-center rounded-full bg-transparent ease-spring transition-transform duration-100 hover:scale-110 hover:bg-transparent absolute top-2 right-1']"
+GRAND_PRIZE_XPATH = "//button[@class='flex size-9 cursor-pointer items-center justify-center rounded-full bg-transparent ease-spring transition-transform duration-100 hover:scale-110 hover:bg-transparent absolute -top-1 right-1']"
+POWER_TOTEM_XPATH = "//button[@class='flex size-9 cursor-pointer items-center justify-center rounded-full bg-transparent ease-spring transition-transform duration-100 hover:scale-110 hover:bg-transparent absolute top-[-40px] right-[-12px]']"
+REWARD_BUTTON_XPATH = "//button[@aria-label='daily refill']"
 CLAIM_BUTTON_XPATH = "//button[contains(@class, '!text-h5 cursor-pointer w-full py-3 flex items-center')]//span[text()='Claim']"
 
 
@@ -188,21 +191,45 @@ async def sweepjungle_casino(ctx, driver, channel):
 
 async def claim_sweepjungle_bonus(ctx, driver, channel):
 
-    print("[SweepJungle] Attemping to close totem modal...")
+    print("[SweepJungle] Attemping to close best deal modal...")
     try:
-        totem = _wait_clickable(driver, By.XPATH, TOTEM_CLOSE_XPATH, timeout=10)
-        _safe_click(driver, totem, "totem close button")
+        bestdeal = _wait_clickable(driver, By.XPATH, BEST_DEAL_XPATH, timeout=10)
+        _safe_click(driver, bestdeal, "best deal close button")
         await asyncio.sleep(10)
     except Exception as e:
-        print(f"[SweepJungle] Totem failed: {e}")
+        print(f"[SweepJungle] Best deal failed: {e}")
 
-    print("[SweepJungle] Attemping to close prize modal...")
+    print("[SweepJungle] Attemping to close wild shop modal...")
     try:
-        prize = _wait_clickable(driver, By.XPATH, TOTEM_CLOSE_XPATH, timeout=10)
-        _safe_click(driver, prize, "prize close button")
+        wildshop = _wait_clickable(driver, By.XPATH, WILD_SHOP_XPATH, timeout=10)
+        _safe_click(driver, wildshop, "wild shop close button")
         await asyncio.sleep(10)
     except Exception as e:
-        print(f"[SweepJungle] Prize failed: {e}")
+        print(f"[SweepJungle] Wild shop failed: {e}")
+
+    print("[SweepJungle] Attemping to close bonus modal...")
+    try:
+        bonus = _wait_clickable(driver, By.XPATH, BONUS_MODAL_XPATH, timeout=10)
+        _safe_click(driver, bonus, "bonus close button")
+        await asyncio.sleep(10)
+    except Exception as e:
+        print(f"[SweepJungle] Bonus failed: {e}")
+
+    print("[SweepJungle] Attemping to close grand prize modal...")
+    try:
+        grandprize = _wait_clickable(driver, By.XPATH, GRAND_PRIZE_XPATH, timeout=10)
+        _safe_click(driver, grandprize, "grand prize close button")
+        await asyncio.sleep(10)
+    except Exception as e:
+        print(f"[SweepJungle] Grand prize failed: {e}")
+
+    print("[SweepJungle] Attemping to close power totem modal...")
+    try:
+        powertotem = _wait_clickable(driver, By.XPATH, POWER_TOTEM_XPATH, timeout=10)
+        _safe_click(driver, powertotem, "power totem close button")
+        await asyncio.sleep(10)
+    except Exception as e:
+        print(f"[SweepJungle] Power totem failed: {e}")
 
     print("[SweepJungle] Attempting to click on reward button...")
     try:
