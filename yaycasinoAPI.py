@@ -8,6 +8,10 @@ import tempfile
 import discord
 from dotenv import load_dotenv
 from seleniumbase import SB
+from claim_state import (
+    accept_cookie_banner, close_google_prompt, daily_card_snapshot,
+    login_form_visible, reward_success_signatures, wait_for_daily_confirmation,
+)
 
 load_dotenv()
 
@@ -101,31 +105,33 @@ def _try_click_any(sb: SB, xpaths, timeout_each=10) -> bool:
     return False
 
 def _close_popups_flexible(sb: SB):
-    """
-    Close common/lobby popups. Supports 0/1/2 layered popups gracefully.
-    Mirrors the flexible approach used in zulaAPI.
-    """
-    popup_xpaths = [
-        COMMON_POPUP_CLOSE_XPATH,
-        "/html/body/div[4]/div/div[1]/div/div/button",
-        "/html/body/div[5]/div/div[1]/div/div/button",
-        "//button[contains(.,'Close') or contains(.,'Dismiss') or contains(.,'Got it')]",
-        "//div[contains(@class,'modal')]//button[@aria-label='Close']",
-        "//div[contains(@class,'modal')]//button[contains(@class,'close')]",
-    ]
-    closed = 0
-    for _ in range(3):  # attempt up to 3 layers just in case
-        if _try_click_any(sb, popup_xpaths, timeout_each=6):
-            closed += 1
-            sb.wait(0.5)
-        else:
+    """Dismiss consent and unrelated Google offers, not reward receipts."""
+    for _ in range(3):
+        accepted = accept_cookie_banner(sb, passes=1)
+        closed = close_google_prompt(sb)
+        if not accepted and not closed:
             break
-    if closed:
-        print(f"[YayCasino] Closed {closed} popup(s) pre-claim.")
-    try:
-        sb.press_keys("body", "ESCAPE")
-    except Exception:
-        pass
+
+
+# ───────────────────────────────────────────────────────────
+# Daily Bonus candidacy and verification
+# ───────────────────────────────────────────────────────────
+
+def _daily_unavailable(sb: SB) -> bool:
+    card = daily_card_snapshot(sb).get("card")
+    return bool(card and card["unavailable"] and not card["enabled"])
+
+
+def _find_daily_card(sb: SB):
+    for _ in range(8):
+        observation = daily_card_snapshot(sb)
+        card = observation.get("card")
+        if card is not None:
+            return card
+        _close_popups_flexible(sb)
+        sb.wait(0.5)
+    return None
+
 
 # ───────────────────────────────────────────────────────────
 # Main UC-based flow (Zula-style)
@@ -134,8 +140,8 @@ async def yaycasino_uc(ctx, channel: discord.abc.Messageable):
     """
     YayCasino via SeleniumBase (uc=True).
     - Zula-style behavior:
-      • Sends exactly one screenshot only on successful claim.
-      • On unavailable/auth fail, sends one concise status line with a one-off screenshot.
+      • Sends one concise final status with a screenshot.
+      • Separates verified claims, unavailable rewards, and unverified results.
     """
     await channel.send("Launching **YayCasino** (UC)…")
 
@@ -151,6 +157,7 @@ async def yaycasino_uc(ctx, channel: discord.abc.Messageable):
             sb.uc_open_with_reconnect(LOGIN_URL, 4)
             sb.wait_for_ready_state_complete()
             print("[YayCasino] Login page loaded.")
+            accept_cookie_banner(sb)
 
             try:
                 sb.type(f"input[id='{EMAIL_ID}']", username)
@@ -164,7 +171,7 @@ async def yaycasino_uc(ctx, channel: discord.abc.Messageable):
                     pass
             except Exception as e:
                 print(f"[YayCasino][ERROR] Login fields not found: {e}")
-                await _send_status_shot(sb, channel, "YayCasino: countdown not available (or auth failed).", "yaycasino_unavailable")
+                await _send_status_shot(sb, channel, "Yay Casino Login Failed.", "yaycasino_unavailable")
                 return
 
             # Submit login (Enter on password; fallback to explicit button)
@@ -179,7 +186,7 @@ async def yaycasino_uc(ctx, channel: discord.abc.Messageable):
 
             if not submitted:
                 print("[YayCasino][ERROR] Could not submit login.")
-                await _send_status_shot(sb, channel, "[YayCasino] Bonus Unavailable (or auth failed).", "yaycasino_unavailable")
+                await _send_status_shot(sb, channel, "Yay Casino Login Failed.", "yaycasino_unavailable")
                 return
 
 
@@ -200,7 +207,11 @@ async def yaycasino_uc(ctx, channel: discord.abc.Messageable):
             #     pass
 
             # 3) Close popups
+            sb.wait(3)
             _close_popups_flexible(sb)
+            if login_form_visible(sb):
+                await _send_status_shot(sb, channel, "Yay Casino Login Failed.", "yaycasino_login_failed")
+                return
 
             # 4) Open Rewards / Get Coins
             opened_rewards = _try_click_any(
@@ -213,36 +224,49 @@ async def yaycasino_uc(ctx, channel: discord.abc.Messageable):
             )
             if not opened_rewards:
                 print("[YayCasino] Rewards/Coins button not found.")
-                await _send_status_shot(sb, channel, "Rewards/Coins button not found.", "yaycasino_unavailable")
+                await _send_status_shot(sb, channel, "Yay Casino Daily Bonus Unverified.", "yaycasino_unavailable")
                 return
 
             sb.wait(10)  # allow the rewards modal to render fully
             print("[YayCasino] Rewards modal should be open (proceeding).")
 
-            # 5) Click Collect / Claim inside Rewards modal
-            collected = _try_click_any(
-                sb,
-                [
-                    COLLECT_BTN_XPATH,
-                    "//button[contains(.,'Collect') and not(@disabled)]",
-                    "//button[.//span[contains(.,'Collect')] and not(@disabled)]",
-                    "//button[contains(.,'Claim') and not(@disabled)]",
-                ],
-                timeout_each=12,
-            )
+            # 5) Click Collect / Claim only inside an identified Daily Bonus card
+            _close_popups_flexible(sb)
+            card = _find_daily_card(sb)
+            if card is None:
+                print("[YayCasino] No unique Daily Bonus card identified.")
+                await _send_status_shot(sb, channel, "Yay Casino Daily Bonus Unverified.", "yaycasino_no_card")
+                return
+            if card["unavailable"] and not card["enabled"]:
+                await _send_status_shot(sb, channel, "Yay Casino Daily Bonus Unavailable.", "yaycasino_unavailable")
+                return
+            if card["button"] is None or card["unavailable"]:
+                print("[YayCasino] No uniquely enabled Daily Bonus action.")
+                await _send_status_shot(sb, channel, "Yay Casino Daily Bonus Unverified.", "yaycasino_no_candidate")
+                return
 
-            if collected:
-                sb.wait(3)
+            before = reward_success_signatures(sb)
+            try:
+                # A real Selenium click respects an obstructing overlay.
+                card["button"].click()
+            except Exception as error:
+                print(f"[YayCasino] Daily Bonus click failed: {type(error).__name__}")
+                await _send_status_shot(sb, channel, "Yay Casino Daily Bonus Unverified.", "yaycasino_click_failed")
+                return
+
+            # 6) Require actual confirmation, not merely a successful click.
+            verified = wait_for_daily_confirmation(sb, before, _daily_unavailable)
+            if verified:
                 await _send_post_claim(sb, channel, "yaycasino_claimed.png", "Yay Casino Daily Bonus Claimed!")
-                print("[YayCasino] Claimed successfully.")
+                print("[YayCasino] Daily Bonus confirmed.")
             else:
-                print("[YayCasino] No claim available (likely already claimed).")
-                await _send_status_shot(sb, channel, "[YayCasino] Bonus Unavailable (or auth failed).", "yaycasino_unavailable")
+                print("[YayCasino] Daily Bonus click had no verified confirmation.")
+                await _send_status_shot(sb, channel, "Yay Casino Daily Bonus Unverified.", "yaycasino_unverified")
 
     except Exception as e:
         print(f"[YayCasino][ERROR] Exception during automation: {e}")
         try:
             with SB(uc=True, headed=True) as sb_fallback:
-                await _send_status_shot(sb_fallback, channel, "[YayCasino] Bonus Unavailable (or auth failed).", "yaycasino_error")
+                await _send_status_shot(sb_fallback, channel, "Yay Casino Daily Bonus Unverified.", "yaycasino_error")
         except Exception:
-            await channel.send("[YayCasino] Bonus Unavailable (or auth failed).")
+            await channel.send("Yay Casino Daily Bonus Unverified.")

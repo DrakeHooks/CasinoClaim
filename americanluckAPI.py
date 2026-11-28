@@ -4,8 +4,8 @@
 #
 # Discord output policy:
 # - Send the single Launching message.
-# - Send the final screenshot with no caption or debug text.
-# - Print all status, failure, and debug details to the console only.
+# - Send one final standardized status with its screenshot.
+# - Print detailed diagnostics to the console only.
 #
 # Behavior:
 # 1. Logs in.
@@ -29,6 +29,7 @@ from typing import List, Optional
 import discord
 from dotenv import load_dotenv
 from seleniumbase import SB
+from claim_state import accept_cookie_banner, reward_success_signatures, wait_for_daily_confirmation
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.common.exceptions import (
@@ -125,20 +126,23 @@ async def _send_shot(
     path: str,
     caption: str,
 ) -> None:
-    """
-    Print the final status locally, send ONLY the screenshot to Discord,
-    then remove the temporary screenshot.
-
-    The only text message this module sends to Discord is the initial
-    "Launching American Luck (UC)..." message.
-    """
+    """Print diagnostics locally and send one concise status with the screenshot."""
     print(caption)
+    if caption == "American Luck Daily Bonus Claimed!":
+        status = caption
+    elif path == "americanluck_already_claimed.png":
+        status = "American Luck Daily Bonus Unavailable."
+    elif path == "americanluck_login_failed.png":
+        status = "American Luck Login Failed."
+    else:
+        status = "American Luck Daily Bonus Unverified."
 
     try:
         sb.save_screenshot(path)
-        await channel.send(file=discord.File(path))
+        await channel.send(status, file=discord.File(path))
     except Exception as error:
         print(f"[American Luck][SCREENSHOT ERROR] {error}")
+        await channel.send(status)
     finally:
         try:
             if os.path.exists(path):
@@ -591,6 +595,8 @@ def _close_popup(
 # ─────────────────────────────────────────────────────────────
 
 def _handle_cookie_popup(sb: SB) -> bool:
+    if accept_cookie_banner(sb, passes=1):
+        return True
     popup = _find_matching_popup(sb, COOKIE_MARKERS)
 
     if popup is None:
@@ -1109,8 +1115,14 @@ def _debug_state(sb: SB) -> str:
 
 
 def _appears_already_claimed(sb: SB) -> bool:
-    text = _norm(_page_text(sb))
-    return any(marker in text for marker in CLAIMED_MARKERS)
+    card = _daily_bonus_card(sb)
+    if card is None:
+        return False
+    text = _norm(_safe_text(sb, card))
+    return any(marker in text for marker in CLAIMED_MARKERS + (
+        "come back tomorrow", "see you tomorrow", "daily bonus unavailable",
+        "next daily bonus", "available in",
+    )) and _collect_button_inside_card(sb, card) is None
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1143,6 +1155,7 @@ async def americanluck_uc(
             sb.uc_open_with_reconnect(LOGIN_URL, 8)
             sb.wait_for_ready_state_complete()
             sb.wait(1)
+            accept_cookie_banner(sb)
 
             sb.type("input[id='emailAddress']", username)
             sb.type("input[id='password']", password)
@@ -1153,6 +1166,7 @@ async def americanluck_uc(
                 pass
 
             sb.wait(1.5)
+            accept_cookie_banner(sb, passes=2)
 
             login_clicked = _click_xpath(
                 sb,
@@ -1227,25 +1241,30 @@ async def americanluck_uc(
 
             # ── Step 4: claim only Daily Bonus ──
 
-            collected = _click_daily_bonus_collect(sb)
-
-            if not collected:
-                sb.wait(2)
+            before_signatures = reward_success_signatures(sb)
+            before_unavailable = _appears_already_claimed(sb)
+            collected = False
+            if not before_unavailable:
                 collected = _click_daily_bonus_collect(sb)
-
-            if not collected:
-                _scroll_store_to_rewards(sb)
-                sb.wait(1)
-                collected = _click_daily_bonus_collect(sb)
+                if not collected:
+                    sb.wait(2)
+                    collected = _click_daily_bonus_collect(sb)
+                if not collected:
+                    _scroll_store_to_rewards(sb)
+                    sb.wait(1)
+                    collected = _click_daily_bonus_collect(sb)
 
             if collected:
-                sb.wait(3)
-
+                verified = wait_for_daily_confirmation(
+                    sb, before_signatures,
+                    lambda: not before_unavailable and _appears_already_claimed(sb),
+                )
                 await _send_shot(
                     sb,
                     channel,
-                    "americanluck_claimed.png",
-                    "American Luck Daily Bonus Claimed!",
+                    "americanluck_claimed.png" if verified else "americanluck_unverified.png",
+                    "American Luck Daily Bonus Claimed!" if verified else
+                    "[American Luck] Collect clicked, but no new confirmation observed.",
                 )
                 return
 

@@ -19,6 +19,7 @@ from pathlib import Path
 import discord
 from dotenv import load_dotenv
 from seleniumbase import SB
+from claim_state import accept_cookie_banner, login_form_visible
 
 
 load_dotenv()
@@ -320,6 +321,7 @@ def login_fortunewins(sb) -> bool:
     sb.uc_open_with_reconnect(LOGIN_URL, 4)
     wait_ready(sb)
     sleep(2)
+    accept_cookie_banner(sb)
 
     email_ok = set_react_input(sb, "#emailAddress", FW_EMAIL)
     pass_ok = set_react_input(sb, "#password", FW_PASSWORD)
@@ -331,6 +333,9 @@ def login_fortunewins(sb) -> bool:
     with contextlib.suppress(Exception):
         sb.uc_gui_click_captcha()
         sleep(2)
+
+    # Consent can appear again while the login form settles.
+    accept_cookie_banner(sb, passes=2)
 
     # Try clean selectors first.
     if click_css(sb, "form button[type='submit']", timeout=5):
@@ -554,7 +559,7 @@ def run_claim_flow(sb) -> str:
       store_failed
       free_tab_failed
     """
-    if not login_fortunewins(sb):
+    if not login_fortunewins(sb) or login_form_visible(sb):
         return "login_failed"
 
     # Refresh after login helps if it lands on auth callback weirdness.
@@ -563,6 +568,9 @@ def run_claim_flow(sb) -> str:
         wait_ready(sb)
         sleep(3)
 
+    accept_cookie_banner(sb, passes=2)
+    if login_form_visible(sb):
+        return "login_failed"
     close_popups(sb)
 
     if not open_coin_store(sb):

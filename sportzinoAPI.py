@@ -11,6 +11,7 @@ from typing import Any, Dict, Iterable, Optional, Sequence, Tuple
 import discord
 from dotenv import load_dotenv
 from seleniumbase import SB
+from claim_state import reward_success_signatures
 
 load_dotenv()
 
@@ -304,12 +305,13 @@ async def _send_screenshot(
     discord_message: Optional[str] = None,
 ):
     """
-    Print all status/debug information to the worker console.
-
-    When discord_message is provided, send that exact final status to Discord,
-    followed by the screenshot. Other internal details remain console-only.
+    Print detailed diagnostics locally; send one concise status and screenshot.
     """
     print(caption)
+    status = discord_message or (
+        "Sportzino Login Failed." if "login" in prefix or "session_lost" in prefix
+        else "Sportzino Daily Bonus Unverified."
+    )
 
     fd, path = tempfile.mkstemp(
         prefix=f"{prefix}_",
@@ -321,12 +323,10 @@ async def _send_screenshot(
     try:
         sb.save_screenshot(path)
 
-        if discord_message:
-            await channel.send(discord_message)
-
-        await channel.send(file=discord.File(path))
+        await channel.send(status, file=discord.File(path))
     except Exception as error:
         print(f"[Sportzino][SCREENSHOT ERROR] {error}")
+        await channel.send(status)
     finally:
         try:
             if os.path.exists(path):
@@ -1499,6 +1499,13 @@ def _wait_for_claim_result(
     for _ in range(loops):
         state = _current_state(sb)
         obs = _daily_claim_observation(sb)
+        if state['status'] not in ('login', 'checkout', 'inbox') and (
+            reward_success_signatures(sb) - before.get('successSignatures', set())
+        ):
+            return {'status':'success', 'reason':'New visible reward receipt',
+                    'evidence':'Scoped post-click confirmation'}
+        if state['status'] == 'success' and state.get('evidence') == before.get('preSuccessEvidence'):
+            state = {'status':'rewards', 'reason':'Pre-existing notification ignored', 'evidence':''}
         if state['status'] in ('claimed', 'success', 'login', 'checkout', 'inbox'):
             return state
         after_enabled = int(obs.get('enabledCollectCount', 0))
@@ -1506,7 +1513,8 @@ def _wait_for_claim_result(
         # Require both before/after daily card presence. An inbox/closed Coin
         # Store also makes Collect disappear, but does NOT prove a claim.
         if (before_enabled > 0 and before_roots > 0 and after_roots > 0 and
-                after_enabled == 0 and state['status'] == 'rewards'):
+                after_enabled == 0 and state['status'] == 'rewards' and
+                 int(obs.get('disabledCollectCount', 0)) > 0):
             stable_disabled += 1
         else:
             stable_disabled = 0
@@ -1518,9 +1526,9 @@ def _wait_for_claim_result(
                     'reason':'Daily Bonus card remained visible with Collect disabled',
                     'evidence':f'before_enabled={before_enabled} after_enabled={after_enabled}'}
         if state['status'] == 'unavailable':
-            # Could mean a successful claim was just processed or today's
-            # reward was unavailable. Do not repeat the request.
-            return state
+            # Give a delayed receipt time to render; no second click.
+            sb.wait(step)
+            continue
         sb.wait(step)
     return {'status':'unverified',
             'reason':'Claim clicked, but no reliable confirmation was observed',
@@ -1535,7 +1543,8 @@ async def Sportzino(ctx, driver, channel: discord.abc.Messageable):
     - On success, send: Sportzino Daily Bonus Claimed!
     - When unavailable, send: Sportzino Daily Bonus Unavailable.
     - Send the final screenshot after the status message.
-    - All other claim details, scoring, and errors are printed locally.
+    - Unverified results and login failures get a concise status.
+    - Detailed scoring and errors are printed locally.
 
     Claim safety:
     - Scores every visible Collect/Claim control.
@@ -1649,6 +1658,8 @@ async def Sportzino(ctx, driver, channel: discord.abc.Messageable):
 
             pre_state = _current_state(sb)
             before = _daily_claim_observation(sb)
+            before['successSignatures'] = reward_success_signatures(sb)
+            before['preSuccessEvidence'] = pre_state.get('evidence') if pre_state['status'] == 'success' else None
 
             print(f"[Sportzino] Pre-claim state: {pre_state}")
             print(
